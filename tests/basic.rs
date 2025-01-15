@@ -1,8 +1,9 @@
 use cpu_sparse::{CsRenderCtx, Pixmap};
 use peniko::color::palette;
-use peniko::kurbo::{BezPath, Rect, Shape};
+use peniko::kurbo::{BezPath, Circle, Rect, Shape, Stroke};
 use std::io::BufWriter;
 use std::path::PathBuf;
+use oxipng::{InFile, OutFile};
 
 const RECT_TOLERANCE: f32 = 0.1;
 
@@ -17,12 +18,15 @@ fn save_pixmap(ctx: CsRenderCtx, name: Option<&str>) {
             .join(name)
             .with_extension("png");
 
-        let file = std::fs::File::create(&path).unwrap();
-        let w = BufWriter::new(file);
-        let mut encoder = png::Encoder::new(w, ctx.width as u32, ctx.height as u32);
+        let mut out = vec![];
+        let mut encoder = png::Encoder::new(&mut out, ctx.width as u32, ctx.height as u32);
         encoder.set_color(png::ColorType::Rgba);
         let mut writer = encoder.write_header().unwrap();
         writer.write_image_data(pixmap.data()).unwrap();
+        writer.finish().unwrap();
+
+        let optimized = oxipng::optimize_from_memory(&out, &oxipng::Options::max_compression()).unwrap();
+        std::fs::write(&path, optimized).unwrap();
     }
 }
 
@@ -95,3 +99,82 @@ fn full_cover_1() {
 
     save_pixmap(ctx, Some("full_cover_1"))
 }
+
+#[test]
+fn filled_triangle() {
+    let mut ctx = get_ctx(100, 100, false);
+
+    let path = {
+        let mut path = BezPath::new();
+        path.move_to((5.0, 5.0));
+        path.line_to((95.0, 50.0));
+        path.line_to((5.0, 95.0));
+        path.close_path();
+
+        path
+    };
+
+    ctx.fill(
+        &path.into(),
+        palette::css::LIME.into(),
+    );
+
+    save_pixmap(ctx, Some("filled_triangle"));
+}
+
+#[test]
+fn stroked_triangle() {
+    let mut ctx = get_ctx(100, 100, false);
+
+    let path = {
+        let mut path = BezPath::new();
+        path.move_to((5.0, 5.0));
+        path.line_to((95.0, 50.0));
+        path.line_to((5.0, 95.0));
+        path.close_path();
+
+        path
+    };
+
+    let stroke = Stroke::new(3.0);
+
+    ctx.stroke(
+        &path.into(),
+        &stroke,
+        palette::css::LIME.into(),
+    );
+
+    save_pixmap(ctx, Some("stroked_triangle"));
+}
+
+#[test]
+fn filled_circle() {
+    let mut ctx = get_ctx(100, 100, false);
+
+    let circle = Circle::new((50.0, 50.0), 45.0);
+
+    ctx.fill(
+        &circle.to_path(0.1).into(),
+        palette::css::LIME.into(),
+    );
+
+    save_pixmap(ctx, Some("filled_circle"));
+}
+
+#[test]
+fn stroked_circle() {
+    let mut ctx = get_ctx(100, 100, false);
+
+    let circle = Circle::new((50.0, 50.0), 45.0);
+
+    let stroke = Stroke::new(3.0);
+
+    ctx.stroke(
+        &circle.to_path(0.1).into(),
+        &stroke,
+        palette::css::LIME.into(),
+    );
+
+    save_pixmap(ctx, Some("stroked_circle"));
+}
+

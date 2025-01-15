@@ -20,9 +20,9 @@ fn main() {
 
     draw_grid(&mut document);
     draw_line_segments(&mut document, &ctx.line_buf);
-    // draw_tile_areas(&mut document, &ctx.tile_buf);
+    draw_tile_areas(&mut document, &ctx.tile_buf);
     // draw_tile_intersections(&mut document, &ctx.tile_buf);
-    draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
+    // draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
     // draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
 
     println!("{:?}", ctx.tile_buf.len());
@@ -35,10 +35,13 @@ fn main() {
 fn ctx() -> CsRenderCtx {
     let mut ctx = CsRenderCtx::new(WIDTH, HEIGHT);
     let mut path = BezPath::new();
-    path.move_to((-5.0, -5.0));
-    path.line_to((WIDTH as f32 + 10.0, -5.0));
-    path.line_to((WIDTH as f32 + 10.0, HEIGHT as f32 + 10.0));
-    path.line_to((-5.0, HEIGHT as f32 + 10.0));
+    let x_start = -4.0;
+    let y_start = -4.0;
+
+    path.move_to((x_start, y_start));
+    path.line_to((WIDTH as f32, y_start));
+    path.line_to((WIDTH as f32, HEIGHT as f32));
+    path.line_to((x_start, HEIGHT as f32));
     path.close_path();
     path.close_path();
     let piet_path = path.into();
@@ -105,6 +108,8 @@ fn draw_wide_tiles(document: &mut Document, wide_tiles: &[WideTile], alphas: &[u
 
 fn draw_tile_areas(document: &mut Document, tiles: &[Tile]) {
     let mut seen = HashSet::new();
+
+    println!("Tiles: {:#?}", tiles);
 
     for tile in tiles {
         // Draw the points
