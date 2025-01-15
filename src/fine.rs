@@ -51,6 +51,7 @@ impl<'a> Fine<'a> {
         // is not an integral multiple of the tile.
         assert!((x + 1) * WIDE_TILE_WIDTH <= self.width);
         assert!((y + 1) * STRIP_HEIGHT <= self.height);
+
         let base_ix = (y * STRIP_HEIGHT * self.width + x * WIDE_TILE_WIDTH) * 4;
         for j in 0..STRIP_HEIGHT {
             let line_ix = base_ix + j * self.width * 4;

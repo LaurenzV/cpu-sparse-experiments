@@ -10,8 +10,8 @@ use svg::node::element::path::Data;
 use svg::node::element::{Circle, Path, Rectangle};
 use svg::{Document, Node};
 
-const WIDTH: usize = 64;
-const HEIGHT: usize = 64;
+const WIDTH: usize = 67;
+const HEIGHT: usize = 67;
 
 fn main() {
     let mut document = Document::new().set("viewBox", (-10, -10, WIDTH + 20, HEIGHT + 20));
@@ -23,7 +23,7 @@ fn main() {
     draw_tile_areas(&mut document, &ctx.tile_buf);
     // draw_tile_intersections(&mut document, &ctx.tile_buf);
     draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
-    // draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
+    draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
 
     println!("{:?}", ctx.tile_buf.len());
 
@@ -37,7 +37,7 @@ fn ctx() -> CsRenderCtx {
     let mut path = BezPath::new();
     path.move_to((2.5, 2.5));
     path.line_to((45.0, 15.0));
-    path.line_to((7.5, 45.0));
+    path.line_to((7.5, 25.0));
     // path.move_to((2.5, 2.5));
     // path.line_to((4.5, 2.5));
     // path.line_to((4.5, 20.5));

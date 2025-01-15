@@ -21,8 +21,8 @@ use crate::{
 };
 
 pub struct CsRenderCtx {
-    width: usize,
-    height: usize,
+    pub width: usize,
+    pub height: usize,
     pub tiles: Vec<WideTile>,
     pub alphas: Vec<u32>,
 
