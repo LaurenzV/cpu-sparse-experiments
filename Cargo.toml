@@ -1,0 +1,19 @@
+[package]
+name = "cpu-sparse"
+version = "0.1.0"
+authors = ["Raph Levien <raph.levien@gmail.com>", "Laurenz Stampfl <laurenz.stampfl@gmail.com>"]
+description = "An experimental CPU 2D renderer based on sparse strips"
+license = "Apache-2.0 OR MIT"
+edition = "2021"
+keywords = ["graphics", "2d"]
+categories = ["graphics"]
+
+[dependencies]
+peniko = "0.3.0"
+flatten = { git = "https://github.com/linebender/gpu-stroke-expansion-paper", rev = "827ccf6" }
+svg = "0.18.0"
+rand = "0.8.5"
+
+[dev-dependencies]
+png = "0.17.14"
+roxmltree = "0.20.0"
