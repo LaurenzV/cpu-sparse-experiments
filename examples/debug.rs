@@ -10,8 +10,8 @@ use svg::node::element::path::Data;
 use svg::node::element::{Circle, Path, Rectangle};
 use svg::{Document, Node};
 
-const WIDTH: usize = 67;
-const HEIGHT: usize = 67;
+const WIDTH: usize = 16;
+const HEIGHT: usize = 16;
 
 fn main() {
     let mut document = Document::new().set("viewBox", (-10, -10, WIDTH + 20, HEIGHT + 20));
@@ -20,10 +20,10 @@ fn main() {
 
     draw_grid(&mut document);
     draw_line_segments(&mut document, &ctx.line_buf);
-    draw_tile_areas(&mut document, &ctx.tile_buf);
+    // draw_tile_areas(&mut document, &ctx.tile_buf);
     // draw_tile_intersections(&mut document, &ctx.tile_buf);
     draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
-    draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
+    // draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
 
     println!("{:?}", ctx.tile_buf.len());
 
@@ -35,13 +35,11 @@ fn main() {
 fn ctx() -> CsRenderCtx {
     let mut ctx = CsRenderCtx::new(WIDTH, HEIGHT);
     let mut path = BezPath::new();
-    path.move_to((2.5, 2.5));
-    path.line_to((45.0, 15.0));
-    path.line_to((7.5, 25.0));
-    // path.move_to((2.5, 2.5));
-    // path.line_to((4.5, 2.5));
-    // path.line_to((4.5, 20.5));
-    // path.line_to((2.5, 20.5));
+    path.move_to((-5.0, -5.0));
+    path.line_to((WIDTH as f32 + 10.0, -5.0));
+    path.line_to((WIDTH as f32 + 10.0, HEIGHT as f32 + 10.0));
+    path.line_to((-5.0, HEIGHT as f32 + 10.0));
+    path.close_path();
     path.close_path();
     let piet_path = path.into();
     ctx.fill(&piet_path, palette::css::DARK_BLUE.into());

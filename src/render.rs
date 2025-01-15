@@ -109,10 +109,18 @@ impl CsRenderCtx {
         // }
         // self.strip_buf.remove(0);
         // println!("{:#?}", &self.strip_buf);
+        println!("{:#?}", self.strip_buf);
+        // return;
         let color = brush_to_color(brush);
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
+
+            // Don't render strips that are outside the viewport vertically.
+            if strip.y() as usize >= self.height {
+                break;
+            }
+
             let next_strip = &self.strip_buf[i + 1];
             let x0 = strip.x();
             let y = strip.strip_y();
@@ -157,9 +165,9 @@ impl CsRenderCtx {
             if !tile.cmds.is_empty() || tile.bg.components[3] != 0.0 {
                 let x = i % width_tiles;
                 let y = i / width_tiles;
-                println!("tile {x}, {y} bg {}", tile.bg.to_rgba8());
+                eprintln!("tile {x}, {y} bg {}", tile.bg.to_rgba8());
                 for cmd in &tile.cmds {
-                    println!("{cmd:?}")
+                    eprintln!("{cmd:?}")
                 }
             }
         }

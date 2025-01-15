@@ -207,6 +207,10 @@ impl Strip {
         self.xy & 0xffff
     }
 
+    pub fn y(&self) -> u32 {
+        self.xy / (1 << 16)
+    }
+
     pub fn strip_y(&self) -> u32 {
         self.xy / ((1 << 16) * STRIP_HEIGHT as u32)
     }

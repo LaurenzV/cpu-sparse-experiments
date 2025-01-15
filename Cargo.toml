@@ -15,5 +15,6 @@ svg = "0.18.0"
 rand = "0.8.5"
 
 [dev-dependencies]
+oxipng = "9.1.3"
 png = "0.17.14"
 roxmltree = "0.20.0"
