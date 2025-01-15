@@ -47,19 +47,28 @@ impl<'a> Fine<'a> {
     }
 
     pub(crate) fn pack_scalar(&mut self, x: usize, y: usize) {
-        // Note that these can trigger if the method is called on a pixmap that
-        // is not an integral multiple of the tile.
-        assert!((x + 1) * WIDE_TILE_WIDTH <= self.width);
-        assert!((y + 1) * STRIP_HEIGHT <= self.height);
-
         let base_ix = (y * STRIP_HEIGHT * self.width + x * WIDE_TILE_WIDTH) * 4;
+
         for j in 0..STRIP_HEIGHT {
             let line_ix = base_ix + j * self.width * 4;
+
+            // Continue if the current row is outside the range of the pixmap.
+            if y * STRIP_HEIGHT + j >= self.height {
+                break;
+            }
+
             for i in 0..WIDE_TILE_WIDTH {
+                // Abort if the current column is outside the range of the pixmap.
+                if x * WIDE_TILE_WIDTH + i >= self.width {
+                    break;
+                }
+
+                let target_ix = line_ix + i * 4;
+
                 let mut rgba_f32 = [0.0; 4];
                 rgba_f32.copy_from_slice(&self.scratch[(i * STRIP_HEIGHT + j) * 4..][..4]);
                 let rgba_u8 = rgba_f32.map(|x| (x * 255.0).round() as u8);
-                self.out_buf[line_ix + i * 4..][..4].copy_from_slice(&rgba_u8);
+                self.out_buf[target_ix..][..4].copy_from_slice(&rgba_u8);
             }
         }
     }
