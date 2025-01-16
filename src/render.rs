@@ -31,6 +31,8 @@ pub struct CsRenderCtx {
     pub line_buf: Vec<FlatLine>,
     pub tile_buf: Vec<Tile>,
     pub strip_buf: Vec<Strip>,
+
+    transform: Affine,
 }
 
 pub struct CsResourceCtx;
@@ -54,6 +56,7 @@ impl CsRenderCtx {
             line_buf,
             tile_buf,
             strip_buf,
+            transform: Affine::IDENTITY
         }
     }
 
@@ -109,7 +112,6 @@ impl CsRenderCtx {
         // }
         // self.strip_buf.remove(0);
         // println!("{:#?}", &self.strip_buf);
-        println!("{:#?}", self.strip_buf);
         // return;
         let color = brush_to_color(brush);
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
@@ -165,10 +167,6 @@ impl CsRenderCtx {
             if !tile.cmds.is_empty() || tile.bg.components[3] != 0.0 {
                 let x = i % width_tiles;
                 let y = i / width_tiles;
-                eprintln!("tile {x}, {y} bg {}", tile.bg.to_rgba8());
-                for cmd in &tile.cmds {
-                    eprintln!("{cmd:?}")
-                }
             }
         }
     }
@@ -186,9 +184,12 @@ impl CsRenderCtx {
         self.render_path(brush);
     }
 
+    pub fn set_transform(&mut self, transform: Affine) {
+        self.transform = transform;
+    }
+
     fn get_affine(&self) -> Affine {
-        // TODO: get from graphics state
-        Affine::scale(1.0)
+        self.transform
     }
 }
 

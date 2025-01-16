@@ -27,8 +27,6 @@ fn main() {
 
     println!("{:?}", ctx.tile_buf.len());
 
-    ctx.debug_dump();
-
     svg::save("target/out.svg", &document).unwrap();
 }
 

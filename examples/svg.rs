@@ -24,20 +24,13 @@ pub fn main() {
     let parsed = PicoSvg::load(&svg, 1.0).expect("error parsing SVG");
     let mut pixmap = Pixmap::new(WIDTH, HEIGHT);
     // Hacky code for crude measurements; change this to arg parsing
-    for i in 0..200 {
-        ctx.reset();
-        let start = std::time::Instant::now();
-        render_svg(&mut ctx, &parsed.items);
-        let coarse_time = start.elapsed();
-        ctx.render_to_pixmap(&mut pixmap);
-        if i % 100 == 0 {
-            println!(
-                "time to coarse: {coarse_time:?}, time to fine: {:?}",
-                start.elapsed()
-            );
-        }
-    }
+    ctx.reset();
+    let start = std::time::Instant::now();
+    render_svg(&mut ctx, &parsed.items);
+    ctx.render_to_pixmap(&mut pixmap);
     pixmap.unpremultiply();
+    let end = start.elapsed();
+    println!("{:?}", end);
     let file = std::fs::File::create(out_filename).unwrap();
     let w = BufWriter::new(file);
     let mut encoder = png::Encoder::new(w, WIDTH as u32, HEIGHT as u32);
