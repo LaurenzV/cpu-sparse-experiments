@@ -15,7 +15,7 @@ use usvg::tiny_skia_path::PathSegment;
 use usvg::{Node, Paint};
 
 pub fn main() {
-    let scale = 10.0 / 9.0;
+    let scale = 2.0;
     let svg = std::fs::read_to_string("svgs/gs.svg").expect("error reading file");
     let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
     let width = (tree.size().width() * scale).ceil() as usize;
@@ -28,18 +28,15 @@ pub fn main() {
 
     // Hacky code for crude measurements; change this to arg parsing
     let start = std::time::Instant::now();
-    let num_iterations = 500;
-    for i in 0..num_iterations {
-        ctx.reset();
-        render_tree(&mut ctx, &mut sctx, &tree);
-        ctx.render_to_pixmap(&mut pixmap);
-    }
-    let end = start.elapsed().as_micros();
-    println!("{:?}ms", end / num_iterations);
+    ctx.reset();
+    render_tree(&mut ctx, &mut sctx, &tree);
+    ctx.render_to_pixmap(&mut pixmap);
+    let end = start.elapsed();
+    println!("{:?} micros", end.as_micros());
 
     pixmap.unpremultiply();
 
-    let file = std::fs::File::create("out.png").unwrap();
+    let file = std::fs::File::create("ours.png").unwrap();
     let w = BufWriter::new(file);
     let mut encoder = png::Encoder::new(w, width as u32, height as u32);
     encoder.set_color(png::ColorType::Rgba);

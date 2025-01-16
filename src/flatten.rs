@@ -41,11 +41,16 @@ pub fn fill(path: &BezPath, affine: Affine, line_buf: &mut Vec<FlatLine>) {
 
 pub fn stroke(path: &BezPath, style: &Stroke, affine: Affine, line_buf: &mut Vec<FlatLine>) {
     line_buf.clear();
-    let iter = path.iter().map(|el| affine * el);
-    let lines: LoweredPath<Line> = flatten::stroke::stroke_undashed(iter, style, TOL);
+
+    // TODO: Temporary hack to ensure that strokes are scaled properly by the transform.
+    let tolerance = TOL / affine.as_coeffs()[0].max(affine.as_coeffs()[3]);
+
+    let lines: LoweredPath<Line> = flatten::stroke::stroke_undashed(path.iter(), style, tolerance);
     for line in &lines.path {
-        let p0 = [line.p0.x as f32, line.p0.y as f32];
-        let p1 = [line.p1.x as f32, line.p1.y as f32];
+        let scaled_p0 = affine * line.p0;
+        let scaled_p1 = affine * line.p1;
+        let p0 = [scaled_p0.x as f32, scaled_p0.y as f32];
+        let p1 = [scaled_p1.x as f32, scaled_p1.y as f32];
         line_buf.push(FlatLine::new(p0, p1));
     }
 }

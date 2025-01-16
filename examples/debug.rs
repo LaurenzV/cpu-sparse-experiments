@@ -11,8 +11,8 @@ use svg::node::element::path::Data;
 use svg::node::element::{Circle, Path, Rectangle};
 use svg::{Document, Node};
 
-const WIDTH: usize = 64;
-const HEIGHT: usize = 64;
+const WIDTH: usize = 1000;
+const HEIGHT: usize = 1000;
 
 fn main() {
     let mut document = Document::new().set("viewBox", (-10, -10, WIDTH + 20, HEIGHT + 20));
@@ -27,7 +27,7 @@ fn main() {
 
     draw_grid(&mut document);
     draw_line_segments(&mut document, &ctx.line_buf);
-    draw_tile_areas(&mut document, &ctx.tile_buf);
+    // draw_tile_areas(&mut document, &ctx.tile_buf);
     // draw_tile_intersections(&mut document, &ctx.tile_buf);
     // draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
     // draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);

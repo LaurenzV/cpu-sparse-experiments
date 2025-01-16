@@ -3,7 +3,7 @@ use crate::CsRenderCtx;
 use peniko::color::AlphaColor;
 use peniko::kurbo::{Affine, BezPath, Stroke};
 use usvg::tiny_skia_path::PathSegment;
-use usvg::{Node, Paint};
+use usvg::{Node, Paint, PaintOrder};
 
 pub struct SVGContext {
     transforms: Vec<Affine>,
@@ -66,28 +66,40 @@ fn render_path(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, path: &usvg::Path) 
 
     ctx.set_transform(sctx.get_transform());
 
-    if let Some(fill) = path.fill() {
-        let color = match fill.paint() {
-            Paint::Color(c) => {
-                AlphaColor::from_rgba8(c.red, c.green, c.blue, fill.opacity().to_u8())
-            }
-            _ => return,
-        };
+    let fill = |ctx: &mut CsRenderCtx, path: &usvg::Path| {
+        if let Some(fill) = path.fill() {
+            let color = match fill.paint() {
+                Paint::Color(c) => {
+                    AlphaColor::from_rgba8(c.red, c.green, c.blue, fill.opacity().to_u8())
+                }
+                _ => return,
+            };
 
-        ctx.fill(&convert_path_data(path), color.into());
-    }
+            ctx.fill(&convert_path_data(path), color.into());
+        }
+    };
 
-    if let Some(stroke) = path.stroke() {
-        let color = match stroke.paint() {
-            Paint::Color(c) => {
-                AlphaColor::from_rgba8(c.red, c.green, c.blue, stroke.opacity().to_u8())
-            }
-            _ => return,
-        };
+    let stroke = |ctx: &mut CsRenderCtx, path: &usvg::Path| {
+        if let Some(stroke) = path.stroke() {
+            let color = match stroke.paint() {
+                Paint::Color(c) => {
+                    AlphaColor::from_rgba8(c.red, c.green, c.blue, stroke.opacity().to_u8())
+                }
+                _ => return,
+            };
 
-        let stroke = Stroke::new(stroke.width().get() as f64);
+            let stroke = Stroke::new(stroke.width().get() as f64);
 
-        ctx.stroke(&convert_path_data(path), &stroke, color.into());
+            ctx.stroke(&convert_path_data(path), &stroke, color.into());
+        }
+    };
+
+    if path.paint_order() == PaintOrder::FillAndStroke {
+        fill(ctx, path);
+        stroke(ctx, path);
+    } else {
+        stroke(ctx, path);
+        fill(ctx, path);
     }
 }
 
