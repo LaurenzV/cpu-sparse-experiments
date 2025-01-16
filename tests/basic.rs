@@ -1,9 +1,9 @@
 use cpu_sparse::{CsRenderCtx, Pixmap};
+use oxipng::{InFile, OutFile};
 use peniko::color::palette;
 use peniko::kurbo::{BezPath, Circle, Rect, Shape, Stroke};
 use std::io::BufWriter;
 use std::path::PathBuf;
-use oxipng::{InFile, OutFile};
 
 const RECT_TOLERANCE: f32 = 0.1;
 
@@ -25,7 +25,8 @@ fn save_pixmap(ctx: CsRenderCtx, name: Option<&str>) {
         writer.write_image_data(pixmap.data()).unwrap();
         writer.finish().unwrap();
 
-        let optimized = oxipng::optimize_from_memory(&out, &oxipng::Options::max_compression()).unwrap();
+        let optimized =
+            oxipng::optimize_from_memory(&out, &oxipng::Options::max_compression()).unwrap();
         std::fs::write(&path, optimized).unwrap();
     }
 }
@@ -114,10 +115,7 @@ fn filled_triangle() {
         path
     };
 
-    ctx.fill(
-        &path.into(),
-        palette::css::LIME.into(),
-    );
+    ctx.fill(&path.into(), palette::css::LIME.into());
 
     save_pixmap(ctx, Some("filled_triangle"));
 }
@@ -138,11 +136,7 @@ fn stroked_triangle() {
 
     let stroke = Stroke::new(3.0);
 
-    ctx.stroke(
-        &path.into(),
-        &stroke,
-        palette::css::LIME.into(),
-    );
+    ctx.stroke(&path.into(), &stroke, palette::css::LIME.into());
 
     save_pixmap(ctx, Some("stroked_triangle"));
 }
@@ -153,10 +147,7 @@ fn filled_circle() {
 
     let circle = Circle::new((50.0, 50.0), 45.0);
 
-    ctx.fill(
-        &circle.to_path(0.1).into(),
-        palette::css::LIME.into(),
-    );
+    ctx.fill(&circle.to_path(0.1).into(), palette::css::LIME.into());
 
     save_pixmap(ctx, Some("filled_circle"));
 }
@@ -177,4 +168,3 @@ fn stroked_circle() {
 
     save_pixmap(ctx, Some("stroked_circle"));
 }
-

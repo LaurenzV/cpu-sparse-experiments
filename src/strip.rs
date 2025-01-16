@@ -11,6 +11,7 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
+use crate::tiling::TILE_WIDTH;
 use crate::{tiling::Vec2, wide_tile::STRIP_HEIGHT};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -84,7 +85,7 @@ impl Tile {
         let x1 = (self.p1 & 0xffff) as f32 * (1.0 / 8192.0);
         // On CPU, might be better to do this as fixed point
         let xmin = x0.min(x1).floor() as u32;
-        let xmax = (xmin + 1).max(x0.max(x1).ceil() as u32);
+        let xmax = (xmin + 1).max(x0.max(x1).ceil() as u32).min(TILE_WIDTH);
         Footprint((1 << xmax) - (1 << xmin))
     }
 
@@ -117,6 +118,7 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
     // logic here to process the final strip.
     for i in 1..tiles.len() {
         let tile = &tiles[i];
+        tile.footprint();
         if prev_tile.loc() != tile.loc() {
             let start_delta = delta;
             let same_strip = prev_tile.loc().same_strip(&tile.loc());
@@ -185,12 +187,6 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
             cols += x1 - x0;
             fp = if same_strip { 1 } else { 0 };
 
-            // println!("{:?}", prev_tile.loc());
-            // println!("{:?}", strip_start);
-            // for row in &areas {
-            //     println!("{:?}", row);
-            // }
-
             strip_start = !same_strip;
             seg_start = i;
             if !prev_tile.loc().same_row(&tile.loc()) {
@@ -198,6 +194,7 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
             }
         }
         fp |= tile.footprint().0;
+
         prev_tile = tile;
     }
 }
@@ -213,5 +210,24 @@ impl Strip {
 
     pub fn strip_y(&self) -> u32 {
         self.xy / ((1 << 16) * STRIP_HEIGHT as u32)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::strip::Tile;
+    use crate::tiling::scale_up;
+
+    // TODO: Is this the correct behavior?
+    #[test]
+    fn footprint_at_edge() {
+        let tile = Tile {
+            x: 0,
+            y: 0,
+            p0: (scale_up(0.0) << 16) + scale_up(1.0),
+            p1: (scale_up(1.0) << 16) + scale_up(1.0),
+        };
+
+        assert_eq!(tile.footprint().0, 0);
     }
 }

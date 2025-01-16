@@ -1,22 +1,29 @@
 use cpu_sparse::strip::{Strip, Tile};
+use cpu_sparse::svg::{render_tree, SVGContext};
 use cpu_sparse::tiling::{FlatLine, Vec2, TILE_HEIGHT, TILE_WIDTH};
 use cpu_sparse::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
 use cpu_sparse::CsRenderCtx;
 use peniko::color::palette;
-use peniko::kurbo::{BezPath, Stroke};
+use peniko::kurbo::{Affine, BezPath, Stroke};
 use rand::Rng;
 use std::collections::HashSet;
 use svg::node::element::path::Data;
 use svg::node::element::{Circle, Path, Rectangle};
 use svg::{Document, Node};
 
-const WIDTH: usize = 16;
-const HEIGHT: usize = 16;
+const WIDTH: usize = 64;
+const HEIGHT: usize = 64;
 
 fn main() {
     let mut document = Document::new().set("viewBox", (-10, -10, WIDTH + 20, HEIGHT + 20));
 
     let ctx = ctx();
+
+    // let svg = std::fs::read_to_string("gs.svg").expect("error reading file");
+    // let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
+    // let mut ctx = CsRenderCtx::new(WIDTH, HEIGHT);
+    // let mut sctx = SVGContext::new();
+    // render_tree(&mut ctx, &mut sctx, &tree);
 
     draw_grid(&mut document);
     draw_line_segments(&mut document, &ctx.line_buf);
@@ -24,8 +31,6 @@ fn main() {
     // draw_tile_intersections(&mut document, &ctx.tile_buf);
     // draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
     // draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
-
-    println!("{:?}", ctx.tile_buf.len());
 
     svg::save("target/out.svg", &document).unwrap();
 }
@@ -36,14 +41,18 @@ fn ctx() -> CsRenderCtx {
     let x_start = -4.0;
     let y_start = -4.0;
 
-    path.move_to((x_start, y_start));
-    path.line_to((WIDTH as f32, y_start));
-    path.line_to((WIDTH as f32, HEIGHT as f32));
-    path.line_to((x_start, HEIGHT as f32));
-    path.close_path();
-    path.close_path();
-    let piet_path = path.into();
-    ctx.fill(&piet_path, palette::css::DARK_BLUE.into());
+    let path = {
+        let mut path = BezPath::new();
+        path.move_to((5.0, 5.0));
+        path.line_to((95.0, 50.0));
+        path.line_to((5.0, 95.0));
+        path.close_path();
+
+        path
+    };
+
+    ctx.set_transform(Affine::scale(0.25));
+    ctx.fill(&path.into(), palette::css::LIME.into());
     // let stroke = Stroke::new(3.0);
     // ctx.stroke(&piet_path, &stroke, palette::css::DARK_BLUE.into());
 
@@ -107,8 +116,6 @@ fn draw_wide_tiles(document: &mut Document, wide_tiles: &[WideTile], alphas: &[u
 fn draw_tile_areas(document: &mut Document, tiles: &[Tile]) {
     let mut seen = HashSet::new();
 
-    println!("Tiles: {:#?}", tiles);
-
     for tile in tiles {
         // Draw the points
         let x = tile.x as u32 * TILE_WIDTH;
@@ -118,13 +125,19 @@ fn draw_tile_areas(document: &mut Document, tiles: &[Tile]) {
             continue;
         }
 
+        let color = if tile.x == 95 && tile.y == 86 {
+            "red"
+        } else {
+            "darkblue"
+        };
+
         let rect = Rectangle::new()
             .set("x", x)
             .set("y", y)
             .set("width", TILE_WIDTH)
             .set("height", TILE_HEIGHT)
-            .set("fill", "darkblue")
-            .set("stroke", "darkblue")
+            .set("fill", color)
+            .set("stroke", color)
             .set("stroke-opacity", 0.6)
             .set("stroke-width", 0.2)
             .set("fill-opacity", 0.1);

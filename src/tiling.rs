@@ -33,7 +33,7 @@ const TILE_SCALE: f32 = 8192.0;
 // scale factor relative to unit square in tile
 const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
 
-fn scale_up(z: f32) -> u32 {
+pub(crate) fn scale_up(z: f32) -> u32 {
     (z * FRAC_TILE_SCALE).round() as u32
 }
 
@@ -225,9 +225,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let mut count = 0;
             while xi != x1 || yi != y1 {
                 count += 1;
-                if count == 400 {
-                    panic!();
-                }
+
                 if t_clipy < t_clipx {
                     // intersected with horizontal grid line
                     let x_intersect = s0.x + (s1.x - s0.x) * t_clipy - xi;

@@ -7,6 +7,7 @@ pub mod pixmap;
 pub mod render;
 pub mod simd;
 pub mod strip;
+pub mod svg;
 pub mod tiling;
 pub mod wide_tile;
 

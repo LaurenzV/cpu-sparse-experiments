@@ -56,7 +56,7 @@ impl CsRenderCtx {
             line_buf,
             tile_buf,
             strip_buf,
-            transform: Affine::IDENTITY
+            transform: Affine::IDENTITY,
         }
     }
 
@@ -96,23 +96,10 @@ impl CsRenderCtx {
 
     /// Render a path, which has already been flattened into `line_buf`.
     fn render_path(&mut self, brush: BrushRef) {
-        // TODO: need to make sure tiles contained in viewport - we'll likely
-        // panic otherwise.
-        // println!("{:#?}", &self.line_buf);
         tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
+        self.tile_buf.sort_unstable_by(Tile::cmp);
 
-        // println!("Before sorting: {:#?}", &self.tile_buf);
-        self.tile_buf.sort_by(Tile::cmp);
-        // println!("After sorting: {:#?}", &self.tile_buf);
         crate::simd::render_strips(&self.tile_buf, &mut self.strip_buf, &mut self.alphas);
-        // for strip in &self.strip_buf {
-        //     println!("{:?}", strip);
-        //     println!("x: {:?}", strip.x());
-        //     println!("y: {:?}", strip.strip_y());
-        // }
-        // self.strip_buf.remove(0);
-        // println!("{:#?}", &self.strip_buf);
-        // return;
         let color = brush_to_color(brush);
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         for i in 0..self.strip_buf.len() - 1 {
@@ -180,7 +167,6 @@ impl CsRenderCtx {
     pub fn stroke(&mut self, path: &Path, stroke: &peniko::kurbo::Stroke, brush: BrushRef) {
         let affine = self.get_affine();
         crate::flatten::stroke(&path.path, stroke, affine, &mut self.line_buf);
-        // println!("{:#?}", self.line_buf);
         self.render_path(brush);
     }
 
