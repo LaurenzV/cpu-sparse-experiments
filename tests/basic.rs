@@ -1,10 +1,11 @@
+use crate::util::{check_ref, render_pixmap};
 use cpu_sparse::{CsRenderCtx, Pixmap};
 use oxipng::{InFile, OutFile};
-use peniko::color::palette;
+use peniko::color::palette::css::{BLUE, GREEN, LIME, REBECCA_PURPLE, RED};
+use peniko::color::{palette, AlphaColor};
 use peniko::kurbo::{BezPath, Circle, Rect, Shape, Stroke};
 use std::io::BufWriter;
 use std::path::PathBuf;
-use crate::util::{check_ref, render_pixmap};
 
 mod util;
 
@@ -102,7 +103,6 @@ fn filled_triangle() {
 #[test]
 fn stroked_triangle() {
     let mut ctx = get_ctx(100, 100, false);
-
     let path = {
         let mut path = BezPath::new();
         path.move_to((5.0, 5.0));
@@ -112,9 +112,7 @@ fn stroked_triangle() {
 
         path
     };
-
     let stroke = Stroke::new(3.0);
-
     ctx.stroke(&path.into(), &stroke, palette::css::LIME.into());
 
     check_ref(&ctx, "stroked_triangle");
@@ -123,20 +121,40 @@ fn stroked_triangle() {
 #[test]
 fn filled_circle() {
     let mut ctx = get_ctx(100, 100, false);
-
     let circle = Circle::new((50.0, 50.0), 45.0);
-
     ctx.fill(&circle.to_path(0.1).into(), palette::css::LIME.into());
 
     check_ref(&ctx, "filled_circle");
 }
 
 #[test]
-fn stroked_circle() {
+fn filled_circle_with_opacity() {
+    let mut ctx = get_ctx(100, 100, false);
+    let circle = Circle::new((50.0, 50.0), 45.0);
+    ctx.fill(
+        &circle.to_path(0.1).into(),
+        REBECCA_PURPLE.with_alpha(0.5).into(),
+    );
+
+    check_ref(&ctx, "filled_circle_with_opacity");
+}
+
+#[test]
+fn filled_overlapping_circles() {
     let mut ctx = get_ctx(100, 100, false);
 
-    let circle = Circle::new((50.0, 50.0), 45.0);
+    for e in [(35.0, 35.0, RED), (65.0, 35.0, GREEN), (50.0, 65.0, BLUE)] {
+        let circle = Circle::new((e.0, e.1), 30.0);
+        ctx.fill(&circle.to_path(0.1).into(), e.2.with_alpha(0.5).into());
+    }
 
+    check_ref(&ctx, "filled_overlapping_circles");
+}
+
+#[test]
+fn stroked_circle() {
+    let mut ctx = get_ctx(100, 100, false);
+    let circle = Circle::new((50.0, 50.0), 45.0);
     let stroke = Stroke::new(3.0);
 
     ctx.stroke(

@@ -1,16 +1,16 @@
+use cpu_sparse::{CsRenderCtx, Pixmap};
+use image::{load_from_memory, Rgba, RgbaImage};
+use once_cell::sync::Lazy;
 use std::cmp::max;
 use std::path::PathBuf;
 use std::sync::LazyLock;
-use image::{load_from_memory, Rgba, RgbaImage};
-use once_cell::sync::Lazy;
-use cpu_sparse::{CsRenderCtx, Pixmap};
 
-const REPLACE: Option<&str> = option_env!("REPLACE");
+const REPLACE: bool = true;
 
 static REFS_PATH: Lazy<PathBuf> =
     Lazy::new(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("refs"));
 static DIFFS_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
-    let path =PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("diffs");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("diffs");
     let _ = std::fs::remove_dir_all(&path);
     let _ = std::fs::create_dir_all(&path);
     path
@@ -41,7 +41,8 @@ pub(crate) fn check_ref(ctx: &CsRenderCtx, name: &str) {
 
     let write_ref_image = || {
         let optimized =
-            oxipng::optimize_from_memory(&encoded_image, &oxipng::Options::max_compression()).unwrap();
+            oxipng::optimize_from_memory(&encoded_image, &oxipng::Options::max_compression())
+                .unwrap();
         std::fs::write(&ref_path, optimized).unwrap();
     };
 
@@ -58,7 +59,7 @@ pub(crate) fn check_ref(ctx: &CsRenderCtx, name: &str) {
     let diff_image = get_diff(&ref_image, &actual);
 
     if let Some(diff_image) = diff_image {
-        if REPLACE.is_some() {
+        if REPLACE {
             write_ref_image();
             panic!("test was replaced");
         }
@@ -117,7 +118,7 @@ fn get_diff(expected_image: &RgbaImage, actual_image: &RgbaImage) -> Option<Rgba
 
     if pixel_diff > 0 {
         Some(diff_image)
-    }   else {
+    } else {
         None
     }
 }
