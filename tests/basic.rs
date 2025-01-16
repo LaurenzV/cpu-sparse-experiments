@@ -1,5 +1,5 @@
 use crate::util::{check_ref, render_pixmap};
-use cpu_sparse::{CsRenderCtx, Pixmap};
+use cpu_sparse::{CsRenderCtx, FillRule, Pixmap};
 use oxipng::{InFile, OutFile};
 use peniko::color::palette::css::{BLUE, GREEN, LIME, REBECCA_PURPLE, RED};
 use peniko::color::{palette, AlphaColor};
@@ -16,7 +16,7 @@ fn get_ctx(width: usize, height: usize, transparent: bool) -> CsRenderCtx {
     if !transparent {
         let path = Rect::new(0.0, 0.0, width as f64, height as f64).to_path(0.1);
 
-        ctx.fill(&path.into(), palette::css::WHITE.into());
+        ctx.fill(&path.into(), FillRule::NonZero, palette::css::WHITE.into());
     }
 
     ctx
@@ -74,7 +74,7 @@ fn empty_1134x1376() {
 fn full_cover_1() {
     let mut ctx = get_ctx(8, 8, true);
     ctx.fill(
-        &Rect::new(0.0, 0.0, 8.0, 8.0).to_path(0.1).into(),
+        &Rect::new(0.0, 0.0, 8.0, 8.0).to_path(0.1).into(), FillRule::NonZero,
         palette::css::BEIGE.into(),
     );
 
@@ -95,7 +95,7 @@ fn filled_triangle() {
         path
     };
 
-    ctx.fill(&path.into(), palette::css::LIME.into());
+    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "filled_triangle");
 }
@@ -122,7 +122,7 @@ fn stroked_triangle() {
 fn filled_circle() {
     let mut ctx = get_ctx(100, 100, false);
     let circle = Circle::new((50.0, 50.0), 45.0);
-    ctx.fill(&circle.to_path(0.1).into(), palette::css::LIME.into());
+    ctx.fill(&circle.to_path(0.1).into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "filled_circle");
 }
@@ -132,7 +132,7 @@ fn filled_circle_with_opacity() {
     let mut ctx = get_ctx(100, 100, false);
     let circle = Circle::new((50.0, 50.0), 45.0);
     ctx.fill(
-        &circle.to_path(0.1).into(),
+        &circle.to_path(0.1).into(), FillRule::NonZero,
         REBECCA_PURPLE.with_alpha(0.5).into(),
     );
 
@@ -145,7 +145,7 @@ fn filled_overlapping_circles() {
 
     for e in [(35.0, 35.0, RED), (65.0, 35.0, GREEN), (50.0, 65.0, BLUE)] {
         let circle = Circle::new((e.0, e.1), 30.0);
-        ctx.fill(&circle.to_path(0.1).into(), e.2.with_alpha(0.5).into());
+        ctx.fill(&circle.to_path(0.1).into(), FillRule::NonZero, e.2.with_alpha(0.5).into());
     }
 
     check_ref(&ctx, "filled_overlapping_circles");

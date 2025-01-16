@@ -1,5 +1,5 @@
 use crate::render::Path;
-use crate::CsRenderCtx;
+use crate::{CsRenderCtx, FillRule};
 use peniko::color::AlphaColor;
 use peniko::kurbo::{Affine, BezPath, Stroke};
 use usvg::tiny_skia_path::PathSegment;
@@ -75,7 +75,7 @@ fn render_path(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, path: &usvg::Path) 
                 _ => return,
             };
 
-            ctx.fill(&convert_path_data(path), color.into());
+            ctx.fill(&convert_path_data(path), convert_fill_rule(fill.rule()), color.into());
         }
     };
 
@@ -100,6 +100,13 @@ fn render_path(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, path: &usvg::Path) 
     } else {
         stroke(ctx, path);
         fill(ctx, path);
+    }
+}
+
+fn convert_fill_rule(fill_rule: usvg::FillRule) -> FillRule {
+    match fill_rule {
+        usvg::FillRule::NonZero => FillRule::NonZero,
+        usvg::FillRule::EvenOdd => FillRule::EvenOdd
     }
 }
 

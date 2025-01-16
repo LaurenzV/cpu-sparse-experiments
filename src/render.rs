@@ -12,13 +12,7 @@ use peniko::{
 };
 use std::collections::BTreeMap;
 
-use crate::{
-    fine::Fine,
-    strip::{self, Strip, Tile},
-    tiling::{self, FlatLine},
-    wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
-    Pixmap,
-};
+use crate::{fine::Fine, strip::{self, Strip, Tile}, tiling::{self, FlatLine}, wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH}, FillRule, Pixmap};
 
 pub struct CsRenderCtx {
     pub width: usize,
@@ -95,7 +89,7 @@ impl CsRenderCtx {
     }
 
     /// Render a path, which has already been flattened into `line_buf`.
-    fn render_path(&mut self, brush: BrushRef) {
+    fn render_path(&mut self, fill_rule: FillRule, brush: BrushRef) {
         tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
         self.tile_buf.sort_unstable_by(Tile::cmp);
 
@@ -133,7 +127,7 @@ impl CsRenderCtx {
                 col += width;
                 self.tiles[row_start + xtile].push(Cmd::Strip(cmd));
             }
-            if next_strip.winding != 0 && y == next_strip.strip_y() {
+            if fill_rule.active_fill(next_strip.winding) && y == next_strip.strip_y() {
                 x = x1;
                 let x2 = next_strip.x();
                 let fxt0 = x1 as usize / WIDE_TILE_WIDTH;
@@ -158,16 +152,16 @@ impl CsRenderCtx {
         }
     }
 
-    pub fn fill(&mut self, path: &Path, brush: BrushRef) {
+    pub fn fill(&mut self, path: &Path, fill_rule: FillRule, brush: BrushRef) {
         let affine = self.get_affine();
         crate::flatten::fill(&path.path, affine, &mut self.line_buf);
-        self.render_path(brush);
+        self.render_path(fill_rule, brush);
     }
 
     pub fn stroke(&mut self, path: &Path, stroke: &peniko::kurbo::Stroke, brush: BrushRef) {
         let affine = self.get_affine();
         crate::flatten::stroke(&path.path, stroke, affine, &mut self.line_buf);
-        self.render_path(brush);
+        self.render_path(FillRule::NonZero, brush);
     }
 
     pub fn set_transform(&mut self, transform: Affine) {

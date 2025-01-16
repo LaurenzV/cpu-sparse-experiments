@@ -1,7 +1,7 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use cpu_sparse::{CsRenderCtx, Pixmap};
+use cpu_sparse::{CsRenderCtx, FillRule, Pixmap};
 use peniko::color::palette;
 use peniko::kurbo::{BezPath, Stroke};
 use std::io::BufWriter;
@@ -22,7 +22,7 @@ pub fn main() {
     // path.line_to((7.5, 10.0));
     path.close_path();
     let piet_path = path.into();
-    ctx.fill(&piet_path, palette::css::DARK_BLUE.into());
+    ctx.fill(&piet_path, FillRule::NonZero, palette::css::DARK_BLUE.into());
     // let stroke = Stroke::new(1.0);
     // ctx.stroke(&piet_path, &stroke, palette::css::DARK_BLUE.into());
 

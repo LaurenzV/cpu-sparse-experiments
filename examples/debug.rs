@@ -2,7 +2,7 @@ use cpu_sparse::strip::{Strip, Tile};
 use cpu_sparse::svg::{render_tree, SVGContext};
 use cpu_sparse::tiling::{FlatLine, Vec2, TILE_HEIGHT, TILE_WIDTH};
 use cpu_sparse::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
-use cpu_sparse::CsRenderCtx;
+use cpu_sparse::{CsRenderCtx, FillRule};
 use peniko::color::palette;
 use peniko::kurbo::{Affine, BezPath, Stroke};
 use rand::Rng;
@@ -11,25 +11,25 @@ use svg::node::element::path::Data;
 use svg::node::element::{Circle, Path, Rectangle};
 use svg::{Document, Node};
 
-const WIDTH: usize = 1000;
-const HEIGHT: usize = 1000;
+const WIDTH: usize = 200;
+const HEIGHT: usize = 200;
 
 fn main() {
     let mut document = Document::new().set("viewBox", (-10, -10, WIDTH + 20, HEIGHT + 20));
 
-    let ctx = ctx();
+    // let ctx = ctx();
 
-    // let svg = std::fs::read_to_string("gs.svg").expect("error reading file");
-    // let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
-    // let mut ctx = CsRenderCtx::new(WIDTH, HEIGHT);
-    // let mut sctx = SVGContext::new();
-    // render_tree(&mut ctx, &mut sctx, &tree);
+    let svg = std::fs::read_to_string("svgs/gs.svg").expect("error reading file");
+    let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
+    let mut ctx = CsRenderCtx::new(WIDTH, HEIGHT);
+    let mut sctx = SVGContext::new();
+    render_tree(&mut ctx, &mut sctx, &tree);
 
     draw_grid(&mut document);
     draw_line_segments(&mut document, &ctx.line_buf);
-    // draw_tile_areas(&mut document, &ctx.tile_buf);
+    draw_tile_areas(&mut document, &ctx.tile_buf);
     // draw_tile_intersections(&mut document, &ctx.tile_buf);
-    // draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
+    draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
     // draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
 
     svg::save("target/out.svg", &document).unwrap();
@@ -52,7 +52,7 @@ fn ctx() -> CsRenderCtx {
     };
 
     ctx.set_transform(Affine::scale(0.25));
-    ctx.fill(&path.into(), palette::css::LIME.into());
+    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
     // let stroke = Stroke::new(3.0);
     // ctx.stroke(&piet_path, &stroke, palette::css::DARK_BLUE.into());
 
