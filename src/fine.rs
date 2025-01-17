@@ -5,7 +5,7 @@
 
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
-const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
+pub(crate) const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
 
 pub(crate) struct Fine<'a> {
     pub(crate) width: usize,
@@ -36,7 +36,7 @@ impl<'a> Fine<'a> {
             height,
             out_buf,
             scratch,
-            use_simd: false,
+            use_simd: true,
         }
     }
 

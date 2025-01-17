@@ -1,7 +1,5 @@
-// Copyright 2024 the Piet Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! SIMD speedups
+#[cfg(target_arch = "aarch64")]
+mod neon;
 
 use crate::{
     fine::Fine,
@@ -22,11 +20,22 @@ impl<'a> Fine<'a> {
         self.clear_scalar(color);
     }
 
-    pub(crate) fn fill(&mut self, x: usize, y: usize, color: [f32; 4]) {
-        self.fill_scalar(x, y, color);
+    pub(crate) fn fill(&mut self, x: usize, width: usize, color: [f32; 4]) {
+        if self.use_simd {
+            unsafe {
+                self.fill_simd(x, width, color);
+            }
+        } else {
+            self.fill_scalar(x, width, color);
+        }
     }
 
     pub(crate) fn strip(&mut self, x: usize, width: usize, alphas: &[u32], color: [f32; 4]) {
-        self.strip_scalar(x, width, alphas, color);
+        if self.use_simd {
+            self.strip_scalar(x, width, alphas, color);
+            // unsafe { self.strip_simd(x, width, alphas, color); }
+        } else {
+            self.strip_scalar(x, width, alphas, color);
+        }
     }
 }

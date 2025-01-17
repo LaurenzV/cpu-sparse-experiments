@@ -97,6 +97,7 @@ impl CsRenderCtx {
     /// Render a path, which has already been flattened into `line_buf`.
     fn render_path(&mut self, fill_rule: FillRule, brush: BrushRef) {
         tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
+        println!("{:?}", self.tile_buf.len());
         self.tile_buf.sort_unstable_by(Tile::cmp);
 
         crate::simd::render_strips(&self.tile_buf, &mut self.strip_buf, &mut self.alphas);
