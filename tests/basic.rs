@@ -74,7 +74,8 @@ fn empty_1134x1376() {
 fn full_cover_1() {
     let mut ctx = get_ctx(8, 8, true);
     ctx.fill(
-        &Rect::new(0.0, 0.0, 8.0, 8.0).to_path(0.1).into(), FillRule::NonZero,
+        &Rect::new(0.0, 0.0, 8.0, 8.0).to_path(0.1).into(),
+        FillRule::NonZero,
         palette::css::BEIGE.into(),
     );
 
@@ -122,7 +123,11 @@ fn stroked_triangle() {
 fn filled_circle() {
     let mut ctx = get_ctx(100, 100, false);
     let circle = Circle::new((50.0, 50.0), 45.0);
-    ctx.fill(&circle.to_path(0.1).into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill(
+        &circle.to_path(0.1).into(),
+        FillRule::NonZero,
+        palette::css::LIME.into(),
+    );
 
     check_ref(&ctx, "filled_circle");
 }
@@ -132,7 +137,8 @@ fn filled_circle_with_opacity() {
     let mut ctx = get_ctx(100, 100, false);
     let circle = Circle::new((50.0, 50.0), 45.0);
     ctx.fill(
-        &circle.to_path(0.1).into(), FillRule::NonZero,
+        &circle.to_path(0.1).into(),
+        FillRule::NonZero,
         REBECCA_PURPLE.with_alpha(0.5).into(),
     );
 
@@ -145,7 +151,11 @@ fn filled_overlapping_circles() {
 
     for e in [(35.0, 35.0, RED), (65.0, 35.0, GREEN), (50.0, 65.0, BLUE)] {
         let circle = Circle::new((e.0, e.1), 30.0);
-        ctx.fill(&circle.to_path(0.1).into(), FillRule::NonZero, e.2.with_alpha(0.5).into());
+        ctx.fill(
+            &circle.to_path(0.1).into(),
+            FillRule::NonZero,
+            e.2.with_alpha(0.5).into(),
+        );
     }
 
     check_ref(&ctx, "filled_overlapping_circles");

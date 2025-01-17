@@ -12,7 +12,13 @@ use peniko::{
 };
 use std::collections::BTreeMap;
 
-use crate::{fine::Fine, strip::{self, Strip, Tile}, tiling::{self, FlatLine}, wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH}, FillRule, Pixmap};
+use crate::{
+    fine::Fine,
+    strip::{self, Strip, Tile},
+    tiling::{self, FlatLine},
+    wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
+    FillRule, Pixmap,
+};
 
 pub struct CsRenderCtx {
     pub width: usize,

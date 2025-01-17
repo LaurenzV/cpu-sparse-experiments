@@ -14,14 +14,14 @@ pub mod wide_tile;
 #[derive(Clone, Copy)]
 pub enum FillRule {
     NonZero,
-    EvenOdd
+    EvenOdd,
 }
 
 impl FillRule {
     pub(crate) fn active_fill(&self, winding: i32) -> bool {
         match self {
             FillRule::NonZero => winding != 0,
-            FillRule::EvenOdd => winding % 2 != 0
+            FillRule::EvenOdd => winding % 2 != 0,
         }
     }
 }
