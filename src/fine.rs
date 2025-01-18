@@ -36,7 +36,7 @@ impl<'a> Fine<'a> {
             height,
             out_buf,
             scratch,
-            use_simd: true,
+            use_simd: false,
         }
     }
 
