@@ -43,7 +43,7 @@ pub fn stroke(path: &BezPath, style: &Stroke, affine: Affine, line_buf: &mut Vec
     line_buf.clear();
 
     // TODO: Temporary hack to ensure that strokes are scaled properly by the transform.
-    let tolerance = TOL / affine.as_coeffs()[0].max(affine.as_coeffs()[3]);
+    let tolerance = TOL / affine.as_coeffs()[0].abs().max(affine.as_coeffs()[3].abs());
 
     let lines: LoweredPath<Line> = flatten::stroke::stroke_undashed(path.iter(), style, tolerance);
     for line in &lines.path {
