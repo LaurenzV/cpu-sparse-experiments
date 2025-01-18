@@ -12,6 +12,7 @@ use peniko::{
 };
 use std::collections::BTreeMap;
 
+use crate::strip::render_strips_scalar;
 use crate::{
     fine::Fine,
     strip::{self, Strip, Tile},
@@ -74,11 +75,11 @@ impl CsRenderCtx {
         for y in 0..height_tiles {
             for x in 0..width_tiles {
                 let tile = &self.tiles[y * width_tiles + x];
-                fine.clear(tile.bg.components);
+                fine.clear_scalar(tile.bg.components);
                 for cmd in &tile.cmds {
                     fine.run_cmd(cmd, &self.alphas);
                 }
-                fine.pack(x, y);
+                fine.pack_scalar(x, y);
             }
         }
     }
@@ -99,7 +100,7 @@ impl CsRenderCtx {
         tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
         self.tile_buf.sort_unstable_by(Tile::cmp);
 
-        crate::simd::render_strips(&self.tile_buf, &mut self.strip_buf, &mut self.alphas);
+        render_strips_scalar(&self.tile_buf, &mut self.strip_buf, &mut self.alphas);
         let color = brush_to_color(brush);
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         for i in 0..self.strip_buf.len() - 1 {

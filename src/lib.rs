@@ -5,7 +5,6 @@ pub mod fine;
 pub mod flatten;
 pub mod pixmap;
 pub mod render;
-pub mod simd;
 pub mod strip;
 pub mod svg;
 pub mod tiling;

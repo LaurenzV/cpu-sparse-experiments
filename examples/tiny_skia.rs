@@ -2,15 +2,15 @@ use tiny_skia::{Color, FillRule, Pixmap};
 use usvg::{Node, Paint, PaintOrder, Transform};
 
 fn main() {
-    let scale = 10.0 / 9.0;
-    let svg = std::fs::read_to_string("svgs/gs.svg").expect("error reading file");
+    let scale = 1.0;
+    let svg = std::fs::read_to_string("svgs/coat_of_arms.svg").expect("error reading file");
     let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
     let width = (tree.size().width() * scale).ceil() as usize;
     let height = (tree.size().height() * scale).ceil() as usize;
 
     let mut sctx = SVGContext::new_with_scale(scale as f64);
 
-    let num_iters = 200;
+    let num_iters = 500;
     let mut pix = None;
 
     // Hacky code for crude measurements; change this to arg parsing

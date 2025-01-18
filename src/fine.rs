@@ -16,16 +16,6 @@ pub(crate) struct Fine<'a> {
     // That said, if we use u8, then this is basically a block of
     // untyped memory.
     pub(crate) scratch: [f32; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-    /// Whether to use SIMD
-    ///
-    /// This is useful to toggle for performance evaluation reasons. It also
-    /// *must* be false if runtime detection fails, otherwise we have safety
-    /// problems. This is important for x86_64, as we'll be targeting Haswell
-    /// as the minimum.
-    #[allow(unused)]
-    // The allow(unused) lint exception is because some platforms may not have
-    // a SIMD implementation, and thus won't check the field.
-    pub(crate) use_simd: bool,
 }
 
 impl<'a> Fine<'a> {
@@ -36,7 +26,6 @@ impl<'a> Fine<'a> {
             height,
             out_buf,
             scratch,
-            use_simd: false,
         }
     }
 
@@ -60,11 +49,11 @@ impl<'a> Fine<'a> {
     pub(crate) fn run_cmd(&mut self, cmd: &Cmd, alphas: &[u32]) {
         match cmd {
             Cmd::Fill(f) => {
-                self.fill(f.x as usize, f.width as usize, f.color.components);
+                self.fill_scalar(f.x as usize, f.width as usize, f.color.components);
             }
             Cmd::Strip(s) => {
                 let aslice = &alphas[s.alpha_ix..];
-                self.strip(s.x as usize, s.width as usize, aslice, s.color.components);
+                self.strip_scalar(s.x as usize, s.width as usize, aslice, s.color.components);
             }
         }
     }
