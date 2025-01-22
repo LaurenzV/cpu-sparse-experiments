@@ -1,6 +1,6 @@
 use cpu_sparse::strip::{Strip, Tile};
 use cpu_sparse::svg::{render_tree, SVGContext};
-use cpu_sparse::tiling::{FlatLine, Vec2, TILE_HEIGHT, TILE_WIDTH};
+use cpu_sparse::tiling::{FlatLine, Point, TILE_HEIGHT, TILE_WIDTH};
 use cpu_sparse::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
 use cpu_sparse::{CsRenderCtx, FillRule};
 use peniko::color::palette;
@@ -225,8 +225,8 @@ fn draw_tile_intersections(document: &mut Document, tiles: &[Tile]) {
         let x = tile.x as u32 * TILE_WIDTH;
         let y = tile.y as u32 * TILE_HEIGHT;
 
-        let p0 = Vec2::unpack(tile.p0);
-        let p1 = Vec2::unpack(tile.p1);
+        let p0 = tile.p0.unpack();
+        let p1 = tile.p1.unpack();
         for p in [(p0, -0.05, "darkgreen"), (p1, 0.05, "purple")] {
             let circle = Circle::new()
                 .set("cx", x as f32 + p.0.x + p.1)
@@ -246,8 +246,8 @@ fn draw_line_segments(document: &mut Document, line_buf: &[FlatLine]) {
     let mut last = None;
 
     for line in line_buf {
-        let first = (line.p0[0], line.p0[1]);
-        let second = (line.p1[0], line.p1[1]);
+        let first = (line.p0.x, line.p0.y);
+        let second = (line.p1.x, line.p1.y);
 
         if Some(first) != last {
             data = data.move_to(first)

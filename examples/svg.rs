@@ -26,7 +26,7 @@ pub fn main() {
     let mut sctx = SVGContext::new_with_scale(scale as f64);
     let mut pixmap = Pixmap::new(width, height);
 
-    let num_iters = 500;
+    let num_iters = 300;
 
     // Hacky code for crude measurements; change this to arg parsing
     let start = std::time::Instant::now();
