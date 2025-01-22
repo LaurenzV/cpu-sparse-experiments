@@ -1,11 +1,8 @@
 use crate::util::{check_ref, render_pixmap};
-use cpu_sparse::{CsRenderCtx, FillRule, Pixmap};
-use oxipng::{InFile, OutFile};
-use peniko::color::palette::css::{BLUE, GREEN, LIME, REBECCA_PURPLE, RED};
+use cpu_sparse::{CsRenderCtx, FillRule};
+use peniko::color::palette::css::{BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED};
 use peniko::color::{palette, AlphaColor};
 use peniko::kurbo::{BezPath, Circle, Rect, Shape, Stroke};
-use std::io::BufWriter;
-use std::path::PathBuf;
 
 mod util;
 
@@ -174,4 +171,37 @@ fn stroked_circle() {
     );
 
     check_ref(&ctx, "stroked_circle");
+}
+
+fn star_path() -> BezPath {
+    let mut path = BezPath::new();
+    path.move_to((50.0, 10.0));
+    path.line_to((75.0, 90.0));
+    path.line_to((10.0, 40.0));
+    path.line_to((90.0, 40.0));
+    path.line_to((25.0, 90.0));
+    path.line_to((50.0, 10.0));
+
+    path
+}
+
+#[test]
+fn filling_nonzero_rule() {
+    let mut ctx = get_ctx(100, 100, false);
+    let star = star_path();
+
+    ctx.fill(&star.into(), FillRule::NonZero, MAROON.into());
+
+    check_ref(&ctx, "filling_nonzero_rule");
+}
+
+// TODO: Not working correctly yet!
+#[test]
+fn filling_evenodd_rule() {
+    let mut ctx = get_ctx(100, 100, false);
+    let star = star_path();
+
+    ctx.fill(&star.into(), FillRule::EvenOdd, MAROON.into());
+
+    check_ref(&ctx, "filling_evenodd_rule");
 }
