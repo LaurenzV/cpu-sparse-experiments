@@ -190,11 +190,7 @@ fn filling_nonzero_rule() {
     let mut ctx = get_ctx(100, 100, false);
     let star = star_path();
 
-    ctx.fill(
-        &star.into(),
-        FillRule::NonZero,
-        MAROON.into(),
-    );
+    ctx.fill(&star.into(), FillRule::NonZero, MAROON.into());
 
     check_ref(&ctx, "filling_nonzero_rule");
 }
@@ -205,11 +201,7 @@ fn filling_evenodd_rule() {
     let mut ctx = get_ctx(100, 100, false);
     let star = star_path();
 
-    ctx.fill(
-        &star.into(),
-        FillRule::EvenOdd,
-        MAROON.into(),
-    );
+    ctx.fill(&star.into(), FillRule::EvenOdd, MAROON.into());
 
     check_ref(&ctx, "filling_evenodd_rule");
 }
