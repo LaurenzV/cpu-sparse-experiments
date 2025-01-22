@@ -11,8 +11,8 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::tiling::TILE_WIDTH;
-use crate::{tiling::Vec2, wide_tile::STRIP_HEIGHT};
+use crate::tiling::{PackedPoint, TILE_WIDTH};
+use crate::{tiling::Point, wide_tile::STRIP_HEIGHT};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct Loc {
@@ -25,14 +25,14 @@ pub(crate) struct Footprint(pub(crate) u32);
 pub struct Tile {
     pub x: u16,
     pub y: u16,
-    pub p0: u32, // packed
-    pub p1: u32, // packed
+    pub p0: PackedPoint, // packed
+    pub p1: PackedPoint, // packed
 }
 
 impl std::fmt::Debug for Tile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let p0 = Vec2::unpack(self.p0);
-        let p1 = Vec2::unpack(self.p1);
+        let p0 = self.p0.unpack();
+        let p1 = self.p1.unpack();
         write!(
             f,
             "Tile {{ xy: ({}, {}), p0: ({:.4}, {:.4}), p1: ({:.4}, {:.4}) }}",
@@ -60,19 +60,6 @@ impl Loc {
 }
 
 impl Tile {
-    #[allow(unused)]
-    /// Create a tile from synthetic data.
-    fn new(loc: Loc, footprint: Footprint, delta: i32) -> Self {
-        let p0 = (delta == -1) as u32 * 65536 + footprint.0.trailing_zeros() * 8192;
-        let p1 = (delta == 1) as u32 * 65536 + (32 - footprint.0.leading_zeros()) * 8192;
-        Tile {
-            x: loc.x,
-            y: loc.y,
-            p0,
-            p1,
-        }
-    }
-
     pub(crate) fn loc(&self) -> Loc {
         Loc {
             x: self.x,
@@ -81,8 +68,8 @@ impl Tile {
     }
 
     pub(crate) fn footprint(&self) -> Footprint {
-        let x0 = (self.p0 & 0xffff) as f32 * (1.0 / 8192.0);
-        let x1 = (self.p1 & 0xffff) as f32 * (1.0 / 8192.0);
+        let x0 = self.p0.unpacked_x();
+        let x1 = self.p1.unpacked_x();
         // On CPU, might be better to do this as fixed point
         let xmin = x0.min(x1).floor() as u32;
         let xmax = (xmin + 1).max(x0.max(x1).ceil() as u32).min(TILE_WIDTH);
@@ -90,7 +77,7 @@ impl Tile {
     }
 
     pub(crate) fn delta(&self) -> i32 {
-        ((self.p1 >> 16) == 0) as i32 - ((self.p0 >> 16) == 0) as i32
+        (self.p1.packed_y() == 0) as i32 - (self.p0.packed_y() == 0) as i32
     }
 
     // Comparison function for sorting. Only compares loc, doesn't care
@@ -130,8 +117,8 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
             let mut areas = [[start_delta as f32; 4]; 4];
             for tile in &tiles[seg_start..i] {
                 delta += tile.delta();
-                let p0 = Vec2::unpack(tile.p0);
-                let p1 = Vec2::unpack(tile.p1);
+                let p0 = tile.p0.unpack();
+                let p1 = tile.p1.unpack();
                 let slope = (p1.x - p0.x) / (p1.y - p0.y);
                 for x in x0..x1 {
                     let startx = p0.x - x as f32;
@@ -216,7 +203,7 @@ impl Strip {
 #[cfg(test)]
 mod tests {
     use crate::strip::Tile;
-    use crate::tiling::scale_up;
+    use crate::tiling::{scale_up, PackedPoint};
 
     // TODO: Is this the correct behavior?
     #[test]
@@ -224,8 +211,8 @@ mod tests {
         let tile = Tile {
             x: 0,
             y: 0,
-            p0: (scale_up(0.0) << 16) + scale_up(1.0),
-            p1: (scale_up(1.0) << 16) + scale_up(1.0),
+            p0: PackedPoint::new(scale_up(1.0), scale_up(0.0)),
+            p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
         };
 
         assert_eq!(tile.footprint().0, 0);
