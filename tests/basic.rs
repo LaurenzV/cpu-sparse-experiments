@@ -1,23 +1,11 @@
-use crate::util::{check_ref, render_pixmap};
-use cpu_sparse::{CsRenderCtx, FillRule};
+use crate::util::{check_ref, get_ctx, render_pixmap};
+use cpu_sparse::{CsRenderCtx, FillRule, Pixmap};
+use oxipng::{InFile, OutFile};
 use peniko::color::palette::css::{BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED};
 use peniko::color::{palette, AlphaColor};
 use peniko::kurbo::{BezPath, Circle, Rect, Shape, Stroke};
 
 mod util;
-
-const RECT_TOLERANCE: f32 = 0.1;
-
-fn get_ctx(width: usize, height: usize, transparent: bool) -> CsRenderCtx {
-    let mut ctx = CsRenderCtx::new(width, height);
-    if !transparent {
-        let path = Rect::new(0.0, 0.0, width as f64, height as f64).to_path(0.1);
-
-        ctx.fill(&path.into(), FillRule::NonZero, palette::css::WHITE.into());
-    }
-
-    ctx
-}
 
 #[test]
 fn empty_1x1() {
