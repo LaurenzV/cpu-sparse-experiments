@@ -1,7 +1,7 @@
 use crate::util::{check_ref, get_ctx};
 use cpu_sparse::FillRule;
 use peniko::color::palette;
-use peniko::kurbo::{BezPath, Circle, Stroke};
+use peniko::kurbo::{Affine, BezPath, Circle, Stroke};
 
 mod util;
 
@@ -24,17 +24,15 @@ fn issue_2_incorrect_filling_1() {
 #[test]
 fn issue_2_incorrect_filling_2() {
     let mut p = BezPath::default();
-    p.move_to((128.0, 128.0));
-    p.line_to((160.0, 128.0));
-    p.line_to((160.0, 160.0));
-    p.line_to((128.0, 160.0));
+    p.move_to((16.0, 16.0));
+    p.line_to((48.0, 16.0));
+    p.line_to((48.0, 48.0));
+    p.line_to((16.0, 48.0));
     p.close_path();
 
     let mut ctx = get_ctx(64, 64, false);
 
-    ctx.set_transform(Affine::translate((-112.0, -112.0)));
     ctx.fill(&p.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_2");
 }
-
