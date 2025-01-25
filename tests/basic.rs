@@ -1,7 +1,7 @@
-use crate::util::{check_ref, render_pixmap};
+use crate::util::{check_ref, get_ctx, render_pixmap};
 use cpu_sparse::{CsRenderCtx, FillRule, Pixmap};
 use oxipng::{InFile, OutFile};
-use peniko::color::palette::css::{BLUE, GREEN, LIME, REBECCA_PURPLE, RED};
+use peniko::color::palette::css::{BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED};
 use peniko::color::{palette, AlphaColor};
 use peniko::kurbo::{BezPath, Circle, Rect, Shape, Stroke};
 
