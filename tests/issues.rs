@@ -37,7 +37,6 @@ fn issue_2_incorrect_filling_2() {
     check_ref(&ctx, "issue_2_incorrect_filling_2");
 }
 
-
 #[test]
 fn issue_2_incorrect_filling_3() {
     let mut path = BezPath::new();
@@ -145,5 +144,3 @@ fn issue_2_incorrect_filling_8() {
 
     check_ref(&ctx, "issue_2_incorrect_filling_8");
 }
-
-
