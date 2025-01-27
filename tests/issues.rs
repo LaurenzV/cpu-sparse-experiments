@@ -66,7 +66,7 @@ fn issue_2_incorrect_filling_4() {
     path.line_to((28.000002, 9.));
     path.line_to((24.000002, 9.));
     path.line_to((20.000002, 9.));
-    path.move_to((16.000002, 9.));
+    path.line_to((16.000002, 9.));
     path.close_path();
 
     let mut ctx = get_ctx(64, 64, false);
