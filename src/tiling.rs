@@ -120,23 +120,48 @@ fn span(a: f32, b: f32) -> u32 {
 }
 
 pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
-    // Lines that cross vertical tile boundaries need special treatment during
-    // anti aliasing. This case is detected via tile-relative x == 0. However,
-    // lines can naturally start or end at a multiple of the 4x4 grid, too, but
-    // these don't constitute crossings. We nudge these points ever so slightly,
-    // by ensuring that xfrac0 and xfrac1 are always at least 1, which
-    // corresponds to 1/8192 of a pixel.
-    //
-    // Note that we cannot check if line.p0.x or s0.x modulo 4 equal 0 because
-    // those values operate at higher precision than xfrac values. For example,
-    // the coordinate 4.00001 % 4 != 0, but after scaleUp, xfrac == 0.
-
     tile_buf.clear();
+
+    let round = |f: f32| -> f32 {
+        // Round to the same resolution as used by our u16 representation
+        // (see scale_up). This avoids discrepancies between the f32 and
+        // u16 values when checking for alignment with the tile grid.
+        //
+        // We round just the fractional part to avoid precision issues for large
+        // coordinates.)
+        let i = f.trunc();
+        let frac = f.fract();
+        i + (frac * FRAC_TILE_SCALE).round() / FRAC_TILE_SCALE
+    };
+    let round_point = |p: Point| -> Point {
+        Point {
+            x: round(p.x),
+            y: round(p.y),
+        }
+    };
+    let nudge_point = |p: Point| -> Point {
+        // Lines that cross vertical tile boundaries need special treatment during
+        // anti aliasing. This case is detected via tile-relative x == 0. However,
+        // lines can naturally start or end at a multiple of the 4x4 grid, too, but
+        // these don't constitute crossings. We nudge these points ever so slightly,
+        // by ensuring that xfrac0 and xfrac1 are always at least 1, which
+        // corresponds to 1/8192 of a pixel.
+
+        if p.x.fract() == 0.0 {
+            Point {
+                x: p.x + 1.0 / FRAC_TILE_SCALE,
+                y: p.y,
+            }
+        } else {
+            p
+        }
+    };
+
     for line in lines {
         let p0 = line.p0;
         let p1 = line.p1;
-        let s0 = p0 * TILE_SCALE_X;
-        let s1 = p1 * TILE_SCALE_Y;
+        let s0 = nudge_point(round_point(p0 * TILE_SCALE_X));
+        let s1 = nudge_point(round_point(p1 * TILE_SCALE_Y));
         let count_x = span(s0.x, s1.x);
         let count_y = span(s0.y, s1.y);
         let mut x = s0.x.floor();
@@ -149,12 +174,12 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             // s0.y is on bottom of first tile
             y -= 1.0;
         }
-        let xfrac0 = scale_up(s0.x - x).max(1);
+        let xfrac0 = scale_up(s0.x - x);
         let yfrac0 = scale_up(s0.y - y);
         let packed0 = PackedPoint::new(xfrac0, yfrac0);
         // These could be replaced with <2 and the max(1.0) in span removed
         if count_x == 1 {
-            let xfrac1 = scale_up(s1.x - x).max(1);
+            let xfrac1 = scale_up(s1.x - x);
             if count_y == 1 {
                 let yfrac1 = scale_up(s1.y - y);
 
@@ -225,7 +250,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 // flip x between left and right of tile
                 last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
             }
-            let xfrac1 = scale_up(s1.x - (x + (count_x - 1) as f32 * sign)).max(1);
+            let xfrac1 = scale_up(s1.x - (x + (count_x - 1) as f32 * sign));
             let yfrac1 = scale_up(s1.y - y);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
@@ -296,7 +321,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
                 }
             }
-            let xfrac1 = scale_up(s1.x - xi).max(1);
+            let xfrac1 = scale_up(s1.x - xi);
             let yfrac1 = scale_up(s1.y - yi);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
