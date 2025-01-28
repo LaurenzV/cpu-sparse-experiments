@@ -25,8 +25,8 @@ pub(crate) struct Footprint(pub(crate) u32);
 pub struct Tile {
     pub x: u16,
     pub y: u16,
-    pub p0: PackedPoint, // packed
-    pub p1: PackedPoint, // packed
+    pub p0: PackedPoint,
+    pub p1: PackedPoint,
 }
 
 impl std::fmt::Debug for Tile {
@@ -41,7 +41,6 @@ impl std::fmt::Debug for Tile {
     }
 }
 
-#[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
     pub xy: u32, // this could be u16's on the Rust side
@@ -161,7 +160,7 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
 
             for x in x0..x1 {
                 let mut alphas = 0u32;
-                
+
                 for y in 0..4 {
                     let area = areas[x as usize][y];
                     // nonzero winding number rule
