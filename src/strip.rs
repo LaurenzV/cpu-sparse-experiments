@@ -12,7 +12,7 @@
 //! path_id type should probably become a generic parameter.
 
 use crate::tiling::{PackedPoint, TILE_WIDTH};
-use crate::{tiling::Point, wide_tile::STRIP_HEIGHT};
+use crate::wide_tile::STRIP_HEIGHT;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct Loc {
@@ -49,6 +49,8 @@ pub struct Strip {
 }
 
 impl Loc {
+    /// Two locations are on the same strip if they are on the same
+    /// row and next to each other.
     pub(crate) fn same_strip(&self, other: &Self) -> bool {
         self.same_row(other) && (other.x - self.x) / 2 == 0
     }
