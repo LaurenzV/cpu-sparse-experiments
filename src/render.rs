@@ -100,7 +100,12 @@ impl CsRenderCtx {
         tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
         self.tile_buf.sort_unstable_by(Tile::cmp);
 
-        render_strips_scalar(&self.tile_buf, &mut self.strip_buf, &mut self.alphas, fill_rule);
+        render_strips_scalar(
+            &self.tile_buf,
+            &mut self.strip_buf,
+            &mut self.alphas,
+            fill_rule,
+        );
         let color = brush_to_color(brush);
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         for i in 0..self.strip_buf.len() - 1 {

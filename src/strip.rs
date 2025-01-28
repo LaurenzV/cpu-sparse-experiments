@@ -11,9 +11,9 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::FillRule;
 use crate::tiling::{PackedPoint, TILE_WIDTH};
 use crate::wide_tile::STRIP_HEIGHT;
+use crate::FillRule;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct Loc {
@@ -92,7 +92,12 @@ impl Tile {
     }
 }
 
-pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_buf: &mut Vec<u32>, fill_rule: FillRule) {
+pub fn render_strips_scalar(
+    tiles: &[Tile],
+    strip_buf: &mut Vec<Strip>,
+    alpha_buf: &mut Vec<u32>,
+    fill_rule: FillRule,
+) {
     strip_buf.clear();
 
     let mut strip_start = true;
@@ -190,15 +195,16 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
                     let area = areas[x as usize][y];
 
                     let area_u8 = match fill_rule {
-                        FillRule::NonZero => (area.abs().min(1.0) * 255.0).round() as u32,
+                        FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
                         FillRule::EvenOdd => {
                             let floored = area.floor();
+                            let even = floored as i32 % 2;
+                            // If we have for example 2.68, then opacity is 68%, while for
+                            // 1.68 it would be (1 - 0.68) = 32%
+                            let add_val = even as f32;
+                            let mul_factor = (-2 * even + 1) as f32;
 
-                            (if floored as i32 % 2 == 0 {
-                                area - floored
-                            }   else {
-                                1.0 - (area - floored)
-                            } * 255.0).round() as u32
+                            ((add_val + mul_factor * (area - floored)) * 255.0 + 0.5) as u32
                         }
                     };
 
