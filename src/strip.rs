@@ -12,7 +12,7 @@
 //! path_id type should probably become a generic parameter.
 
 use crate::tiling::{PackedPoint, TILE_WIDTH};
-use crate::{tiling::Point, wide_tile::STRIP_HEIGHT};
+use crate::wide_tile::STRIP_HEIGHT;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct Loc {
@@ -25,8 +25,8 @@ pub(crate) struct Footprint(pub(crate) u32);
 pub struct Tile {
     pub x: u16,
     pub y: u16,
-    pub p0: PackedPoint, // packed
-    pub p1: PackedPoint, // packed
+    pub p0: PackedPoint,
+    pub p1: PackedPoint,
 }
 
 impl std::fmt::Debug for Tile {
@@ -41,7 +41,6 @@ impl std::fmt::Debug for Tile {
     }
 }
 
-#[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
     pub xy: u32, // this could be u16's on the Rust side
@@ -50,6 +49,8 @@ pub struct Strip {
 }
 
 impl Loc {
+    /// Two locations are on the same strip if they are on the same
+    /// row and next to each other.
     pub(crate) fn same_strip(&self, other: &Self) -> bool {
         self.same_row(other) && (other.x - self.x) / 2 == 0
     }
@@ -90,58 +91,88 @@ impl Tile {
     }
 }
 
-// This can be unused when SIMD is selected. Probably a good idea to make it
-// selectable at runtime; will be needed for AVX2.
-#[allow(unused)]
 pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_buf: &mut Vec<u32>) {
     strip_buf.clear();
+
     let mut strip_start = true;
     let mut cols = alpha_buf.len() as u32;
     let mut prev_tile = &tiles[0];
     let mut fp = prev_tile.footprint().0;
     let mut seg_start = 0;
     let mut delta = 0;
+
     // Note: the input should contain a sentinel tile, to avoid having
     // logic here to process the final strip.
     for i in 1..tiles.len() {
         let tile = &tiles[i];
-        tile.footprint();
+
         if prev_tile.loc() != tile.loc() {
             let start_delta = delta;
             let same_strip = prev_tile.loc().same_strip(&tile.loc());
+
             if same_strip {
                 fp |= 8;
             }
+
             let x0 = fp.trailing_zeros();
             let x1 = 32 - fp.leading_zeros();
             let mut areas = [[start_delta as f32; 4]; 4];
+
             for tile in &tiles[seg_start..i] {
                 delta += tile.delta();
+
                 let p0 = tile.p0.unpack();
                 let p1 = tile.p1.unpack();
-                let slope = (p1.x - p0.x) / (p1.y - p0.y);
+                let inv_slope = (p1.x - p0.x) / (p1.y - p0.y);
+
+                // Note: We are iterating in column-major order because the inner loop always
+                // has a constant number of iterations, which makes it more SIMD-friendly. Worth
+                // running some tests whether a different order allows for better performance.
                 for x in x0..x1 {
-                    let startx = p0.x - x as f32;
+                    // Relative x offset of the start point from the
+                    // current column.
+                    let rel_x = p0.x - x as f32;
+
                     for y in 0..4 {
-                        let starty = p0.y - y as f32;
-                        let y0 = starty.clamp(0.0, 1.0);
+                        // Relative y offset of the start
+                        // point from the current row.
+                        let rel_y = p0.y - y as f32;
+                        // y values will be 1 if the point is below the current row,
+                        // 0 if the point is above the current row, and between 0-1
+                        // if it is on the same row.
+                        let y0 = rel_y.clamp(0.0, 1.0);
                         let y1 = (p1.y - y as f32).clamp(0.0, 1.0);
+                        // If != 0, then the line intersects the current row
+                        // in the current tile.
                         let dy = y0 - y1;
+
                         // Note: getting rid of this predicate might help with
                         // auto-vectorization. That said, just getting rid of
                         // it causes artifacts (which may be divide by zero).
                         if dy != 0.0 {
-                            let xx0 = startx + (y0 - starty) * slope;
-                            let xx1 = startx + (y1 - starty) * slope;
+                            // x intersection points in the current tile.
+                            let xx0 = rel_x + (y0 - rel_y) * inv_slope;
+                            let xx1 = rel_x + (y1 - rel_y) * inv_slope;
                             let xmin0 = xx0.min(xx1);
                             let xmax = xx0.max(xx1);
+                            // Subtract a small delta to prevent a division by zero below.
                             let xmin = xmin0.min(1.0) - 1e-6;
+                            // Clip x_max to the right side of the pixel.
                             let b = xmax.min(1.0);
+                            // Clip x_max to the left side of the pixel.
                             let c = b.max(0.0);
+                            // Clip x_min to the left side of the pixel.
                             let d = xmin.max(0.0);
+                            // Calculate the covered area.
+                            // TODO: How is this formula derived?
                             let a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
+
+                            // Above area calculation is under the assumption that the line
+                            // covers the whole row, here we account for the fact that only a
+                            // a fraction of the height could be covered.
                             areas[x as usize][y] += a * dy;
                         }
+
                         if p0.x == 0.0 {
                             areas[x as usize][y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
                         } else if p1.x == 0.0 {
@@ -153,12 +184,14 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
 
             for x in x0..x1 {
                 let mut alphas = 0u32;
+
                 for y in 0..4 {
                     let area = areas[x as usize][y];
                     // nonzero winding number rule
                     let area_u8 = (area.abs().min(1.0) * 255.0).round() as u32;
                     alphas += area_u8 << (y * 8);
                 }
+
                 alpha_buf.push(alphas);
             }
 
@@ -169,17 +202,21 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
                     col: cols,
                     winding: start_delta,
                 };
+
                 strip_buf.push(strip);
             }
+
             cols += x1 - x0;
             fp = if same_strip { 1 } else { 0 };
 
             strip_start = !same_strip;
             seg_start = i;
+
             if !prev_tile.loc().same_row(&tile.loc()) {
                 delta = 0;
             }
         }
+
         fp |= tile.footprint().0;
 
         prev_tile = tile;
