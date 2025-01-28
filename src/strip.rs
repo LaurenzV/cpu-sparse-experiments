@@ -150,7 +150,7 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
                         // auto-vectorization. That said, just getting rid of
                         // it causes artifacts (which may be divide by zero).
                         if dy != 0.0 {
-                            // x intersection points in the current row.
+                            // x intersection points in the current tile.
                             let xx0 = rel_x + (y0 - rel_y) * inv_slope;
                             let xx1 = rel_x + (y1 - rel_y) * inv_slope;
                             let xmin0 = xx0.min(xx1);
@@ -163,8 +163,13 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
                             let c = b.max(0.0);
                             // Clip x_min to the left side of the pixel.
                             let d = xmin.max(0.0);
+                            // Calculate the covered area.
+                            // TODO: How is this formula derived?
                             let a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
 
+                            // Above area calculation is under the assumption that the line
+                            // covers the whole row, here we account for the fact that only a
+                            // a fraction of the height could be covered.
                             areas[x as usize][y] += a * dy;
                         }
 
