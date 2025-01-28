@@ -125,21 +125,34 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
                 let p1 = tile.p1.unpack();
                 let inv_slope = (p1.x - p0.x) / (p1.y - p0.y);
 
+                // Note: We are iterating in column-major order because the inner loop always
+                // has a constant number of iterations, which makes it more SIMD-friendly. Worth
+                // running some tests whether a different order allows for better performance.
                 for x in x0..x1 {
-                    let startx = p0.x - x as f32;
+                    // Relative x offset of the start point from the
+                    // current column.
+                    let start_x = p0.x - x as f32;
 
                     for y in 0..4 {
-                        let starty = p0.y - y as f32;
-                        let y0 = starty.clamp(0.0, 1.0);
+                        // Relative y offset of the start
+                        // point from the current row.
+                        let start_y = p0.y - y as f32;
+                        // y values will be 1 if the point is below the current row,
+                        // 0 if the point is above the current row, and between 0-1
+                        // if it is on the same row.
+                        let y0 = start_y.clamp(0.0, 1.0);
                         let y1 = (p1.y - y as f32).clamp(0.0, 1.0);
+                        // If != 0, then the line intersects the current row
+                        // in the current tile.
                         let dy = y0 - y1;
 
                         // Note: getting rid of this predicate might help with
                         // auto-vectorization. That said, just getting rid of
                         // it causes artifacts (which may be divide by zero).
                         if dy != 0.0 {
-                            let xx0 = startx + (y0 - starty) * inv_slope;
-                            let xx1 = startx + (y1 - starty) * inv_slope;
+                            // x intersection points in the current row.
+                            let xx0 = start_x + (y0 - start_y) * inv_slope;
+                            let xx1 = start_x + (y1 - start_y) * inv_slope;
                             let xmin0 = xx0.min(xx1);
                             let xmax = xx0.max(xx1);
                             let xmin = xmin0.min(1.0) - 1e-6;
