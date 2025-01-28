@@ -131,16 +131,16 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
                 for x in x0..x1 {
                     // Relative x offset of the start point from the
                     // current column.
-                    let start_x = p0.x - x as f32;
+                    let rel_x = p0.x - x as f32;
 
                     for y in 0..4 {
                         // Relative y offset of the start
                         // point from the current row.
-                        let start_y = p0.y - y as f32;
+                        let rel_y = p0.y - y as f32;
                         // y values will be 1 if the point is below the current row,
                         // 0 if the point is above the current row, and between 0-1
                         // if it is on the same row.
-                        let y0 = start_y.clamp(0.0, 1.0);
+                        let y0 = rel_y.clamp(0.0, 1.0);
                         let y1 = (p1.y - y as f32).clamp(0.0, 1.0);
                         // If != 0, then the line intersects the current row
                         // in the current tile.
@@ -151,13 +151,17 @@ pub fn render_strips_scalar(tiles: &[Tile], strip_buf: &mut Vec<Strip>, alpha_bu
                         // it causes artifacts (which may be divide by zero).
                         if dy != 0.0 {
                             // x intersection points in the current row.
-                            let xx0 = start_x + (y0 - start_y) * inv_slope;
-                            let xx1 = start_x + (y1 - start_y) * inv_slope;
+                            let xx0 = rel_x + (y0 - rel_y) * inv_slope;
+                            let xx1 = rel_x + (y1 - rel_y) * inv_slope;
                             let xmin0 = xx0.min(xx1);
                             let xmax = xx0.max(xx1);
+                            // Subtract a small delta to prevent a division by zero below.
                             let xmin = xmin0.min(1.0) - 1e-6;
+                            // Clip x_max to the right side of the pixel.
                             let b = xmax.min(1.0);
+                            // Clip x_max to the left side of the pixel.
                             let c = b.max(0.0);
+                            // Clip x_min to the left side of the pixel.
                             let d = xmin.max(0.0);
                             let a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
 
