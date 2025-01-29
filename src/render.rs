@@ -111,14 +111,14 @@ impl CsRenderCtx {
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
 
-            // Don't render strips that are outside the viewport.
             if strip.x() as usize >= self.width {
+                // Don't render strips that are outside the viewport.
                 continue;
             }
 
-            // Since strips are sorted by location, any subsequent strips will also be out
-            // of bounds.
             if strip.y() as usize >= self.height {
+                // Since strips are sorted by location, any subsequent strips will also be
+                // outside the viewport, so we can abort entirely.
                 break;
             }
 
