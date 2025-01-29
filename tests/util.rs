@@ -31,12 +31,13 @@ pub fn get_ctx(width: usize, height: usize, transparent: bool) -> CsRenderCtx {
     ctx
 }
 
-pub(crate) fn render_pixmap(ctx: &CsRenderCtx) -> Pixmap {
+pub fn render_pixmap(ctx: &CsRenderCtx) -> Pixmap {
     let mut pixmap = Pixmap::new(ctx.width, ctx.height);
     ctx.render_to_pixmap(&mut pixmap);
 
     pixmap
 }
+
 pub fn check_ref(ctx: &CsRenderCtx, name: &str) {
     let mut pixmap = render_pixmap(ctx);
     pixmap.unpremultiply();

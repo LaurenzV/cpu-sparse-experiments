@@ -1,4 +1,4 @@
-use crate::util::{check_ref, get_ctx};
+use crate::util::{check_ref, get_ctx, render_pixmap};
 use cpu_sparse::FillRule;
 use peniko::color::palette;
 use peniko::kurbo::{Affine, BezPath, Circle, Stroke};
@@ -143,4 +143,19 @@ fn issue_2_incorrect_filling_8() {
     ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_8");
+}
+
+#[test]
+fn issue_11_out_of_bound_strip() {
+    let mut path = BezPath::new();
+    path.move_to((258.0, 254.0));
+    path.line_to((265.0, 254.0));
+
+    let mut ctx = get_ctx(256, 256, true);
+
+    let stroke = Stroke::new(1.0);
+    ctx.stroke(&path.into(), &stroke, palette::css::DARK_BLUE.into());
+
+    // Just make sure we don't panic
+    let _ = render_pixmap(&ctx);
 }
