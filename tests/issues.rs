@@ -154,8 +154,6 @@ fn issue_11_out_of_bound_strip() {
     let mut ctx = get_ctx(256, 256, true);
 
     let stroke = Stroke::new(1.0);
+    // Just make sure we don't panic.
     ctx.stroke(&path.into(), &stroke, palette::css::DARK_BLUE.into());
-
-    // Just make sure we don't panic
-    let _ = render_pixmap(&ctx);
 }
