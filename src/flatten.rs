@@ -16,8 +16,16 @@ pub fn fill(path: &BezPath, affine: Affine, line_buf: &mut Vec<FlatLine>) {
     let mut start = kurbo::Point::default();
     let mut p0 = kurbo::Point::default();
     let iter = path.iter().map(|el| affine * el);
+
+    let mut closed = false;
+
     kurbo::flatten(iter, TOL, |el| match el {
         kurbo::PathEl::MoveTo(p) => {
+            if !closed && p0 != start {
+                close_path(start, p0, line_buf);
+            }
+
+            closed = false;
             start = p;
             p0 = p;
         }
@@ -30,14 +38,15 @@ pub fn fill(path: &BezPath, affine: Affine, line_buf: &mut Vec<FlatLine>) {
         kurbo::PathEl::QuadTo(_, _) => unreachable!(),
         kurbo::PathEl::CurveTo(_, _, _) => unreachable!(),
         kurbo::PathEl::ClosePath => {
-            let pt0 = Point::new(p0.x as f32, p0.y as f32);
-            let pt1 = Point::new(start.x as f32, start.y as f32);
+            closed = true;
 
-            if pt0 != pt1 {
-                line_buf.push(FlatLine::new(pt0, pt1));
-            }
+            close_path(start, p0, line_buf);
         }
     });
+
+    if !closed {
+        close_path(start, p0, line_buf);
+    }
 }
 
 pub fn stroke(path: &BezPath, style: &Stroke, affine: Affine, line_buf: &mut Vec<FlatLine>) {
@@ -53,5 +62,14 @@ pub fn stroke(path: &BezPath, style: &Stroke, affine: Affine, line_buf: &mut Vec
         let p0 = Point::new(scaled_p0.x as f32, scaled_p0.y as f32);
         let p1 = Point::new(scaled_p1.x as f32, scaled_p1.y as f32);
         line_buf.push(FlatLine::new(p0, p1));
+    }
+}
+
+fn close_path(start: kurbo::Point, p0: kurbo::Point, line_buf: &mut Vec<FlatLine>) {
+    let pt0 = Point::new(p0.x as f32, p0.y as f32);
+    let pt1 = Point::new(start.x as f32, start.y as f32);
+
+    if pt0 != pt1 {
+        line_buf.push(FlatLine::new(pt0, pt1));
     }
 }

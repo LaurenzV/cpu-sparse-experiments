@@ -157,3 +157,37 @@ fn issue_11_out_of_bound_strip() {
     // Just make sure we don't panic.
     ctx.stroke(&path.into(), &stroke, palette::css::DARK_BLUE.into());
 }
+
+#[test]
+fn issue_12_filling_unclosed_path_1() {
+    let mut path = BezPath::new();
+    path.move_to((75.0, 25.0));
+    path.line_to((25.0, 25.0));
+    path.line_to((25.0, 75.0));
+
+    let mut ctx = get_ctx(100, 100, false);
+
+    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+
+    check_ref(&ctx, "issue_12_filling_unclosed_path_1");
+}
+
+#[test]
+fn issue_12_filling_unclosed_path_2() {
+    let mut path = BezPath::new();
+    path.move_to((50.0, 0.0));
+    path.line_to((0.0, 0.0));
+    path.line_to((0.0, 50.0));
+
+    path.move_to((50.0, 50.0));
+    path.line_to((100.0, 50.0));
+    path.line_to((100.0, 100.0));
+    path.line_to((50.0, 100.0));
+    path.close_path();
+
+    let mut ctx = get_ctx(100, 100, false);
+
+    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+
+    check_ref(&ctx, "issue_12_filling_unclosed_path_2");
+}
