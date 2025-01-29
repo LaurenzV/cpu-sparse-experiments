@@ -197,14 +197,14 @@ pub fn render_strips_scalar(
                     let area_u8 = match fill_rule {
                         FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
                         FillRule::EvenOdd => {
-                            let floored = area.floor();
-                            let even = floored as i32 % 2;
+                            let even = area as i32 % 2;
                             // If we have for example 2.68, then opacity is 68%, while for
-                            // 1.68 it would be (1 - 0.68) = 32%
+                            // 1.68 it would be (1 - 0.68) = 32%.
                             let add_val = even as f32;
-                            let mul_factor = (-2 * even + 1) as f32;
+                            // 1 for even, -1 for odd.
+                            let sign = (-2 * even + 1) as f32;
 
-                            ((add_val + mul_factor * (area - floored)) * 255.0 + 0.5) as u32
+                            ((add_val + sign * area.fract()) * 255.0 + 0.5) as u32
                         }
                     };
 
