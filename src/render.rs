@@ -111,8 +111,14 @@ impl CsRenderCtx {
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
 
-            // Don't render strips that are outside the viewport vertically.
+            if strip.x() as usize >= self.width {
+                // Don't render strips that are outside the viewport.
+                continue;
+            }
+
             if strip.y() as usize >= self.height {
+                // Since strips are sorted by location, any subsequent strips will also be
+                // outside the viewport, so we can abort entirely.
                 break;
             }
 
@@ -126,6 +132,7 @@ impl CsRenderCtx {
             let xtile1 = (x1 as usize + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
             let mut x = x0;
             let mut col = strip.col;
+
             for xtile in xtile0..xtile1 {
                 let x_tile_rel = x % WIDE_TILE_WIDTH as u32;
                 let width = x1.min(((xtile + 1) * WIDE_TILE_WIDTH) as u32) - x;
@@ -139,6 +146,7 @@ impl CsRenderCtx {
                 col += width;
                 self.tiles[row_start + xtile].push(Cmd::Strip(cmd));
             }
+
             if fill_rule.active_fill(next_strip.winding) && y == next_strip.strip_y() {
                 x = x1;
                 let x2 = next_strip.x();
