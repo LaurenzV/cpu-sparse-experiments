@@ -51,9 +51,7 @@ fn render_group(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, group: &usvg::Grou
             Node::Path(p) => {
                 render_path(ctx, sctx, p);
             }
-            Node::Image(i) => {
-                render_image(ctx, sctx, i)
-            }
+            Node::Image(i) => render_image(ctx, sctx, i),
             Node::Text(_) => {}
         }
     }
@@ -64,9 +62,7 @@ fn render_group(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, group: &usvg::Grou
 fn render_image(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, image: &usvg::Image) {
     let pixmap = match image.kind() {
         ImageKind::JPEG(_) => unimplemented!(),
-        ImageKind::PNG(i) => {
-            Pixmap::from_png(i).unwrap()
-        }
+        ImageKind::PNG(i) => Pixmap::from_png(i).unwrap(),
         ImageKind::GIF(_) => unimplemented!(),
         ImageKind::WEBP(_) => unimplemented!(),
         ImageKind::SVG(_) => unimplemented!(),

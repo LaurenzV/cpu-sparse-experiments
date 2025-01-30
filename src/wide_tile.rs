@@ -1,6 +1,7 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::paint::Paint;
 use peniko::color::{AlphaColor, Srgb};
 
 pub const WIDE_TILE_WIDTH: usize = 256;
@@ -22,7 +23,7 @@ pub enum Cmd {
 pub struct CmdFill {
     pub x: u32,
     pub width: u32,
-    pub color: AlphaColor<Srgb>,
+    pub paint: Paint,
 }
 
 #[derive(Debug)]
@@ -30,7 +31,7 @@ pub struct CmdStrip {
     pub x: u32,
     pub width: u32,
     pub alpha_ix: usize,
-    pub color: AlphaColor<Srgb>,
+    pub paint: Paint,
 }
 
 impl Default for WideTile {
@@ -43,12 +44,16 @@ impl Default for WideTile {
 }
 
 impl WideTile {
-    pub(crate) fn fill(&mut self, x: u32, width: u32, color: AlphaColor<Srgb>) {
-        if x == 0 && width == WIDE_TILE_WIDTH as u32 && color.components[3] == 1.0 {
-            self.cmds.clear();
-            self.bg = color;
+    pub(crate) fn fill(&mut self, x: u32, width: u32, paint: Paint) {
+        if let Paint::Solid(s) = &paint {
+            if x == 0 && width == WIDE_TILE_WIDTH as u32 && s.components[3] == 1.0 {
+                self.cmds.clear();
+                self.bg = *s;
+            } else {
+                self.cmds.push(Cmd::Fill(CmdFill { x, width, paint }));
+            }
         } else {
-            self.cmds.push(Cmd::Fill(CmdFill { x, width, color }));
+            self.cmds.push(Cmd::Fill(CmdFill { x, width, paint }));
         }
     }
 

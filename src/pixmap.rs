@@ -5,6 +5,7 @@
 
 use zune_png::zune_core::options::DecoderOptions;
 
+#[derive(Debug)]
 pub struct Pixmap {
     pub(crate) width: usize,
     pub(crate) height: usize,

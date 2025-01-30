@@ -3,6 +3,7 @@
 
 //! Fine rasterization
 
+use crate::paint::Paint;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
 pub(crate) const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
@@ -49,52 +50,67 @@ impl<'a> Fine<'a> {
     pub(crate) fn run_cmd(&mut self, cmd: &Cmd, alphas: &[u32]) {
         match cmd {
             Cmd::Fill(f) => {
-                self.fill_scalar(f.x as usize, f.width as usize, f.color.components);
+                self.fill_scalar(f.x as usize, f.width as usize, &f.paint);
             }
             Cmd::Strip(s) => {
                 let aslice = &alphas[s.alpha_ix..];
-                self.strip_scalar(s.x as usize, s.width as usize, aslice, s.color.components);
+                self.strip_scalar(s.x as usize, s.width as usize, aslice, &s.paint);
             }
         }
     }
 
-    pub(crate) fn fill_scalar(&mut self, x: usize, width: usize, color: [f32; 4]) {
-        if color[3] == 1.0 {
-            for z in
-                self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width].chunks_exact_mut(4)
-            {
-                z.copy_from_slice(&color);
-            }
-        } else {
-            let one_minus_alpha = 1.0 - color[3];
-            for z in
-                self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width].chunks_exact_mut(4)
-            {
-                for i in 0..4 {
-                    //z[i] = color[i] + one_minus_alpha * z[i];
-                    // Note: the mul_add will perform poorly on x86_64 default cpu target
-                    // Probably right thing to do is craft a #cfg that detects fma, fcma, etc.
-                    // What we really want is fmuladdf32 from intrinsics!
-                    z[i] = z[i].mul_add(one_minus_alpha, color[i]);
+    pub(crate) fn fill_scalar(&mut self, x: usize, width: usize, paint: &Paint) {
+        match paint {
+            Paint::Solid(c) => {
+                let color = c.components;
+
+                if color[3] == 1.0 {
+                    for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+                        .chunks_exact_mut(4)
+                    {
+                        z.copy_from_slice(&color);
+                    }
+                } else {
+                    let one_minus_alpha = 1.0 - color[3];
+                    for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+                        .chunks_exact_mut(4)
+                    {
+                        for i in 0..4 {
+                            //z[i] = color[i] + one_minus_alpha * z[i];
+                            // Note: the mul_add will perform poorly on x86_64 default cpu target
+                            // Probably right thing to do is craft a #cfg that detects fma, fcma, etc.
+                            // What we really want is fmuladdf32 from intrinsics!
+                            z[i] = z[i].mul_add(one_minus_alpha, color[i]);
+                        }
+                    }
                 }
             }
+            Paint::Pattern(_) => unimplemented!(),
         }
     }
 
-    pub(crate) fn strip_scalar(&mut self, x: usize, width: usize, alphas: &[u32], color: [f32; 4]) {
-        debug_assert!(alphas.len() >= width);
-        let cs = color.map(|x| x * (1.0 / 255.0));
-        for (z, a) in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-            .chunks_exact_mut(16)
-            .zip(alphas)
-        {
-            for j in 0..4 {
-                let mask_alpha = ((*a >> (j * 8)) & 0xff) as f32;
-                let one_minus_alpha = 1.0 - mask_alpha * cs[3];
-                for i in 0..4 {
-                    z[j * 4 + i] = z[j * 4 + i].mul_add(one_minus_alpha, mask_alpha * cs[i]);
+    pub(crate) fn strip_scalar(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
+        match paint {
+            Paint::Solid(s) => {
+                let color = &s.components;
+
+                debug_assert!(alphas.len() >= width);
+                let cs = color.map(|x| x * (1.0 / 255.0));
+                for (z, a) in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+                    .chunks_exact_mut(16)
+                    .zip(alphas)
+                {
+                    for j in 0..4 {
+                        let mask_alpha = ((*a >> (j * 8)) & 0xff) as f32;
+                        let one_minus_alpha = 1.0 - mask_alpha * cs[3];
+                        for i in 0..4 {
+                            z[j * 4 + i] =
+                                z[j * 4 + i].mul_add(one_minus_alpha, mask_alpha * cs[i]);
+                        }
+                    }
                 }
             }
+            Paint::Pattern(_) => unimplemented!(),
         }
     }
 }
