@@ -12,6 +12,7 @@ use peniko::{
 };
 use std::collections::BTreeMap;
 
+use crate::paint::Paint;
 use crate::strip::render_strips_scalar;
 use crate::{
     fine::Fine,
@@ -42,9 +43,14 @@ impl CsRenderCtx {
     pub fn new(width: usize, height: usize) -> Self {
         let width_tiles = (width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         let height_tiles = (height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
-        let tiles = (0..width_tiles * height_tiles)
-            .map(|_| WideTile::default())
-            .collect();
+        let mut tiles = Vec::with_capacity(width_tiles * height_tiles);
+
+        for w in 0..width_tiles {
+            for h in 0..height_tiles {
+                tiles.push(WideTile::new(w * WIDE_TILE_WIDTH, h * STRIP_HEIGHT));
+            }
+        }
+
         let alphas = vec![];
         let line_buf = vec![];
         let tile_buf = vec![];
@@ -96,7 +102,7 @@ impl CsRenderCtx {
     }
 
     /// Render a path, which has already been flattened into `line_buf`.
-    fn render_path(&mut self, fill_rule: FillRule, brush: BrushRef) {
+    fn render_path(&mut self, fill_rule: FillRule, paint: Paint) {
         tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
         self.tile_buf.sort_unstable_by(Tile::cmp);
 
@@ -106,7 +112,6 @@ impl CsRenderCtx {
             &mut self.alphas,
             fill_rule,
         );
-        let color = brush_to_color(brush);
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
@@ -140,7 +145,7 @@ impl CsRenderCtx {
                     x: x_tile_rel,
                     width,
                     alpha_ix: col as usize,
-                    color,
+                    paint: paint.clone(),
                 };
                 x += width;
                 col += width;
@@ -156,7 +161,7 @@ impl CsRenderCtx {
                     let x_tile_rel = x % WIDE_TILE_WIDTH as u32;
                     let width = x2.min(((xtile + 1) * WIDE_TILE_WIDTH) as u32) - x;
                     x += width;
-                    self.tiles[row_start + xtile].fill(x_tile_rel, width, color);
+                    self.tiles[row_start + xtile].fill(x_tile_rel, width, paint.clone());
                 }
             }
         }
@@ -172,16 +177,16 @@ impl CsRenderCtx {
         }
     }
 
-    pub fn fill(&mut self, path: &Path, fill_rule: FillRule, brush: BrushRef) {
+    pub fn fill(&mut self, path: &Path, fill_rule: FillRule, paint: Paint) {
         let affine = self.get_affine();
         crate::flatten::fill(&path.path, affine, &mut self.line_buf);
-        self.render_path(fill_rule, brush);
+        self.render_path(fill_rule, paint);
     }
 
-    pub fn stroke(&mut self, path: &Path, stroke: &peniko::kurbo::Stroke, brush: BrushRef) {
+    pub fn stroke(&mut self, path: &Path, stroke: &peniko::kurbo::Stroke, paint: Paint) {
         let affine = self.get_affine();
         crate::flatten::stroke(&path.path, stroke, affine, &mut self.line_buf);
-        self.render_path(FillRule::NonZero, brush);
+        self.render_path(FillRule::NonZero, paint);
     }
 
     pub fn set_transform(&mut self, transform: Affine) {
