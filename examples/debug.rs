@@ -1,3 +1,4 @@
+use cpu_sparse::paint::Paint;
 use cpu_sparse::strip::{Strip, Tile};
 use cpu_sparse::svg::{render_tree, SVGContext};
 use cpu_sparse::tiling::{FlatLine, Point, TILE_HEIGHT, TILE_WIDTH};
@@ -65,7 +66,8 @@ fn draw_wide_tiles(document: &mut Document, wide_tiles: &[WideTile], alphas: &[u
             match cmd {
                 Cmd::Fill(f) => {
                     for i in 0..f.width {
-                        let color = f.color.to_rgba8();
+                        let Paint::Solid(c) = f.paint else { continue };
+                        let color = c.to_rgba8();
 
                         for h in 0..STRIP_HEIGHT {
                             let rect = Rectangle::new()
@@ -87,7 +89,8 @@ fn draw_wide_tiles(document: &mut Document, wide_tiles: &[WideTile], alphas: &[u
                     for i in 0..s.width {
                         let alpha = alphas[s.alpha_ix + i as usize];
                         let entries = alpha.to_le_bytes();
-                        let color = s.color.to_rgba8();
+                        let Paint::Solid(c) = s.paint else { continue };
+                        let color = c.to_rgba8();
 
                         for h in 0..STRIP_HEIGHT {
                             let rect = Rectangle::new()
