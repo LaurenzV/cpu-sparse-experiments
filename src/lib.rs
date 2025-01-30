@@ -9,6 +9,7 @@ pub mod strip;
 pub mod svg;
 pub mod tiling;
 pub mod wide_tile;
+mod pattern;
 
 #[derive(Clone, Copy)]
 pub enum FillRule {

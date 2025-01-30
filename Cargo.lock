@@ -311,6 +311,7 @@ dependencies = [
  "svg",
  "tiny-skia",
  "usvg",
+ "zune-png",
 ]
 
 [[package]]
@@ -1786,4 +1787,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99a5bab8d7dedf81405c4bb1f2b83ea057643d9cb28778cea9eecddeedd2e028"
 dependencies = [
  "zune-core",
+]
+
+[[package]]
+name = "zune-png"
+version = "0.4.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d29c085769c6f29effea890f093120ac019375fdc789d2a496ba8ba96c77509"
+dependencies = [
+ "zune-core",
+ "zune-inflate",
 ]

@@ -1,9 +1,9 @@
 use crate::render::Path;
-use crate::{CsRenderCtx, FillRule};
+use crate::{CsRenderCtx, FillRule, Pixmap};
 use peniko::color::AlphaColor;
 use peniko::kurbo::{Affine, BezPath, Stroke};
 use usvg::tiny_skia_path::PathSegment;
-use usvg::{Node, Paint, PaintOrder};
+use usvg::{ImageKind, Node, Paint, PaintOrder};
 
 pub struct SVGContext {
     transforms: Vec<Affine>,
@@ -51,12 +51,26 @@ fn render_group(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, group: &usvg::Grou
             Node::Path(p) => {
                 render_path(ctx, sctx, p);
             }
-            Node::Image(_) => {}
+            Node::Image(i) => {
+                render_image(ctx, sctx, i)
+            }
             Node::Text(_) => {}
         }
     }
 
     sctx.pop_transform();
+}
+
+fn render_image(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, image: &usvg::Image) {
+    let pixmap = match image.kind() {
+        ImageKind::JPEG(_) => unimplemented!(),
+        ImageKind::PNG(i) => {
+            Pixmap::from_png(i).unwrap()
+        }
+        ImageKind::GIF(_) => unimplemented!(),
+        ImageKind::WEBP(_) => unimplemented!(),
+        ImageKind::SVG(_) => unimplemented!(),
+    };
 }
 
 fn render_path(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, path: &usvg::Path) {
