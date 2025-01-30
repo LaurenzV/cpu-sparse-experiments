@@ -43,9 +43,14 @@ impl CsRenderCtx {
     pub fn new(width: usize, height: usize) -> Self {
         let width_tiles = (width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         let height_tiles = (height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
-        let tiles = (0..width_tiles * height_tiles)
-            .map(|_| WideTile::default())
-            .collect();
+        let mut tiles = Vec::with_capacity(width_tiles * height_tiles);
+
+        for w in 0..width_tiles {
+            for h in 0..height_tiles {
+                tiles.push(WideTile::new(w * WIDE_TILE_WIDTH, h * STRIP_HEIGHT));
+            }
+        }
+
         let alphas = vec![];
         let line_buf = vec![];
         let tile_buf = vec![];

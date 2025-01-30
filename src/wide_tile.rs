@@ -9,8 +9,21 @@ pub const STRIP_HEIGHT: usize = 4;
 
 #[derive(Debug)]
 pub struct WideTile {
+    pub x: usize,
+    pub y: usize,
     pub bg: AlphaColor<Srgb>,
     pub cmds: Vec<Cmd>,
+}
+
+impl WideTile {
+    pub fn new(x: usize, y: usize) -> Self {
+        Self {
+            x,
+            y,
+            bg: AlphaColor::TRANSPARENT,
+            cmds: vec![],
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -32,15 +45,6 @@ pub struct CmdStrip {
     pub width: u32,
     pub alpha_ix: usize,
     pub paint: Paint,
-}
-
-impl Default for WideTile {
-    fn default() -> Self {
-        Self {
-            bg: AlphaColor::TRANSPARENT,
-            cmds: vec![],
-        }
-    }
 }
 
 impl WideTile {
