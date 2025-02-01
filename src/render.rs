@@ -81,7 +81,7 @@ impl CsRenderCtx {
         for y in 0..height_tiles {
             for x in 0..width_tiles {
                 let tile = &self.tiles[y * width_tiles + x];
-                fine.clear_scalar(tile.bg.components);
+                fine.clear_scalar(tile.bg.premultiply().to_rgba8().to_u8_array());
                 for cmd in &tile.cmds {
                     fine.run_cmd(cmd, &self.alphas);
                 }
