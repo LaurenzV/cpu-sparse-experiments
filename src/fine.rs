@@ -30,9 +30,9 @@ impl<'a> Fine<'a> {
         }
     }
 
-    pub(crate) fn clear_scalar(&mut self, color: [u8; 4]) {
+    pub(crate) fn clear_scalar(&mut self, premul_color: [u8; 4]) {
         for z in self.scratch.chunks_exact_mut(4) {
-            z.copy_from_slice(&color);
+            z.copy_from_slice(&premul_color);
         }
     }
 
@@ -63,16 +63,16 @@ impl<'a> Fine<'a> {
     pub(crate) fn fill_scalar(&mut self, x: usize, width: usize, paint: &Paint) {
         match paint {
             Paint::Solid(c) => {
-                let color = c.premultiply().to_rgba8().to_u8_array();
+                let premul_color = c.premultiply().to_rgba8().to_u8_array();
 
-                if color[3] == 255 {
+                if premul_color[3] == 255 {
                     for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
                         .chunks_exact_mut(4)
                     {
-                        z.copy_from_slice(&color);
+                        z.copy_from_slice(&premul_color);
                     }
                 } else {
-                    let one_minus_alpha = 255 - color[3];
+                    let inv_alpha = 255 - premul_color[3];
                     for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
                         .chunks_exact_mut(4)
                     {
@@ -81,7 +81,7 @@ impl<'a> Fine<'a> {
                             // Note: the mul_add will perform poorly on x86_64 default cpu target
                             // Probably right thing to do is craft a #cfg that detects fma, fcma, etc.
                             // What we really want is fmuladdf32 from intrinsics!
-                            z[i] = mul_255(z[i], one_minus_alpha).saturating_add(color[i]);
+                            z[i] = mul_255(z[i], inv_alpha).saturating_add(premul_color[i]);
                         }
                     }
                 }
@@ -102,9 +102,9 @@ impl<'a> Fine<'a> {
                 {
                     for j in 0..4 {
                         let mask_alpha = ((*a >> (j * 8)) & 0xff) as u8;
-                        let one_minus_alpha = 255 - mul_255(mask_alpha, color[3]);
+                        let inv_alpha = 255 - mul_255(mask_alpha, color[3]);
                         for i in 0..4 {
-                            z[j * 4 + i] = mul_255(z[j * 4 + i], one_minus_alpha)
+                            z[j * 4 + i] = mul_255(z[j * 4 + i], inv_alpha)
                                 + mul_255(mask_alpha, color[i]);
                         }
                     }
