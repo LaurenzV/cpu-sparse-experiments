@@ -72,16 +72,12 @@ impl<'a> Fine<'a> {
                         z.copy_from_slice(&premul_color);
                     }
                 } else {
-                    let inv_alpha = 255 - premul_color[3];
+                    let inv_alpha = 255 - premul_color[3] as u16;
                     for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
                         .chunks_exact_mut(4)
                     {
                         for i in 0..4 {
-                            //z[i] = color[i] + one_minus_alpha * z[i];
-                            // Note: the mul_add will perform poorly on x86_64 default cpu target
-                            // Probably right thing to do is craft a #cfg that detects fma, fcma, etc.
-                            // What we really want is fmuladdf32 from intrinsics!
-                            z[i] = mul_255(z[i], inv_alpha).saturating_add(premul_color[i]);
+                            z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + premul_color[i];
                         }
                     }
                 }
@@ -101,11 +97,13 @@ impl<'a> Fine<'a> {
                     .zip(alphas)
                 {
                     for j in 0..4 {
-                        let mask_alpha = ((*a >> (j * 8)) & 0xff) as u8;
-                        let inv_alpha = 255 - mul_255(mask_alpha, color[3]);
+                        let mask_alpha = ((*a >> (j * 8)) & 0xff) as u16;
+                        let inv_alpha = 255 - (mask_alpha * color[3] as u16) / 255;
                         for i in 0..4 {
-                            z[j * 4 + i] = mul_255(z[j * 4 + i], inv_alpha)
-                                + mul_255(mask_alpha, color[i]);
+                            let im1 = z[j * 4 + i] as u16 * inv_alpha;
+                            let im2 = mask_alpha * color[i] as u16;
+                            let im3 = div_255(im1 + im2);
+                            z[j * 4 + i] = im3 as u8;
                         }
                     }
                 }
@@ -116,8 +114,10 @@ impl<'a> Fine<'a> {
 }
 
 #[inline(always)]
-fn mul_255(val1: u8, val2: u8) -> u8 {
-    ((val1 as u16 * val2 as u16) / 255) as u8
+fn div_255(val: u16) -> u16 {
+    // For some reason, doing this instead of / 255 makes strip_scalar 3x faster on ARM.
+    // TODO: Measure behavior on x86
+    (val + 1 + (val >> 8)) >> 8
 }
 
 pub(crate) fn pack_scalar(
