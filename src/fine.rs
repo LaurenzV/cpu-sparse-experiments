@@ -16,12 +16,12 @@ pub(crate) struct Fine<'a> {
     // f32 RGBA pixels
     // That said, if we use u8, then this is basically a block of
     // untyped memory.
-    pub(crate) scratch: [f32; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+    pub(crate) scratch: [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
 }
 
 impl<'a> Fine<'a> {
     pub(crate) fn new(width: usize, height: usize, out_buf: &'a mut [u8]) -> Self {
-        let scratch = [0.0; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4];
+        let scratch = [0; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4];
         Self {
             width,
             height,
@@ -30,7 +30,7 @@ impl<'a> Fine<'a> {
         }
     }
 
-    pub(crate) fn clear_scalar(&mut self, color: [f32; 4]) {
+    pub(crate) fn clear_scalar(&mut self, color: [u8; 4]) {
         for z in self.scratch.chunks_exact_mut(4) {
             z.copy_from_slice(&color);
         }
@@ -62,16 +62,16 @@ impl<'a> Fine<'a> {
     pub(crate) fn fill_scalar(&mut self, x: usize, width: usize, paint: &Paint) {
         match paint {
             Paint::Solid(c) => {
-                let color = c.components;
+                let color = c.to_rgba8().to_u8_array();
 
-                if color[3] == 1.0 {
+                if color[3] == 255 {
                     for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
                         .chunks_exact_mut(4)
                     {
                         z.copy_from_slice(&color);
                     }
                 } else {
-                    let one_minus_alpha = 1.0 - color[3];
+                    let one_minus_alpha = 255 - color[3];
                     for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
                         .chunks_exact_mut(4)
                     {
@@ -80,7 +80,7 @@ impl<'a> Fine<'a> {
                             // Note: the mul_add will perform poorly on x86_64 default cpu target
                             // Probably right thing to do is craft a #cfg that detects fma, fcma, etc.
                             // What we really want is fmuladdf32 from intrinsics!
-                            z[i] = z[i].mul_add(one_minus_alpha, color[i]);
+                            z[i] = mul_255(z[i], one_minus_alpha).saturating_add(color[i]);
                         }
                     }
                 }
@@ -92,20 +92,18 @@ impl<'a> Fine<'a> {
     pub(crate) fn strip_scalar(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
         match paint {
             Paint::Solid(s) => {
-                let color = &s.components;
+                let color = s.to_rgba8().to_u8_array();
 
                 debug_assert!(alphas.len() >= width);
-                let cs = color.map(|x| x * (1.0 / 255.0));
                 for (z, a) in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
                     .chunks_exact_mut(16)
                     .zip(alphas)
                 {
                     for j in 0..4 {
-                        let mask_alpha = ((*a >> (j * 8)) & 0xff) as f32;
-                        let one_minus_alpha = 1.0 - mask_alpha * cs[3];
+                        let mask_alpha = ((*a >> (j * 8)) & 0xff) as u8;
+                        let one_minus_alpha = 255 - mul_255(mask_alpha, color[3]);
                         for i in 0..4 {
-                            z[j * 4 + i] =
-                                z[j * 4 + i].mul_add(one_minus_alpha, mask_alpha * cs[i]);
+                            z[j * 4 + i] = mul_255(z[j * 4 + i], one_minus_alpha).saturating_add(mul_255(mask_alpha, color[i]));
                         }
                     }
                 }
@@ -115,9 +113,14 @@ impl<'a> Fine<'a> {
     }
 }
 
+#[inline(always)]
+fn mul_255(val1: u8, val2: u8) -> u8 {
+    ((val1 as u16 * val2 as u16) / 255) as u8
+}
+
 pub(crate) fn pack_scalar(
     out_buf: &mut [u8],
-    scratch: &[f32],
+    scratch: &[u8],
     width: usize,
     height: usize,
     x: usize,
@@ -141,10 +144,7 @@ pub(crate) fn pack_scalar(
 
             let target_ix = line_ix + i * 4;
 
-            let mut rgba_f32 = [0.0; 4];
-            rgba_f32.copy_from_slice(&scratch[(i * STRIP_HEIGHT + j) * 4..][..4]);
-            let rgba_u8 = rgba_f32.map(|x| ((x * 255.0) + 0.5) as u8);
-            out_buf[target_ix..][..4].copy_from_slice(&rgba_u8);
+            out_buf[target_ix..][..4].copy_from_slice(&scratch[(i * STRIP_HEIGHT + j) * 4..][..4]);
         }
     }
 }

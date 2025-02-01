@@ -15,7 +15,7 @@ fn main() {
     let start = std::time::Instant::now();
     for _ in 0..num_iters {
         let mut pixmap = Pixmap::new(width as u32, height as u32).unwrap();
-        resvg::render(&tree, Transform::from_scale(3.0, 3.0), &mut pixmap.as_mut());
+        resvg::render(&tree, Transform::from_scale(1.0, 1.0), &mut pixmap.as_mut());
 
         pix = Some(pixmap);
     }
