@@ -62,7 +62,7 @@ impl<'a> Fine<'a> {
     pub(crate) fn fill_scalar(&mut self, x: usize, width: usize, paint: &Paint) {
         match paint {
             Paint::Solid(c) => {
-                let color = c.to_rgba8().to_u8_array();
+                let color = c.premultiply().to_rgba8().to_u8_array();
 
                 if color[3] == 255 {
                     for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
@@ -92,7 +92,7 @@ impl<'a> Fine<'a> {
     pub(crate) fn strip_scalar(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
         match paint {
             Paint::Solid(s) => {
-                let color = s.to_rgba8().to_u8_array();
+                let color = s.premultiply().to_rgba8().to_u8_array();
 
                 debug_assert!(alphas.len() >= width);
                 for (z, a) in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
@@ -103,7 +103,8 @@ impl<'a> Fine<'a> {
                         let mask_alpha = ((*a >> (j * 8)) & 0xff) as u8;
                         let one_minus_alpha = 255 - mul_255(mask_alpha, color[3]);
                         for i in 0..4 {
-                            z[j * 4 + i] = mul_255(z[j * 4 + i], one_minus_alpha).saturating_add(mul_255(mask_alpha, color[i]));
+                            z[j * 4 + i] = mul_255(z[j * 4 + i], one_minus_alpha)
+                                + mul_255(mask_alpha, color[i]);
                         }
                     }
                 }
