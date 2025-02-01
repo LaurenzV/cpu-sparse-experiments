@@ -48,7 +48,6 @@ impl<'a> Fine<'a> {
     }
 
     pub(crate) fn run_cmd(&mut self, cmd: &Cmd, alphas: &[u32]) {
-        // TODO: This became much slower after switching to u8, try to optimize.
         match cmd {
             Cmd::Fill(f) => {
                 self.fill_scalar(f.x as usize, f.width as usize, &f.paint);
