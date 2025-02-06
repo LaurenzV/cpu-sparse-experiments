@@ -1,0 +1,9 @@
+[package]
+name = "bench_gen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cpu-sparse = {path = "../.."}
+svg = "0.18.0"
+rand = "0.8.5"
