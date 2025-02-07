@@ -7,6 +7,7 @@
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
 use crate::strip::render_strips_scalar;
+use crate::tiling::Point;
 use crate::{
     fine::Fine,
     strip::{self, Strip, Tile},
@@ -14,13 +15,16 @@ use crate::{
     wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
     FillRule, Pixmap,
 };
-use peniko::kurbo::{BezPath, Rect};
+use peniko::kurbo::{BezPath, Rect, Shape};
 use peniko::{
     color::{palette, AlphaColor, Srgb},
+    kurbo,
     kurbo::Affine,
     BrushRef,
 };
 use std::collections::BTreeMap;
+
+const DEFAULT_TOLERANCE: f64 = 0.1;
 
 pub struct RenderContext {
     pub width: usize,
@@ -91,24 +95,34 @@ impl RenderContext {
         }
     }
 
-    /// Render a path, which has already been flattened into `line_buf`.
     fn render_path(&mut self, fill_rule: FillRule, paint: Paint) {
         if let Some(rect) = lines_to_rect(&self.line_buf, self.width, self.height) {
             // Fast path for rectangles.
-            self.strip_rect(&rect);
+            self.render_rect(&rect, paint);
         } else {
-            tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
-            self.tile_buf.sort_unstable_by(Tile::cmp);
-
-            render_strips_scalar(
-                &self.tile_buf,
-                &mut self.strip_buf,
-                &mut self.alphas,
-                fill_rule,
-            );
+            self.render_non_rect(fill_rule, paint);
         }
+    }
+
+    /// Render a path, which has already been flattened into `line_buf`.
+    fn render_non_rect(&mut self, fill_rule: FillRule, paint: Paint) {
+        tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
+        self.tile_buf.sort_unstable_by(Tile::cmp);
+
+        render_strips_scalar(
+            &self.tile_buf,
+            &mut self.strip_buf,
+            &mut self.alphas,
+            fill_rule,
+        );
 
         self.generate_commands(fill_rule, paint);
+    }
+
+    /// Render the given rectangle.
+    fn render_rect(&mut self, rect: &Rect, paint: Paint) {
+        self.strip_rect(&rect);
+        self.generate_commands(FillRule::NonZero, paint);
     }
 
     fn wide_tiles_per_row(&self) -> usize {
@@ -174,17 +188,44 @@ impl RenderContext {
     }
 
     /// Fill a path.
-    pub fn fill(&mut self, path: &Path, fill_rule: FillRule, paint: Paint) {
+    pub fn fill_path(&mut self, path: &Path, fill_rule: FillRule, paint: Paint) {
         let affine = self.current_transform();
         crate::flatten::fill(&path.path, affine, &mut self.line_buf);
         self.render_path(fill_rule, paint);
     }
 
+    /// Fill a rectangle.
+    pub fn fill_rect(&mut self, rect: &Rect, paint: Paint) {
+        let affine = self.current_transform();
+        let coeffs = affine.as_coeffs();
+
+        if coeffs[1] == 0.0 && coeffs[2] == 0.0 {
+            // If there is no skewing transform, we can use the rectangle fast path and transform
+            // the points manually.
+            let p1 = affine * kurbo::Point::new(rect.x0, rect.y0);
+            let p2 = affine * kurbo::Point::new(rect.x1, rect.y1);
+
+            let rect = Rect::from_points(p1, p2);
+            self.render_rect(&rect, paint);
+        } else {
+            self.fill_path(
+                &rect.to_path(DEFAULT_TOLERANCE).into(),
+                FillRule::NonZero,
+                paint,
+            );
+        }
+    }
+
     /// Stroke a path.
-    pub fn stroke(&mut self, path: &Path, stroke: &peniko::kurbo::Stroke, paint: Paint) {
+    pub fn stroke_path(&mut self, path: &Path, stroke: &kurbo::Stroke, paint: Paint) {
         let affine = self.current_transform();
         crate::flatten::stroke(&path.path, stroke, affine, &mut self.line_buf);
         self.render_path(FillRule::NonZero, paint);
+    }
+
+    /// Stroke a rectangle.
+    pub fn stroke_rect(&mut self, rect: &Rect, stroke: &kurbo::Stroke, paint: Paint) {
+        self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into(), stroke, paint)
     }
 
     /// Pre-concatenate a new transform to the current transformation matrix.
