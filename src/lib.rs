@@ -28,4 +28,4 @@ impl FillRule {
 }
 
 pub use pixmap::Pixmap;
-pub use render::CsRenderCtx;
+pub use render::RenderContext;

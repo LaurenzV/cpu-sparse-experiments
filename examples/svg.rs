@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use cpu_sparse::render::Path;
 use cpu_sparse::svg::{render_tree, SVGContext};
-use cpu_sparse::{CsRenderCtx, Pixmap};
+use cpu_sparse::{Pixmap, RenderContext};
 use peniko::color::{palette, AlphaColor, Srgb};
 use peniko::kurbo::{Affine, BezPath, Point, Shape, Size, Stroke, Vec2};
 use peniko::{BrushRef, Color};
@@ -21,7 +21,7 @@ pub fn main() {
     let width = (tree.size().width() * scale).ceil() as usize;
     let height = (tree.size().height() * scale).ceil() as usize;
 
-    let mut ctx = CsRenderCtx::new(width, height);
+    let mut ctx = RenderContext::new(width, height);
 
     let mut sctx = SVGContext::new_with_scale(scale as f64);
     let mut pixmap = Pixmap::new(width, height);

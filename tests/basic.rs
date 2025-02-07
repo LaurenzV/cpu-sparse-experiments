@@ -1,5 +1,5 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use cpu_sparse::{CsRenderCtx, FillRule, Pixmap};
+use cpu_sparse::{FillRule, Pixmap, RenderContext};
 use oxipng::{InFile, OutFile};
 use peniko::color::palette::css::{BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED};
 use peniko::color::{palette, AlphaColor};

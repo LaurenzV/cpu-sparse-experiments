@@ -3,7 +3,7 @@ use cpu_sparse::strip::{Strip, Tile};
 use cpu_sparse::svg::{render_tree, SVGContext};
 use cpu_sparse::tiling::{FlatLine, Point, TILE_HEIGHT, TILE_WIDTH};
 use cpu_sparse::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
-use cpu_sparse::{CsRenderCtx, FillRule};
+use cpu_sparse::{FillRule, RenderContext};
 use peniko::color::palette;
 use peniko::kurbo::{Affine, BezPath, Stroke};
 use rand::Rng;
@@ -22,7 +22,7 @@ fn main() {
 
     let svg = std::fs::read_to_string("svgs/gs.svg").expect("error reading file");
     let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
-    let mut ctx = CsRenderCtx::new(WIDTH, HEIGHT);
+    let mut ctx = RenderContext::new(WIDTH, HEIGHT);
     let mut sctx = SVGContext::new();
     render_tree(&mut ctx, &mut sctx, &tree);
 
@@ -36,8 +36,8 @@ fn main() {
     svg::save("target/out.svg", &document).unwrap();
 }
 
-fn ctx() -> CsRenderCtx {
-    let mut ctx = CsRenderCtx::new(WIDTH, HEIGHT);
+fn ctx() -> RenderContext {
+    let mut ctx = RenderContext::new(WIDTH, HEIGHT);
     let mut path = BezPath::new();
     let x_start = -4.0;
     let y_start = -4.0;
