@@ -1,4 +1,4 @@
-//! Methods for drawing rectangles more efficiently
+//! Methods for drawing rectangles more efficiently.
 //!
 //! When drawing simple rectangles, we can make quite a few optimizations that are
 //! not necessary for arbitrary paths. For example, alpha calculation becomes much easier,
@@ -30,6 +30,7 @@ impl RenderContext {
 
         let top_strip_index = y0 as u32 / STRIP_HEIGHT as u32;
         let top_strip_y = top_strip_index * STRIP_HEIGHT as u32;
+
         let bottom_strip_index = y1 as u32 / STRIP_HEIGHT as u32;
         let bottom_strip_y = bottom_strip_index * STRIP_HEIGHT as u32;
 
@@ -60,7 +61,6 @@ impl RenderContext {
         };
 
         let vertical_alpha = |right: bool| -> f32 {
-            // The reason we need to calculate the coverage from the left and
             if right {
                 let start = (x0 - x1_floored).max(0.0);
                 let end = x1 - x1_floored;
@@ -94,14 +94,13 @@ impl RenderContext {
                                 alphas: &[f32; 4],
                                 strip_y: u32| {
             // Let's first start by stripping the horizontal line of the rectangle.
-            // Strip the first column, which might have an additional alpha due to non-integer
+            // Strip the first column, which might have an additional alpha mask due to non-integer
             // alignment of x0.
             let mut col = alpha_buf.len() as u32;
             alpha_buf.push(alpha(&alphas, left_alpha));
 
-            // If the rect covers more than one pixel horizontally, fill all the remaining ones with
-            // the same opacity as in `alphas`, and deal with the final column similarly to the
-            // first one.
+            // If the rect covers more than one pixel horizontally, fill all the remaining ones
+            // except for the last one with the same opacity as in `alphas`.
             if x_end - x_start > 1 {
                 for _ in (x_start + 1)..x_end {
                     alpha_buf.push(alpha(&alphas, 1.0));
@@ -129,8 +128,8 @@ impl RenderContext {
             top_strip_y,
         );
 
-        // If rect covers more than one strip, we need to strip the vertical line segments
-        // of the rectangle, and finally the bottom horizontal line segment.
+        // If rect covers more than one strip vertically, we need to strip the vertical line
+        // segments of the rectangle, and finally the bottom horizontal line segment.
         if top_strip_index != bottom_strip_index {
             let alphas = [1.0, 1.0, 1.0, 1.0];
 
@@ -167,7 +166,7 @@ impl RenderContext {
             );
         }
 
-        // Push sentinel strip
+        // Push sentinel strip.
         self.strip_buf.push(Strip {
             x: 65524,
             y: 65532,
@@ -177,6 +176,7 @@ impl RenderContext {
     }
 }
 
+/// Check if a sequence of flat lines can be reduced to a rectangle.
 pub(crate) fn lines_to_rect(line_buf: &[FlatLine], width: usize, height: usize) -> Option<Rect> {
     if line_buf.len() != 4 {
         return None;
