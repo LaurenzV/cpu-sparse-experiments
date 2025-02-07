@@ -104,9 +104,14 @@ impl RenderContext {
         self.generate_commands(fill_rule, paint);
     }
 
+    fn wide_tiles_per_row(&self) -> usize {
+        (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH
+    }
+
     /// Generate the strip and fill commands for each wide tile using the current `strip_buf`.
     fn generate_commands(&mut self, fill_rule: FillRule, paint: Paint) {
-        let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
+        let width_tiles = self.wide_tiles_per_row();
+
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
 
@@ -218,85 +223,5 @@ fn brush_to_color(brush: BrushRef) -> AlphaColor<Srgb> {
     match brush {
         BrushRef::Solid(c) => c,
         _ => palette::css::MAGENTA,
-    }
-}
-
-fn lines_to_rect(line_buf: &[FlatLine]) -> Option<Rect> {
-    if line_buf.len() != 4 {
-        return None;
-    }
-
-    let mut horizontal = line_buf[0].p0.x != line_buf[0].p1.x;
-    let mut is_rect = true;
-
-    let mut x_min = f64::MAX;
-    let mut y_min = f64::MAX;
-    let mut x_max = f64::MIN;
-    let mut y_max = f64::MIN;
-
-    for i in 0..4 {
-        if horizontal {
-            is_rect &= line_buf[i].p0.y == line_buf[i].p1.y;
-        } else {
-            is_rect &= line_buf[i].p0.x == line_buf[i].p1.x;
-        }
-
-        x_min = x_min.min(line_buf[i].p0.x.min(line_buf[i].p1.x) as f64);
-        y_min = y_min.min(line_buf[i].p0.y.min(line_buf[i].p1.y) as f64);
-        x_max = x_max.max(line_buf[i].p0.x.max(line_buf[i].p1.x) as f64);
-        y_max = y_max.max(line_buf[i].p0.y.max(line_buf[i].p1.y) as f64);
-
-        horizontal = !horizontal;
-    }
-
-    if is_rect {
-        Some(Rect::new(x_min, y_min, x_max, y_max))
-    } else {
-        None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use peniko::kurbo::Rect;
-    use crate::render::lines_to_rect;
-    use crate::tiling::{FlatLine, Point};
-
-    #[test]
-    fn lines_to_rect_1() {
-        let lines = [FlatLine::new(
-            Point::new(-10.0, -10.0),
-            Point::new(10.0, -10.0),
-        ), FlatLine::new(
-            Point::new(10.0, -10.0),
-            Point::new(10.0, 10.0),
-        ), FlatLine::new(
-            Point::new(10.0, 10.0),
-            Point::new(-10.0, 10.0),
-        ), FlatLine::new(
-            Point::new(-10.0, 10.0),
-            Point::new(-10.0, -10.0),
-        )];
-
-        assert_eq!(lines_to_rect(&lines).unwrap(), Rect::new(-10.0, -10.0, 10.0, 10.0))
-    }
-
-    #[test]
-    fn lines_to_rect_2() {
-        let lines = [FlatLine::new(
-            Point::new(10.0, -10.0),
-            Point::new(-10.0, -10.0),
-        ), FlatLine::new(
-            Point::new(-10.0, -10.0),
-            Point::new(-10.0, 10.0),
-        ), FlatLine::new(
-            Point::new(-10.0, 10.0),
-            Point::new(10.0, 10.0),
-        ), FlatLine::new(
-            Point::new(10.0, 10.0),
-            Point::new(10.0, -10.0),
-        )];
-
-        assert_eq!(lines_to_rect(&lines).unwrap(), Rect::new(-10.0, -10.0, 10.0, 10.0))
     }
 }

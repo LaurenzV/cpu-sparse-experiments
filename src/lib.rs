@@ -6,6 +6,7 @@ pub mod flatten;
 pub mod paint;
 pub mod pattern;
 pub mod pixmap;
+mod rect;
 pub mod render;
 pub mod strip;
 pub mod svg;
