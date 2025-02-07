@@ -152,6 +152,61 @@ impl Iterator for RectRotIterator {
     }
 }
 
+pub struct PolyIterator {
+    params: Params,
+    nz: bool,
+    num_vertices: usize,
+    rng: StdRng,
+}
+
+impl PolyIterator {
+    pub fn new(params: Params, num_vertices: usize, nz: bool) -> Self {
+        Self {
+            params,
+            nz,
+            num_vertices,
+            rng: StdRng::from_seed(SEED),
+        }
+    }
+}
+
+impl Iterator for PolyIterator {
+    type Item = Command;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let size = self.params.size;
+
+        let mut x = self.rng.random_range(0..=(self.params.width - size)) as f64;
+        let mut y = self.rng.random_range(0..=(self.params.height - size)) as f64;
+
+        let mut path = BezPath::new();
+        let mut move_to = false;
+
+        for _ in 0..self.num_vertices {
+            let xd = self.rng.random_range(0..=size) as f64;
+            let yd = self.rng.random_range(0..=size) as f64;
+
+            let point = Point::new(x + xd, y + yd);
+
+            if !move_to {
+                path.move_to(point);
+                move_to = true;
+            }   else {
+                path.line_to(point);
+            }
+        }
+
+        let color = gen_color(&mut self.rng, 127);
+
+        if self.params.stroke {
+            Some(Command::StrokePath(path.into(), color))
+        }   else {
+            Some(Command::FillPath(path.into(), color))
+        }
+
+    }
+}
+
 fn gen_color(rng: &mut StdRng, alpha: u8) -> AlphaColor<Srgb> {
     // Generate random color
     let r = rng.random_range(0..=255);
