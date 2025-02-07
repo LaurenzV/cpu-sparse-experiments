@@ -115,6 +115,12 @@ impl RenderContext {
             winding: 0,
         });
 
+        // If rect covers more than one strip, we need to strip the vertical line segments
+        // of the rectangle, and finally the bottom horizontal line segment.
+        if bottom_strip_y != top_strip_y {
+
+        }
+
         // Push sentinel strip
         self.strip_buf.push(Strip {
             x: 65524,
