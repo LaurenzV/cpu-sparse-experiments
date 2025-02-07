@@ -193,3 +193,29 @@ fn filling_evenodd_rule() {
 
     check_ref(&ctx, "filling_evenodd_rule");
 }
+
+#[test]
+fn aligned_rect() {
+    let mut ctx = get_ctx(30, 20, false);
+    let rect = Rect::new(1.0, 1.0, 29.0, 19.0);
+    ctx.fill(
+        &rect.to_path(0.1).into(),
+        FillRule::NonZero,
+        REBECCA_PURPLE.with_alpha(0.5).into(),
+    );
+
+    check_ref(&ctx, "aligned_rect");
+}
+
+#[test]
+fn unaligned_rect() {
+    let mut ctx = get_ctx(30, 20, false);
+    let rect = Rect::new(1.5, 1.5, 28.5, 18.5);
+    ctx.fill(
+        &rect.to_path(0.1).into(),
+        FillRule::NonZero,
+        REBECCA_PURPLE.with_alpha(0.5).into(),
+    );
+
+    check_ref(&ctx, "unaligned_rect");
+}
