@@ -1,25 +1,28 @@
-use bench_gen::{Command, FillRectAIterator, FillRectRotIterator, FillRectUIterator, Params};
+use bench_gen::{Command, Params, PolyIterator, RectRotIterator, RectUIterator};
 use cpu_sparse::{FillRule, Pixmap, RenderContext};
+use peniko::kurbo::{Cap, Join, Stroke};
 use std::io::BufWriter;
 use std::time::Instant;
 
 const WIDTH: usize = 512;
 const HEIGHT: usize = 600;
 const RENDER_CALLS: u32 = 1000;
+const STROKE_WIDTH: f64 = 2.0;
 
 fn main() {
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
 
-    for size in [8, 16, 32, 64, 128, 256] {
+    for size in [128].repeat(200) {
         ctx.reset();
 
         let params = Params {
             width: 512,
             height: 600,
+            stroke: true,
             size,
         };
 
-        let commands = FillRectRotIterator::new(params)
+        let commands = RectUIterator::new(params)
             .take(RENDER_CALLS as usize)
             .collect::<Vec<_>>();
 
@@ -35,7 +38,7 @@ fn main() {
         let elapsed = start.elapsed();
 
         println!("Runtime for {}x{}: {:?}", size, size, elapsed);
-        write_pixmap(&mut pixmap, size);
+        // write_pixmap(&mut pixmap, size);
     }
 }
 
@@ -54,8 +57,26 @@ fn run_cmd(ctx: &mut RenderContext, cmd: &Command) {
         Command::FillRect(r, c) => {
             ctx.fill_rect(&r, (*c).into());
         }
+        Command::StrokeRect(r, c) => {
+            let stroke = stroke();
+            ctx.stroke_rect(&r, &stroke, (*c).into());
+        }
         Command::FillPath(p, c) => {
             ctx.fill_path(&p.clone().into(), FillRule::NonZero, (*c).into());
         }
+        Command::StrokePath(p, c) => {
+            let stroke = stroke();
+            ctx.stroke_path(&p.clone().into(), &stroke, (*c).into());
+        }
+    }
+}
+
+fn stroke() -> Stroke {
+    Stroke {
+        width: STROKE_WIDTH,
+        join: Join::Miter,
+        start_cap: Cap::Square,
+        end_cap: Cap::Square,
+        ..Default::default()
     }
 }
