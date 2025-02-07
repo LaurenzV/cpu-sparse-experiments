@@ -34,10 +34,7 @@ impl RenderContext {
         let bottom_strip_y = bottom_strip_index * STRIP_HEIGHT as u32;
 
         let x0_floored = x0.floor();
-        let y0_floored = y0.floor();
-        let x1_ceiled = x1.ceil();
         let x1_floored = x1.floor();
-        let y1_ceiled = y1.ceil();
 
         let x_start = x0_floored as u32;
         // Inclusive, i.e. the pixel at column `x_end` is the right border of the rectangle,
