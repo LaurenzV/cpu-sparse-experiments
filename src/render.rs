@@ -5,6 +5,7 @@
 #![allow(unused)]
 
 use crate::paint::Paint;
+use crate::rect::lines_to_rect;
 use crate::strip::render_strips_scalar;
 use crate::{
     fine::Fine,
@@ -92,15 +93,21 @@ impl RenderContext {
 
     /// Render a path, which has already been flattened into `line_buf`.
     fn render_path(&mut self, fill_rule: FillRule, paint: Paint) {
-        tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
-        self.tile_buf.sort_unstable_by(Tile::cmp);
+        if let Some(rect) = lines_to_rect(&self.line_buf, self.width, self.height) {
+            // Fast path for rectangles.
+            self.strip_rect(&rect);
+        } else {
+            tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
+            self.tile_buf.sort_unstable_by(Tile::cmp);
 
-        render_strips_scalar(
-            &self.tile_buf,
-            &mut self.strip_buf,
-            &mut self.alphas,
-            fill_rule,
-        );
+            render_strips_scalar(
+                &self.tile_buf,
+                &mut self.strip_buf,
+                &mut self.alphas,
+                fill_rule,
+            );
+        }
+
         self.generate_commands(fill_rule, paint);
     }
 
