@@ -44,7 +44,8 @@ impl std::fmt::Debug for Tile {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
-    pub xy: u32, // this could be u16's on the Rust side
+    pub x: u32,
+    pub y: u32,
     pub col: u32,
     pub winding: i32,
 }
@@ -215,9 +216,9 @@ pub fn render_strips_scalar(
             }
 
             if strip_start {
-                let xy = (1 << 18) * prev_tile.y as u32 + 4 * prev_tile.x as u32 + x0;
                 let strip = Strip {
-                    xy,
+                    x: 4 * prev_tile.x as u32 + x0,
+                    y: 4 * prev_tile.y as u32,
                     col: cols,
                     winding: start_delta,
                 };
@@ -244,15 +245,15 @@ pub fn render_strips_scalar(
 
 impl Strip {
     pub fn x(&self) -> u32 {
-        self.xy & 0xffff
+        self.x
     }
 
     pub fn y(&self) -> u32 {
-        self.xy / (1 << 16)
+        self.y
     }
 
     pub fn strip_y(&self) -> u32 {
-        self.xy / ((1 << 16) * STRIP_HEIGHT as u32)
+        self.y / STRIP_HEIGHT as u32
     }
 }
 

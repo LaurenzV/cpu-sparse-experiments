@@ -4,15 +4,8 @@
 // Lots of unused arguments from todo methods. Remove when all methods are implemented.
 #![allow(unused)]
 
-use peniko::kurbo::BezPath;
-use peniko::{
-    color::{palette, AlphaColor, Srgb},
-    kurbo::Affine,
-    BrushRef,
-};
-use std::collections::BTreeMap;
-
 use crate::paint::Paint;
+use crate::rect::lines_to_rect;
 use crate::strip::render_strips_scalar;
 use crate::{
     fine::Fine,
@@ -21,6 +14,13 @@ use crate::{
     wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
     FillRule, Pixmap,
 };
+use peniko::kurbo::{BezPath, Rect};
+use peniko::{
+    color::{palette, AlphaColor, Srgb},
+    kurbo::Affine,
+    BrushRef,
+};
+use std::collections::BTreeMap;
 
 pub struct RenderContext {
     pub width: usize,
@@ -93,21 +93,32 @@ impl RenderContext {
 
     /// Render a path, which has already been flattened into `line_buf`.
     fn render_path(&mut self, fill_rule: FillRule, paint: Paint) {
-        tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
-        self.tile_buf.sort_unstable_by(Tile::cmp);
+        if let Some(rect) = lines_to_rect(&self.line_buf, self.width, self.height) {
+            // Fast path for rectangles.
+            self.strip_rect(&rect);
+        } else {
+            tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
+            self.tile_buf.sort_unstable_by(Tile::cmp);
 
-        render_strips_scalar(
-            &self.tile_buf,
-            &mut self.strip_buf,
-            &mut self.alphas,
-            fill_rule,
-        );
+            render_strips_scalar(
+                &self.tile_buf,
+                &mut self.strip_buf,
+                &mut self.alphas,
+                fill_rule,
+            );
+        }
+
         self.generate_commands(fill_rule, paint);
+    }
+
+    fn wide_tiles_per_row(&self) -> usize {
+        (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH
     }
 
     /// Generate the strip and fill commands for each wide tile using the current `strip_buf`.
     fn generate_commands(&mut self, fill_rule: FillRule, paint: Paint) {
-        let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
+        let width_tiles = self.wide_tiles_per_row();
+
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
 
