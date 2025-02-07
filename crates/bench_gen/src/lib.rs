@@ -11,20 +11,24 @@ const SEED: [u8; 32] = [0; 32];
 pub struct Params {
     pub width: usize,
     pub height: usize,
+    pub stroke: bool,
     pub size: usize,
 }
 
+#[derive(Clone)]
 pub enum Command {
     FillRect(Rect, AlphaColor<Srgb>),
+    StrokeRect(Rect, AlphaColor<Srgb>),
     FillPath(BezPath, AlphaColor<Srgb>),
+    StrokePath(BezPath, AlphaColor<Srgb>),
 }
 
-pub struct FillRectAIterator {
+pub struct RectAIterator {
     params: Params,
     rng: StdRng,
 }
 
-impl FillRectAIterator {
+impl RectAIterator {
     pub fn new(params: Params) -> Self {
         Self {
             params,
@@ -33,7 +37,7 @@ impl FillRectAIterator {
     }
 }
 
-impl Iterator for FillRectAIterator {
+impl Iterator for RectAIterator {
     type Item = Command;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -43,19 +47,26 @@ impl Iterator for FillRectAIterator {
 
         let color = gen_color(&mut self.rng, 127);
 
-        Some(Command::FillRect(
-            Rect::new(x, y, x + (size as f64), y + (size as f64)),
-            color,
-        ))
+        if self.params.stroke {
+            Some(Command::StrokeRect(
+                Rect::new(x, y, x + (size as f64), y + (size as f64)),
+                color,
+            ))
+        } else {
+            Some(Command::FillRect(
+                Rect::new(x, y, x + (size as f64), y + (size as f64)),
+                color,
+            ))
+        }
     }
 }
 
-pub struct FillRectUIterator {
+pub struct RectUIterator {
     params: Params,
     rng: StdRng,
 }
 
-impl FillRectUIterator {
+impl RectUIterator {
     pub fn new(params: Params) -> Self {
         Self {
             params,
@@ -64,7 +75,7 @@ impl FillRectUIterator {
     }
 }
 
-impl Iterator for FillRectUIterator {
+impl Iterator for RectUIterator {
     type Item = Command;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -81,20 +92,27 @@ impl Iterator for FillRectUIterator {
 
         let color = gen_color(&mut self.rng, 127);
 
-        Some(Command::FillRect(
-            Rect::new(x, y, x + (size as f64), y + (size as f64)),
-            color,
-        ))
+        if self.params.stroke {
+            Some(Command::StrokeRect(
+                Rect::new(x, y, x + (size as f64), y + (size as f64)),
+                color,
+            ))
+        } else {
+            Some(Command::FillRect(
+                Rect::new(x, y, x + (size as f64), y + (size as f64)),
+                color,
+            ))
+        }
     }
 }
 
-pub struct FillRectRotIterator {
+pub struct RectRotIterator {
     params: Params,
     angle: f64,
     rng: StdRng,
 }
 
-impl FillRectRotIterator {
+impl RectRotIterator {
     pub fn new(params: Params) -> Self {
         Self {
             params,
@@ -104,7 +122,7 @@ impl FillRectRotIterator {
     }
 }
 
-impl Iterator for FillRectRotIterator {
+impl Iterator for RectRotIterator {
     type Item = Command;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -121,7 +139,67 @@ impl Iterator for FillRectRotIterator {
         let color = gen_color(&mut self.rng, 127);
         let rect = Rect::new(x, y, x + (size as f64), y + (size as f64));
 
-        Some(Command::FillPath(affine * rect.to_path(0.1), color))
+        self.angle += 0.01;
+
+        if self.params.stroke {
+            Some(Command::StrokePath(affine * rect.to_path(0.1), color))
+        } else {
+            Some(Command::FillPath(affine * rect.to_path(0.1), color))
+        }
+    }
+}
+
+pub struct PolyIterator {
+    params: Params,
+    nz: bool,
+    num_vertices: usize,
+    rng: StdRng,
+}
+
+impl PolyIterator {
+    pub fn new(params: Params, num_vertices: usize, nz: bool) -> Self {
+        Self {
+            params,
+            nz,
+            num_vertices,
+            rng: StdRng::from_seed(SEED),
+        }
+    }
+}
+
+impl Iterator for PolyIterator {
+    type Item = Command;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let size = self.params.size;
+
+        let mut x = self.rng.random_range(0..=(self.params.width - size)) as f64;
+        let mut y = self.rng.random_range(0..=(self.params.height - size)) as f64;
+
+        let mut path = BezPath::new();
+        let mut move_to = false;
+
+        for _ in 0..self.num_vertices {
+            let xd = self.rng.random_range(0..=size) as f64;
+            let yd = self.rng.random_range(0..=size) as f64;
+
+            let point = Point::new(x + xd, y + yd);
+
+            if !move_to {
+                path.move_to(point);
+                move_to = true;
+            } else {
+                path.line_to(point);
+            }
+        }
+
+        let color = gen_color(&mut self.rng, 127);
+
+        if self.params.stroke {
+            Some(Command::StrokePath(path.into(), color))
+        } else {
+            Some(Command::FillPath(path.into(), color))
+        }
     }
 }
 
