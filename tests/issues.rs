@@ -16,7 +16,7 @@ fn issue_2_incorrect_filling_1() {
 
     let mut ctx = get_ctx(8, 8, false);
 
-    ctx.fill(&p.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&p.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_1");
 }
@@ -32,7 +32,7 @@ fn issue_2_incorrect_filling_2() {
 
     let mut ctx = get_ctx(64, 64, false);
 
-    ctx.fill(&p.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&p.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_2");
 }
@@ -48,7 +48,7 @@ fn issue_2_incorrect_filling_3() {
 
     let mut ctx = get_ctx(9, 9, false);
 
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_3");
 }
@@ -70,7 +70,7 @@ fn issue_2_incorrect_filling_4() {
 
     let mut ctx = get_ctx(64, 64, false);
 
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_4");
 }
@@ -86,7 +86,7 @@ fn issue_2_incorrect_filling_5() {
 
     let mut ctx = get_ctx(32, 32, false);
 
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_5");
 }
@@ -102,7 +102,7 @@ fn issue_2_incorrect_filling_6() {
 
     let mut ctx = get_ctx(32, 32, false);
 
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_6");
 }
@@ -118,7 +118,7 @@ fn issue_2_incorrect_filling_7() {
 
     let mut ctx = get_ctx(32, 32, false);
 
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_7");
 }
@@ -140,7 +140,7 @@ fn issue_2_incorrect_filling_8() {
 
     let mut ctx = get_ctx(32, 32, false);
 
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_8");
 }
@@ -155,7 +155,7 @@ fn issue_11_out_of_bound_strip() {
 
     let stroke = Stroke::new(1.0);
     // Just make sure we don't panic.
-    ctx.stroke(&path.into(), &stroke, palette::css::DARK_BLUE.into());
+    ctx.stroke_path(&path.into(), &stroke, palette::css::DARK_BLUE.into());
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn issue_12_filling_unclosed_path_1() {
 
     let mut ctx = get_ctx(100, 100, false);
 
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_12_filling_unclosed_path_1");
 }
@@ -187,7 +187,7 @@ fn issue_12_filling_unclosed_path_2() {
 
     let mut ctx = get_ctx(100, 100, false);
 
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "issue_12_filling_unclosed_path_2");
 }

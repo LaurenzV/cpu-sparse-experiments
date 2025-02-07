@@ -58,7 +58,7 @@ fn empty_1134x1376() {
 #[test]
 fn full_cover_1() {
     let mut ctx = get_ctx(8, 8, true);
-    ctx.fill(
+    ctx.fill_path(
         &Rect::new(0.0, 0.0, 8.0, 8.0).to_path(0.1).into(),
         FillRule::NonZero,
         palette::css::BEIGE.into(),
@@ -81,7 +81,7 @@ fn filled_triangle() {
         path
     };
 
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
 
     check_ref(&ctx, "filled_triangle");
 }
@@ -99,7 +99,7 @@ fn stroked_triangle() {
         path
     };
     let stroke = Stroke::new(3.0);
-    ctx.stroke(&path.into(), &stroke, palette::css::LIME.into());
+    ctx.stroke_path(&path.into(), &stroke, palette::css::LIME.into());
 
     check_ref(&ctx, "stroked_triangle");
 }
@@ -108,7 +108,7 @@ fn stroked_triangle() {
 fn filled_circle() {
     let mut ctx = get_ctx(100, 100, false);
     let circle = Circle::new((50.0, 50.0), 45.0);
-    ctx.fill(
+    ctx.fill_path(
         &circle.to_path(0.1).into(),
         FillRule::NonZero,
         palette::css::LIME.into(),
@@ -121,7 +121,7 @@ fn filled_circle() {
 fn filled_circle_with_opacity() {
     let mut ctx = get_ctx(100, 100, false);
     let circle = Circle::new((50.0, 50.0), 45.0);
-    ctx.fill(
+    ctx.fill_path(
         &circle.to_path(0.1).into(),
         FillRule::NonZero,
         REBECCA_PURPLE.with_alpha(0.5).into(),
@@ -136,7 +136,7 @@ fn filled_overlapping_circles() {
 
     for e in [(35.0, 35.0, RED), (65.0, 35.0, GREEN), (50.0, 65.0, BLUE)] {
         let circle = Circle::new((e.0, e.1), 30.0);
-        ctx.fill(
+        ctx.fill_path(
             &circle.to_path(0.1).into(),
             FillRule::NonZero,
             e.2.with_alpha(0.5).into(),
@@ -152,7 +152,7 @@ fn stroked_circle() {
     let circle = Circle::new((50.0, 50.0), 45.0);
     let stroke = Stroke::new(3.0);
 
-    ctx.stroke(
+    ctx.stroke_path(
         &circle.to_path(0.1).into(),
         &stroke,
         palette::css::LIME.into(),
@@ -178,18 +178,17 @@ fn filling_nonzero_rule() {
     let mut ctx = get_ctx(100, 100, false);
     let star = star_path();
 
-    ctx.fill(&star.into(), FillRule::NonZero, MAROON.into());
+    ctx.fill_path(&star.into(), FillRule::NonZero, MAROON.into());
 
     check_ref(&ctx, "filling_nonzero_rule");
 }
 
-// TODO: Not working correctly yet!
 #[test]
 fn filling_evenodd_rule() {
     let mut ctx = get_ctx(100, 100, false);
     let star = star_path();
 
-    ctx.fill(&star.into(), FillRule::EvenOdd, MAROON.into());
+    ctx.fill_path(&star.into(), FillRule::EvenOdd, MAROON.into());
 
     check_ref(&ctx, "filling_evenodd_rule");
 }
@@ -198,24 +197,26 @@ fn filling_evenodd_rule() {
 fn aligned_rect() {
     let mut ctx = get_ctx(30, 20, false);
     let rect = Rect::new(1.0, 1.0, 29.0, 19.0);
-    ctx.fill(
-        &rect.to_path(0.1).into(),
-        FillRule::NonZero,
-        REBECCA_PURPLE.with_alpha(0.5).into(),
-    );
+    ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
 
     check_ref(&ctx, "aligned_rect");
+}
+
+#[test]
+fn stroked_rect() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(5.0, 5.0, 25.0, 25.0);
+    let stroke = Stroke::new(3.0);
+    ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "stroked_rect");
 }
 
 #[test]
 fn unaligned_rect() {
     let mut ctx = get_ctx(30, 20, false);
     let rect = Rect::new(1.5, 1.5, 28.5, 18.5);
-    ctx.fill(
-        &rect.to_path(0.1).into(),
-        FillRule::NonZero,
-        REBECCA_PURPLE.with_alpha(0.5).into(),
-    );
+    ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
 
     check_ref(&ctx, "unaligned_rect");
 }
@@ -224,11 +225,7 @@ fn unaligned_rect() {
 fn strip_inscribed_rect() {
     let mut ctx = get_ctx(30, 20, false);
     let rect = Rect::new(1.5, 9.5, 28.5, 11.5);
-    ctx.fill(
-        &rect.to_path(0.1).into(),
-        FillRule::NonZero,
-        REBECCA_PURPLE.with_alpha(0.5).into(),
-    );
+    ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
 
     check_ref(&ctx, "strip_inscribed_rect");
 }

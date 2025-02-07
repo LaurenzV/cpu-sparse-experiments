@@ -53,7 +53,7 @@ fn ctx() -> RenderContext {
     };
 
     ctx.set_transform(Affine::scale(0.25));
-    ctx.fill(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
     // let stroke = Stroke::new(3.0);
     // ctx.stroke(&piet_path, &stroke, palette::css::DARK_BLUE.into());
 

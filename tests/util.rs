@@ -25,7 +25,7 @@ pub fn get_ctx(width: usize, height: usize, transparent: bool) -> RenderContext 
     if !transparent {
         let path = Rect::new(0.0, 0.0, width as f64, height as f64).to_path(0.1);
 
-        ctx.fill(&path.into(), FillRule::NonZero, palette::css::WHITE.into());
+        ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::WHITE.into());
     }
 
     ctx
