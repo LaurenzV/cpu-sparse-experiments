@@ -28,8 +28,10 @@ impl RenderContext {
             rect.y1 as f32,
         );
 
-        let top_strip_y = (y0 as u32 / STRIP_HEIGHT as u32) * STRIP_HEIGHT as u32;
-        let bottom_strip_y = (y1 as u32 / STRIP_HEIGHT as u32) * STRIP_HEIGHT as u32;
+        let top_strip_index = y0 as u32 / STRIP_HEIGHT as u32;
+        let top_strip_y = top_strip_index * STRIP_HEIGHT as u32;
+        let bottom_strip_index = y1 as u32 / STRIP_HEIGHT as u32;
+        let bottom_strip_y = bottom_strip_index * STRIP_HEIGHT as u32;
 
         let x0_floored = x0.floor();
         let y0_floored = y0.floor();
@@ -38,10 +40,12 @@ impl RenderContext {
         let y1_ceiled = y1.ceil();
 
         let x_start = x0_floored as u32;
-        let x_end = x1_ceiled as u32;
+        // Inclusive, i.e. the pixel at column `x_end` is the right border of the rectangle,
+        // which should be stripped.
+        let x_end = x1_floored as u32;
 
         // Calculate the alpha coverages of the top/bottom borders of the rectangle.
-        let horizontal_alphas = |bottom: bool, strip_y: u32| {
+        let horizontal_alphas = |strip_y: u32| {
             let mut buf = [0.0f32; STRIP_HEIGHT];
 
             let height_start = y0 - strip_y as f32;
@@ -53,10 +57,6 @@ impl RenderContext {
                 let bottom_coverage = (height_end - fi).clamp(0.0, 1.0);
 
                 buf[i] = upper_coverage * bottom_coverage;
-            }
-
-            if bottom {
-                buf.reverse();
             }
 
             buf
@@ -77,48 +77,97 @@ impl RenderContext {
             }
         };
 
-        let top_alphas = horizontal_alphas(false, top_strip_y);
+        let left_alpha = vertical_alpha(false);
+        let right_alpha = vertical_alpha(true);
 
         let alpha = |alphas: &[f32; 4], coverage: f32| {
-            let mut alphas = 0;
+            let mut packed_alphas = 0;
 
             for i in 0..STRIP_HEIGHT {
-                let u8_alpha = ((top_alphas[i] * coverage) * 255.0 + 0.5) as u32;
-                alphas += u8_alpha << (i * 8);
+                let u8_alpha = ((alphas[i] * coverage) * 255.0 + 0.5) as u32;
+                packed_alphas += u8_alpha << (i * 8);
             }
 
-            alphas
+            packed_alphas
         };
 
-        // Let's first start by stripping the top horizontal line of the rectangle.
-        // Strip the first column, which might have an additional alpha due to non-integer
-        // alignment of x0.
-        let mut col = self.alphas.len() as u32;
-        self.alphas.push(alpha(&top_alphas, vertical_alpha(false)));
+        // Create a strip for the top/bottom edge of the rectangle.
+        let horizontal_strip = |alpha_buf: &mut Vec<u32>,
+                                strip_buf: &mut Vec<Strip>,
+                                alphas: &[f32; 4],
+                                strip_y: u32| {
+            // Let's first start by stripping the horizontal line of the rectangle.
+            // Strip the first column, which might have an additional alpha due to non-integer
+            // alignment of x0.
+            let mut col = alpha_buf.len() as u32;
+            alpha_buf.push(alpha(&alphas, left_alpha));
 
-        // If the rect covers more than one pixel horizontally, fill all the remaining ones with
-        // the same opacity as in `top_alphas`, and deal with the final column similarly to the
-        // first one.
-        if x_end - x_start > 1 {
-            for _ in (x_start + 1)..(x_end - 1) {
-                self.alphas.push(alpha(&top_alphas, 1.0));
+            // If the rect covers more than one pixel horizontally, fill all the remaining ones with
+            // the same opacity as in `alphas`, and deal with the final column similarly to the
+            // first one.
+            if x_end - x_start > 1 {
+                for _ in (x_start + 1)..x_end {
+                    alpha_buf.push(alpha(&alphas, 1.0));
+                }
+
+                // Fill the last, right column, which might also need an additional alpha mask
+                // due to non-integer alignment of x1.
+                alpha_buf.push(alpha(&alphas, right_alpha));
             }
 
-            self.alphas.push(alpha(&top_alphas, vertical_alpha(true)));
-        }
+            // Push the actual strip.
+            strip_buf.push(Strip {
+                x: x0_floored as u32,
+                y: strip_y,
+                col,
+                winding: 0,
+            });
+        };
 
-        // Push the top strip.
-        self.strip_buf.push(Strip {
-            x: x0_floored as u32,
-            y: top_strip_y,
-            col,
-            winding: 0,
-        });
+        let top_alphas = horizontal_alphas(top_strip_y);
+        horizontal_strip(
+            &mut self.alphas,
+            &mut self.strip_buf,
+            &top_alphas,
+            top_strip_y,
+        );
 
         // If rect covers more than one strip, we need to strip the vertical line segments
         // of the rectangle, and finally the bottom horizontal line segment.
-        if bottom_strip_y != top_strip_y {
+        if top_strip_index != bottom_strip_index {
+            let alphas = [1.0, 1.0, 1.0, 1.0];
 
+            for i in (top_strip_index + 1)..bottom_strip_index {
+                // Left side.
+                let mut col = self.alphas.len() as u32;
+                self.alphas.push(alpha(&alphas, left_alpha));
+
+                self.strip_buf.push(Strip {
+                    x: x0_floored as u32,
+                    y: i * STRIP_HEIGHT as u32,
+                    col,
+                    winding: 0,
+                });
+
+                // Right side.
+                col = self.alphas.len() as u32;
+                self.alphas.push(alpha(&alphas, vertical_alpha(true)));
+
+                self.strip_buf.push(Strip {
+                    x: x1_floored as u32,
+                    y: i * STRIP_HEIGHT as u32,
+                    col,
+                    winding: 1,
+                });
+            }
+
+            let bottom_alphas = horizontal_alphas(bottom_strip_y);
+            horizontal_strip(
+                &mut self.alphas,
+                &mut self.strip_buf,
+                &bottom_alphas,
+                bottom_strip_y,
+            );
         }
 
         // Push sentinel strip
