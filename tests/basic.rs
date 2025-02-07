@@ -219,3 +219,16 @@ fn unaligned_rect() {
 
     check_ref(&ctx, "unaligned_rect");
 }
+
+#[test]
+fn strip_inscribed_rect() {
+    let mut ctx = get_ctx(30, 20, false);
+    let rect = Rect::new(1.5, 9.5, 28.5, 11.5);
+    ctx.fill(
+        &rect.to_path(0.1).into(),
+        FillRule::NonZero,
+        REBECCA_PURPLE.with_alpha(0.5).into(),
+    );
+
+    check_ref(&ctx, "strip_inscribed_rect");
+}
