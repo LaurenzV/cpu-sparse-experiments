@@ -11,21 +11,24 @@ const SEED: [u8; 32] = [0; 32];
 pub struct Params {
     pub width: usize,
     pub height: usize,
+    pub stroke: bool,
     pub size: usize,
 }
 
 #[derive(Clone)]
 pub enum Command {
     FillRect(Rect, AlphaColor<Srgb>),
+    StrokeRect(Rect, AlphaColor<Srgb>),
     FillPath(BezPath, AlphaColor<Srgb>),
+    StrokePath(BezPath, AlphaColor<Srgb>),
 }
 
-pub struct FillRectAIterator {
+pub struct RectAIterator {
     params: Params,
     rng: StdRng,
 }
 
-impl FillRectAIterator {
+impl RectAIterator {
     pub fn new(params: Params) -> Self {
         Self {
             params,
@@ -34,7 +37,7 @@ impl FillRectAIterator {
     }
 }
 
-impl Iterator for FillRectAIterator {
+impl Iterator for RectAIterator {
     type Item = Command;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -44,19 +47,26 @@ impl Iterator for FillRectAIterator {
 
         let color = gen_color(&mut self.rng, 127);
 
-        Some(Command::FillRect(
-            Rect::new(x, y, x + (size as f64), y + (size as f64)),
-            color,
-        ))
+        if self.params.stroke {
+            Some(Command::StrokeRect(
+                Rect::new(x, y, x + (size as f64), y + (size as f64)),
+                color,
+            ))
+        }   else {
+            Some(Command::FillRect(
+                Rect::new(x, y, x + (size as f64), y + (size as f64)),
+                color,
+            ))
+        }
     }
 }
 
-pub struct FillRectUIterator {
+pub struct RectUIterator {
     params: Params,
     rng: StdRng,
 }
 
-impl FillRectUIterator {
+impl RectUIterator {
     pub fn new(params: Params) -> Self {
         Self {
             params,
@@ -65,7 +75,7 @@ impl FillRectUIterator {
     }
 }
 
-impl Iterator for FillRectUIterator {
+impl Iterator for RectUIterator {
     type Item = Command;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -82,20 +92,29 @@ impl Iterator for FillRectUIterator {
 
         let color = gen_color(&mut self.rng, 127);
 
-        Some(Command::FillRect(
-            Rect::new(x, y, x + (size as f64), y + (size as f64)),
-            color,
-        ))
+        if self.params.stroke {
+            Some(Command::StrokeRect(
+                Rect::new(x, y, x + (size as f64), y + (size as f64)),
+                color,
+            ))
+        }   else {
+            Some(Command::FillRect(
+                Rect::new(x, y, x + (size as f64), y + (size as f64)),
+                color,
+            ))
+        }
+
+
     }
 }
 
-pub struct FillRectRotIterator {
+pub struct RectRotIterator {
     params: Params,
     angle: f64,
     rng: StdRng,
 }
 
-impl FillRectRotIterator {
+impl RectRotIterator {
     pub fn new(params: Params) -> Self {
         Self {
             params,
@@ -105,7 +124,7 @@ impl FillRectRotIterator {
     }
 }
 
-impl Iterator for FillRectRotIterator {
+impl Iterator for RectRotIterator {
     type Item = Command;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -122,9 +141,14 @@ impl Iterator for FillRectRotIterator {
         let color = gen_color(&mut self.rng, 127);
         let rect = Rect::new(x, y, x + (size as f64), y + (size as f64));
 
-        self.angle += 0.05;
+        self.angle += 0.01;
 
-        Some(Command::FillPath(affine * rect.to_path(0.1), color))
+        if self.params.stroke {
+            Some(Command::StrokePath(affine * rect.to_path(0.1), color))
+        }   else {
+            Some(Command::FillPath(affine * rect.to_path(0.1), color))
+        }
+
     }
 }
 
