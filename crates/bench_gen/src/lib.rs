@@ -9,9 +9,9 @@ const SEED: [u8; 32] = [0; 32];
 
 #[derive(Copy, Clone)]
 pub struct Params {
-    width: usize,
-    height: usize,
-    size: usize,
+    pub width: usize,
+    pub height: usize,
+    pub size: usize,
 }
 
 pub enum Command {
