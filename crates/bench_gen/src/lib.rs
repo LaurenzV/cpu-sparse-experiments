@@ -1,9 +1,9 @@
-use std::f64::consts::PI;
 use peniko::color::{AlphaColor, Rgba8, Srgb};
 use peniko::kurbo::{Affine, BezPath, Point, Rect, Shape};
 use rand::prelude::ThreadRng;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use std::f64::consts::PI;
 
 const SEED: [u8; 32] = [0; 32];
 
@@ -114,14 +114,14 @@ impl Iterator for FillRectRotIterator {
         let mut x = self.rng.random_range(0..=(self.params.width - size)) as f64;
         let mut y = self.rng.random_range(0..=(self.params.height - size)) as f64;
 
-        let affine = Affine::rotate_about(self.angle * PI/180.0, Point::new(x + half_size, y + half_size));
+        let affine = Affine::rotate_about(
+            self.angle * PI / 180.0,
+            Point::new(x + half_size, y + half_size),
+        );
         let color = gen_color(&mut self.rng, 127);
         let rect = Rect::new(x, y, x + (size as f64), y + (size as f64));
 
-        Some(Command::FillPath(
-            affine * rect.to_path(0.1),
-            color,
-        ))
+        Some(Command::FillPath(affine * rect.to_path(0.1), color))
     }
 }
 
