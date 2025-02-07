@@ -1,0 +1,8 @@
+[package]
+name = "bench_gen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+peniko = "0.3.1"
+rand = "0.9.0"

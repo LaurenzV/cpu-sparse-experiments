@@ -11,6 +11,7 @@ categories = ["graphics"]
 [dependencies]
 peniko = "0.3.0"
 flatten = { git = "https://github.com/linebender/gpu-stroke-expansion-paper", rev = "827ccf6" }
+bench_gen = { path = "crates/bench_gen"}
 svg = "0.18.0"
 rand = "0.8.5"
 usvg = "0.44.0"
@@ -24,6 +25,7 @@ once_cell = "1.20.2"
 roxmltree = "0.20.0"
 image = "0.25.5"
 tiny-skia = {version = "0.11.4", features = ["png", "simd"]}
+
 
 [profile.release]
 debug = true
