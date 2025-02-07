@@ -52,7 +52,7 @@ impl Iterator for RectAIterator {
                 Rect::new(x, y, x + (size as f64), y + (size as f64)),
                 color,
             ))
-        }   else {
+        } else {
             Some(Command::FillRect(
                 Rect::new(x, y, x + (size as f64), y + (size as f64)),
                 color,
@@ -97,14 +97,12 @@ impl Iterator for RectUIterator {
                 Rect::new(x, y, x + (size as f64), y + (size as f64)),
                 color,
             ))
-        }   else {
+        } else {
             Some(Command::FillRect(
                 Rect::new(x, y, x + (size as f64), y + (size as f64)),
                 color,
             ))
         }
-
-
     }
 }
 
@@ -145,10 +143,9 @@ impl Iterator for RectRotIterator {
 
         if self.params.stroke {
             Some(Command::StrokePath(affine * rect.to_path(0.1), color))
-        }   else {
+        } else {
             Some(Command::FillPath(affine * rect.to_path(0.1), color))
         }
-
     }
 }
 
@@ -191,7 +188,7 @@ impl Iterator for PolyIterator {
             if !move_to {
                 path.move_to(point);
                 move_to = true;
-            }   else {
+            } else {
                 path.line_to(point);
             }
         }
@@ -200,10 +197,9 @@ impl Iterator for PolyIterator {
 
         if self.params.stroke {
             Some(Command::StrokePath(path.into(), color))
-        }   else {
+        } else {
             Some(Command::FillPath(path.into(), color))
         }
-
     }
 }
 
