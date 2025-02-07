@@ -22,7 +22,7 @@ use crate::{
     FillRule, Pixmap,
 };
 
-pub struct CsRenderCtx {
+pub struct RenderContext {
     pub width: usize,
     pub height: usize,
     pub tiles: Vec<WideTile>,
@@ -37,9 +37,8 @@ pub struct CsRenderCtx {
     transform: Affine,
 }
 
-pub struct CsResourceCtx;
-
-impl CsRenderCtx {
+impl RenderContext {
+    /// Create a new render context.
     pub fn new(width: usize, height: usize) -> Self {
         let width_tiles = (width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         let height_tiles = (height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
@@ -67,6 +66,7 @@ impl CsRenderCtx {
         }
     }
 
+    /// Reset the current render context.
     pub fn reset(&mut self) {
         for tile in &mut self.tiles {
             tile.bg = AlphaColor::TRANSPARENT;
@@ -74,6 +74,7 @@ impl CsRenderCtx {
         }
     }
 
+    /// Render the current render context into a pixmap.
     pub fn render_to_pixmap(&self, pixmap: &mut Pixmap) {
         let mut fine = Fine::new(pixmap.width, pixmap.height, &mut pixmap.buf);
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
@@ -90,17 +91,6 @@ impl CsRenderCtx {
         }
     }
 
-    pub fn tile_stats(&self) {
-        let mut histo = BTreeMap::new();
-        let mut total = 0;
-        for tile in &self.tiles {
-            let count = tile.cmds.len();
-            total += count;
-            *histo.entry(count).or_insert(0) += 1;
-        }
-        println!("total = {total}, {histo:?}");
-    }
-
     /// Render a path, which has already been flattened into `line_buf`.
     fn render_path(&mut self, fill_rule: FillRule, paint: Paint) {
         tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
@@ -112,6 +102,11 @@ impl CsRenderCtx {
             &mut self.alphas,
             fill_rule,
         );
+        self.generate_commands(fill_rule, paint);
+    }
+
+    /// Generate the strip and fill commands for each wide tile using the current `strip_buf`.
+    fn generate_commands(&mut self, fill_rule: FillRule, paint: Paint) {
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
@@ -167,33 +162,37 @@ impl CsRenderCtx {
         }
     }
 
-    pub fn debug_dump(&self) {
-        let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
-        for (i, tile) in self.tiles.iter().enumerate() {
-            if !tile.cmds.is_empty() || tile.bg.components[3] != 0.0 {
-                let x = i % width_tiles;
-                let y = i / width_tiles;
-            }
-        }
-    }
-
+    /// Fill a path.
     pub fn fill(&mut self, path: &Path, fill_rule: FillRule, paint: Paint) {
-        let affine = self.get_affine();
+        let affine = self.current_transform();
         crate::flatten::fill(&path.path, affine, &mut self.line_buf);
         self.render_path(fill_rule, paint);
     }
 
+    /// Stroke a path.
     pub fn stroke(&mut self, path: &Path, stroke: &peniko::kurbo::Stroke, paint: Paint) {
-        let affine = self.get_affine();
+        let affine = self.current_transform();
         crate::flatten::stroke(&path.path, stroke, affine, &mut self.line_buf);
         self.render_path(FillRule::NonZero, paint);
     }
 
+    /// Pre-concatenate a new transform to the current transformation matrix.
+    pub fn transform(&mut self, transform: Affine) {
+        self.transform = self.transform * transform;
+    }
+
+    /// Set the current transformation matrix.
     pub fn set_transform(&mut self, transform: Affine) {
         self.transform = transform;
     }
 
-    fn get_affine(&self) -> Affine {
+    /// Set the current transformation matrix.
+    pub fn reset_transform(&mut self) {
+        self.transform = Affine::IDENTITY;
+    }
+
+    /// Return the current transformation matrix.
+    pub fn current_transform(&self) -> Affine {
         self.transform
     }
 }

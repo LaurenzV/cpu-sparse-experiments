@@ -1,5 +1,5 @@
 use crate::render::Path;
-use crate::{CsRenderCtx, FillRule, Pixmap};
+use crate::{FillRule, Pixmap, RenderContext};
 use peniko::color::AlphaColor;
 use peniko::kurbo::{Affine, BezPath, Stroke};
 use usvg::tiny_skia_path::PathSegment;
@@ -36,11 +36,11 @@ impl SVGContext {
     }
 }
 
-pub fn render_tree(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, tree: &usvg::Tree) {
+pub fn render_tree(ctx: &mut RenderContext, sctx: &mut SVGContext, tree: &usvg::Tree) {
     render_group(ctx, sctx, tree.root());
 }
 
-fn render_group(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, group: &usvg::Group) {
+fn render_group(ctx: &mut RenderContext, sctx: &mut SVGContext, group: &usvg::Group) {
     sctx.push_transform(&convert_transform(&group.transform()));
 
     for child in group.children() {
@@ -59,7 +59,7 @@ fn render_group(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, group: &usvg::Grou
     sctx.pop_transform();
 }
 
-fn render_image(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, image: &usvg::Image) {
+fn render_image(ctx: &mut RenderContext, sctx: &mut SVGContext, image: &usvg::Image) {
     let pixmap = match image.kind() {
         ImageKind::JPEG(_) => unimplemented!(),
         ImageKind::PNG(i) => Pixmap::from_png(i).unwrap(),
@@ -69,14 +69,14 @@ fn render_image(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, image: &usvg::Imag
     };
 }
 
-fn render_path(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, path: &usvg::Path) {
+fn render_path(ctx: &mut RenderContext, sctx: &mut SVGContext, path: &usvg::Path) {
     if !path.is_visible() {
         return;
     }
 
     ctx.set_transform(sctx.get_transform());
 
-    let fill = |ctx: &mut CsRenderCtx, path: &usvg::Path| {
+    let fill = |ctx: &mut RenderContext, path: &usvg::Path| {
         if let Some(fill) = path.fill() {
             let color = match fill.paint() {
                 Paint::Color(c) => {
@@ -93,7 +93,7 @@ fn render_path(ctx: &mut CsRenderCtx, sctx: &mut SVGContext, path: &usvg::Path) 
         }
     };
 
-    let stroke = |ctx: &mut CsRenderCtx, path: &usvg::Path| {
+    let stroke = |ctx: &mut RenderContext, path: &usvg::Path| {
         if let Some(stroke) = path.stroke() {
             let color = match stroke.paint() {
                 Paint::Color(c) => {

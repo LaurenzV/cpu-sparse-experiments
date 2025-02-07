@@ -1,4 +1,4 @@
-use cpu_sparse::{CsRenderCtx, FillRule, Pixmap};
+use cpu_sparse::{FillRule, Pixmap, RenderContext};
 use image::{load_from_memory, Rgba, RgbaImage};
 use once_cell::sync::Lazy;
 use peniko::color::palette;
@@ -20,8 +20,8 @@ static DIFFS_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
 
 const RECT_TOLERANCE: f32 = 0.1;
 
-pub fn get_ctx(width: usize, height: usize, transparent: bool) -> CsRenderCtx {
-    let mut ctx = CsRenderCtx::new(width, height);
+pub fn get_ctx(width: usize, height: usize, transparent: bool) -> RenderContext {
+    let mut ctx = RenderContext::new(width, height);
     if !transparent {
         let path = Rect::new(0.0, 0.0, width as f64, height as f64).to_path(0.1);
 
@@ -31,14 +31,14 @@ pub fn get_ctx(width: usize, height: usize, transparent: bool) -> CsRenderCtx {
     ctx
 }
 
-pub fn render_pixmap(ctx: &CsRenderCtx) -> Pixmap {
+pub fn render_pixmap(ctx: &RenderContext) -> Pixmap {
     let mut pixmap = Pixmap::new(ctx.width, ctx.height);
     ctx.render_to_pixmap(&mut pixmap);
 
     pixmap
 }
 
-pub fn check_ref(ctx: &CsRenderCtx, name: &str) {
+pub fn check_ref(ctx: &RenderContext, name: &str) {
     let mut pixmap = render_pixmap(ctx);
     pixmap.unpremultiply();
 
