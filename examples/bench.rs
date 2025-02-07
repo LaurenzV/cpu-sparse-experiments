@@ -1,4 +1,4 @@
-use bench_gen::{Command, FillRectAIterator, FillRectUIterator, Params};
+use bench_gen::{Command, FillRectAIterator, FillRectRotIterator, FillRectUIterator, Params};
 use cpu_sparse::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
 use std::time::Instant;
@@ -19,12 +19,14 @@ fn main() {
             size,
         };
 
+        let commands = FillRectRotIterator::new(params)
+            .take(RENDER_CALLS as usize)
+            .collect::<Vec<_>>();
+
         let start = Instant::now();
         let mut pixmap = Pixmap::new(WIDTH, HEIGHT);
 
-        let mut iter = FillRectAIterator::new(params).take(RENDER_CALLS as usize);
-
-        for cmd in iter {
+        for cmd in &commands {
             run_cmd(&mut ctx, cmd);
         }
 
@@ -47,13 +49,13 @@ fn write_pixmap(pixmap: &mut Pixmap, size: usize) {
     writer.write_image_data(pixmap.data()).unwrap();
 }
 
-fn run_cmd(ctx: &mut RenderContext, cmd: Command) {
+fn run_cmd(ctx: &mut RenderContext, cmd: &Command) {
     match cmd {
         Command::FillRect(r, c) => {
-            ctx.fill_rect(&r, c.into());
+            ctx.fill_rect(&r, (*c).into());
         }
         Command::FillPath(p, c) => {
-            ctx.fill_path(&p.into(), FillRule::NonZero, c.into());
+            ctx.fill_path(&p.clone().into(), FillRule::NonZero, (*c).into());
         }
     }
 }

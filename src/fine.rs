@@ -129,20 +129,16 @@ pub(crate) fn pack_scalar(
 ) {
     let base_ix = (y * STRIP_HEIGHT * width + x * WIDE_TILE_WIDTH) * 4;
 
-    for j in 0..STRIP_HEIGHT {
+    // Make sure we don't process rows outside the range of the pixmap.
+    let max_height = (height - y * STRIP_HEIGHT).min(STRIP_HEIGHT);
+
+    for j in 0..max_height {
         let line_ix = base_ix + j * width * 4;
 
-        // Continue if the current row is outside the range of the pixmap.
-        if y * STRIP_HEIGHT + j >= height {
-            break;
-        }
+        // Make sure we don't process columns outside the range of the pixmap.
+        let max_width = (width - x * WIDE_TILE_WIDTH).min(WIDE_TILE_WIDTH);
 
-        for i in 0..WIDE_TILE_WIDTH {
-            // Abort if the current column is outside the range of the pixmap.
-            if x * WIDE_TILE_WIDTH + i >= width {
-                break;
-            }
-
+        for i in 0..max_width {
             let target_ix = line_ix + i * 4;
 
             out_buf[target_ix..][..4].copy_from_slice(&scratch[(i * STRIP_HEIGHT + j) * 4..][..4]);

@@ -14,6 +14,7 @@ pub struct Params {
     pub size: usize,
 }
 
+#[derive(Clone)]
 pub enum Command {
     FillRect(Rect, AlphaColor<Srgb>),
     FillPath(BezPath, AlphaColor<Srgb>),
@@ -120,6 +121,8 @@ impl Iterator for FillRectRotIterator {
         );
         let color = gen_color(&mut self.rng, 127);
         let rect = Rect::new(x, y, x + (size as f64), y + (size as f64));
+
+        self.angle += 0.05;
 
         Some(Command::FillPath(affine * rect.to_path(0.1), color))
     }
