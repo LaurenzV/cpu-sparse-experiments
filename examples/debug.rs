@@ -41,17 +41,16 @@ fn ctx() -> RenderContext {
 
     let path = {
         let mut path = BezPath::new();
-        path.move_to((500.0, 560.0));
-        path.line_to((511.0, 560.0));
-        path.line_to((511.0, 600.0));
-        path.line_to((500.0, 600.0));
+        path.move_to((500.0, 0.0));
+        path.line_to((511.0, 0.0));
+        path.line_to((511.0, 20.0));
+        path.line_to((500.0, 20.0));
         path.close_path();
 
         path
     };
 
-    // ctx.fill_path(&path.into(), FillRule::N, palette::css::LIME.into());
-    ctx.transform(Affine::translate((00.0, -560.0)));
+    // ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
     // ctx.transform(Affine::translate((-100.0, -100.0)));
     let stroke = Stroke::new(2.0);
     ctx.stroke_path(&path.into(), &stroke, palette::css::DARK_BLUE.into());
