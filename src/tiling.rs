@@ -433,8 +433,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
 #[cfg(test)]
 mod tests {
-    use crate::strip::Tile;
-    use crate::tiling::{scale_up, PackedPoint};
+    use crate::tiling::{scale_up, PackedPoint, Tile};
 
     // TODO: Is this the correct behavior?
     #[test]
