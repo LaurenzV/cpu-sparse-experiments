@@ -12,8 +12,8 @@ use svg::node::element::path::Data;
 use svg::node::element::{Circle, Path, Rectangle};
 use svg::{Document, Node};
 
-const WIDTH: usize = 50;
-const HEIGHT: usize = 50;
+const WIDTH: usize = 512;
+const HEIGHT: usize = 4;
 
 fn main() {
     let mut document = Document::new().set("viewBox", (-10, -10, WIDTH + 20, HEIGHT + 20));
@@ -41,19 +41,20 @@ fn ctx() -> RenderContext {
 
     let path = {
         let mut path = BezPath::new();
-        path.move_to((5.0, 0.0));
-        path.line_to((15.5, 12.5));
-        path.line_to((3.5, 23.0));
-        path.line_to((-7.5, 11.5));
+        path.move_to((500.0, 560.0));
+        path.line_to((511.0, 560.0));
+        path.line_to((511.0, 600.0));
+        path.line_to((500.0, 600.0));
         path.close_path();
 
         path
     };
 
-    ctx.transform(Affine::translate((1.0, 0.0)));
-    ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
-    // let stroke = Stroke::new(3.0);
-    // ctx.stroke(&piet_path, &stroke, palette::css::DARK_BLUE.into());
+    // ctx.fill_path(&path.into(), FillRule::N, palette::css::LIME.into());
+    ctx.transform(Affine::translate((00.0, -560.0)));
+    // ctx.transform(Affine::translate((-100.0, -100.0)));
+    let stroke = Stroke::new(2.0);
+    ctx.stroke_path(&path.into(), &stroke, palette::css::DARK_BLUE.into());
 
     ctx
 }
