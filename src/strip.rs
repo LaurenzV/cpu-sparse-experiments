@@ -17,19 +17,19 @@ use crate::FillRule;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct Loc {
-    x: u16,
-    y: u16,
+    x: i32,
+    y: i32,
 }
 
 pub(crate) struct Footprint(pub(crate) u32);
 
 pub struct Tile {
-    x: u16,
-    y: u16,
+    x: i32,
+    // TODO: i32 shouldn't be necesary for y?
+    y: i32,
     // Whether the tile is oob, i.e. x or y where originally a negative value,
     // and thus the tile should not be rendered, but still be considered for computing
     // the winding number.
-    in_viewport: bool,
     p0: PackedPoint,
     p1: PackedPoint,
 }
@@ -37,9 +37,8 @@ pub struct Tile {
 impl Tile {
     pub fn new(x: f32, y: f32, p0: PackedPoint, p1: PackedPoint) -> Self {
         Self {
-            x: x as u16,
-            y: y as u16,
-            in_viewport: x >= 0.0 && y >= 0.0,
+            x: x as i32,
+            y: y as i32,
             p0,
             p1,
         }
@@ -47,9 +46,8 @@ impl Tile {
 
     pub fn new_u16(x: u16, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
         Self {
-            x,
-            y,
-            in_viewport: true,
+            x: x as i32,
+            y: y as i32,
             p0,
             p1,
         }
@@ -63,11 +61,11 @@ impl Tile {
         self.p1
     }
 
-    pub fn x(&self) -> u16 {
+    pub fn x(&self) -> i32 {
         self.x
     }
 
-    pub fn y(&self) -> u16 {
+    pub fn y(&self) -> i32 {
         self.y
     }
 }
@@ -78,16 +76,16 @@ impl std::fmt::Debug for Tile {
         let p1 = self.p1.unpack();
         write!(
             f,
-            "Tile {{ xy: ({}, {}), in_viewport: {} p0: ({:.4}, {:.4}), p1: ({:.4}, {:.4}) }}",
-            self.x, self.y, self.in_viewport, p0.x, p0.y, p1.x, p1.y
+            "Tile {{ xy: ({}, {}), p0: ({:.4}, {:.4}), p1: ({:.4}, {:.4}) }}",
+            self.x, self.y, p0.x, p0.y, p1.x, p1.y
         )
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
-    pub x: u32,
-    pub y: u32,
+    pub x: i32,
+    pub y: i32,
     pub col: u32,
     pub winding: i32,
 }
@@ -125,15 +123,8 @@ impl Tile {
         (self.p1.packed_y() == 0) as i32 - (self.p0.packed_y() == 0) as i32
     }
 
-    // TODO: Check whether this can be improves code-wise.
     pub fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
-        let xya = ((self.y as u32) << 16) + (self.x as u32);
-        let xyb = ((b.y as u32) << 16) + (b.x as u32);
-        if xya != xyb {
-            xya.cmp(&xyb)
-        } else {
-            self.in_viewport.cmp(&b.in_viewport)
-        }
+        (self.y, self.x).cmp(&(b.y, b.x))
     }
 }
 
@@ -172,10 +163,6 @@ pub fn render_strips_scalar(
 
             for tile in &tiles[seg_start..i] {
                 delta += tile.delta();
-
-                if !tile.in_viewport {
-                    continue;
-                }
 
                 let p0 = tile.p0.unpack();
                 let p1 = tile.p1.unpack();
@@ -266,8 +253,8 @@ pub fn render_strips_scalar(
 
             if strip_start {
                 let strip = Strip {
-                    x: 4 * prev_tile.x as u32 + x0,
-                    y: 4 * prev_tile.y as u32,
+                    x: 4 * prev_tile.x + x0 as i32,
+                    y: 4 * prev_tile.y,
                     col: cols,
                     winding: start_delta,
                 };
@@ -293,16 +280,17 @@ pub fn render_strips_scalar(
 }
 
 impl Strip {
-    pub fn x(&self) -> u32 {
+    pub fn x(&self) -> i32 {
         self.x
     }
 
-    pub fn y(&self) -> u32 {
+    pub fn y(&self) -> i32 {
         self.y
     }
 
     pub fn strip_y(&self) -> u32 {
-        self.y / STRIP_HEIGHT as u32
+        // TODO: Don't convert?
+        self.y as u32 / STRIP_HEIGHT as u32
     }
 }
 
@@ -317,7 +305,6 @@ mod tests {
         let tile = Tile {
             x: 0,
             y: 0,
-            in_viewport: true,
             p0: PackedPoint::new(scale_up(1.0), scale_up(0.0)),
             p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
         };
