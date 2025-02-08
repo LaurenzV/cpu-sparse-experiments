@@ -17,17 +17,58 @@ use crate::FillRule;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct Loc {
-    x: u16,
-    y: u16,
+    x: i32,
+    y: i32,
 }
 
 pub(crate) struct Footprint(pub(crate) u32);
 
 pub struct Tile {
-    pub x: u16,
-    pub y: u16,
-    pub p0: PackedPoint,
-    pub p1: PackedPoint,
+    x: i32,
+    // In practice will always be positive since we can just ignore tiles where y < 0,
+    // but the same does not apply for x, where we do need to preserve tiles where x < 0.
+    y: i32,
+    // Whether the tile is oob, i.e. x or y where originally a negative value,
+    // and thus the tile should not be rendered, but still be considered for computing
+    // the winding number.
+    p0: PackedPoint,
+    p1: PackedPoint,
+}
+
+impl Tile {
+    pub fn new(x: f32, y: f32, p0: PackedPoint, p1: PackedPoint) -> Self {
+        Self {
+            x: x as i32,
+            y: y as i32,
+            p0,
+            p1,
+        }
+    }
+
+    pub fn new_u16(x: u16, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
+        Self {
+            x: x as i32,
+            y: y as i32,
+            p0,
+            p1,
+        }
+    }
+
+    pub fn p0(&self) -> PackedPoint {
+        self.p0
+    }
+
+    pub fn p1(&self) -> PackedPoint {
+        self.p1
+    }
+
+    pub fn x(&self) -> i32 {
+        self.x
+    }
+
+    pub fn y(&self) -> i32 {
+        self.y
+    }
 }
 
 impl std::fmt::Debug for Tile {
@@ -44,8 +85,8 @@ impl std::fmt::Debug for Tile {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
-    pub x: u32,
-    pub y: u32,
+    pub x: i32,
+    pub y: i32,
     pub col: u32,
     pub winding: i32,
 }
@@ -83,13 +124,8 @@ impl Tile {
         (self.p1.packed_y() == 0) as i32 - (self.p0.packed_y() == 0) as i32
     }
 
-    // Comparison function for sorting. Only compares loc, doesn't care
-    // about points. Unpacking code has been validated to be efficient in
-    // Godbolt.
     pub fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
-        let xya = ((self.y as u32) << 16) + (self.x as u32);
-        let xyb = ((b.y as u32) << 16) + (b.x as u32);
-        xya.cmp(&xyb)
+        (self.y, self.x).cmp(&(b.y, b.x))
     }
 }
 
@@ -217,8 +253,8 @@ pub fn render_strips_scalar(
 
             if strip_start {
                 let strip = Strip {
-                    x: 4 * prev_tile.x as u32 + x0,
-                    y: 4 * prev_tile.y as u32,
+                    x: 4 * prev_tile.x + x0 as i32,
+                    y: 4 * prev_tile.y,
                     col: cols,
                     winding: start_delta,
                 };
@@ -244,16 +280,17 @@ pub fn render_strips_scalar(
 }
 
 impl Strip {
-    pub fn x(&self) -> u32 {
+    pub fn x(&self) -> i32 {
         self.x
     }
 
-    pub fn y(&self) -> u32 {
+    pub fn y(&self) -> i32 {
         self.y
     }
 
     pub fn strip_y(&self) -> u32 {
-        self.y / STRIP_HEIGHT as u32
+        // TODO: Don't convert?
+        self.y as u32 / STRIP_HEIGHT as u32
     }
 }
 

@@ -136,27 +136,33 @@ impl RenderContext {
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
 
-            if strip.x() as usize >= self.width {
+            if strip.x() >= self.width as i32 {
                 // Don't render strips that are outside the viewport.
                 continue;
             }
 
-            if strip.y() as usize >= self.height {
+            if strip.y() >= self.height as i32 || strip.y() < 0 {
                 // Since strips are sorted by location, any subsequent strips will also be
                 // outside the viewport, so we can abort entirely.
                 break;
             }
 
             let next_strip = &self.strip_buf[i + 1];
-            let x0 = strip.x();
+            // Currently, strips can also start at a negative x position, since we don't
+            // support viewport culling yet. However, when generating the commands
+            // we only want to emit strips >= 0, so we calculate the adjustment
+            // and then only include the alpha indices for columns where x >= 0.
+            let x0_adjustment = (strip.x()).min(0).abs() as u32;
+            let x0 = (strip.x() + x0_adjustment as i32) as u32;
             let y = strip.strip_y();
             let row_start = y as usize * width_tiles;
-            let strip_width = next_strip.col - strip.col;
+            let mut col = strip.col + x0_adjustment;
+            // Can potentially be 0, if the next strip's x values is also < 0.
+            let strip_width = next_strip.col.saturating_sub(col);
             let x1 = x0 + strip_width;
             let xtile0 = x0 as usize / WIDE_TILE_WIDTH;
             let xtile1 = (x1 as usize + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
             let mut x = x0;
-            let mut col = strip.col;
 
             for xtile in xtile0..xtile1 {
                 let x_tile_rel = x % WIDE_TILE_WIDTH as u32;
@@ -172,9 +178,13 @@ impl RenderContext {
                 self.tiles[row_start + xtile].push(Cmd::Strip(cmd));
             }
 
-            if fill_rule.active_fill(next_strip.winding) && y == next_strip.strip_y() {
+            if fill_rule.active_fill(next_strip.winding)
+                && y == next_strip.strip_y()
+                // Only fill if we are actually inside the viewport.
+                && next_strip.x() >= 0
+            {
                 x = x1;
-                let x2 = next_strip.x();
+                let x2 = next_strip.x() as u32;
                 let fxt0 = x1 as usize / WIDE_TILE_WIDTH;
                 let fxt1 = (x2 as usize + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
                 for xtile in fxt0..fxt1 {

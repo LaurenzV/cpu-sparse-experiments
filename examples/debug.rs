@@ -12,48 +12,46 @@ use svg::node::element::path::Data;
 use svg::node::element::{Circle, Path, Rectangle};
 use svg::{Document, Node};
 
-const WIDTH: usize = 200;
-const HEIGHT: usize = 200;
+const WIDTH: usize = 50;
+const HEIGHT: usize = 50;
 
 fn main() {
     let mut document = Document::new().set("viewBox", (-10, -10, WIDTH + 20, HEIGHT + 20));
 
-    // let ctx = ctx();
+    let ctx = ctx();
 
-    let svg = std::fs::read_to_string("svgs/gs.svg").expect("error reading file");
-    let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
-    let mut ctx = RenderContext::new(WIDTH, HEIGHT);
-    let mut sctx = SVGContext::new();
-    render_tree(&mut ctx, &mut sctx, &tree);
+    // let svg = std::fs::read_to_string("svgs/gs.svg").expect("error reading file");
+    // let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
+    // let mut ctx = RenderContext::new(WIDTH, HEIGHT);
+    // let mut sctx = SVGContext::new();
+    // render_tree(&mut ctx, &mut sctx, &tree);
 
     draw_grid(&mut document);
     draw_line_segments(&mut document, &ctx.line_buf);
     draw_tile_areas(&mut document, &ctx.tile_buf);
-    // draw_tile_intersections(&mut document, &ctx.tile_buf);
+    draw_tile_intersections(&mut document, &ctx.tile_buf);
     draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
-    // draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
+    draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
 
     svg::save("target/out.svg", &document).unwrap();
 }
 
 fn ctx() -> RenderContext {
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
-    let mut path = BezPath::new();
-    let x_start = -4.0;
-    let y_start = -4.0;
 
     let path = {
         let mut path = BezPath::new();
-        path.move_to((5.0, 5.0));
-        path.line_to((95.0, 50.0));
-        path.line_to((5.0, 95.0));
+        path.move_to((5.0, 0.0));
+        path.line_to((15.5, 12.5));
+        path.line_to((3.5, 23.0));
+        path.line_to((-7.5, 11.5));
         path.close_path();
 
         path
     };
 
-    ctx.set_transform(Affine::scale(0.25));
-    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.transform(Affine::translate((1.0, 0.0)));
+    ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
     // let stroke = Stroke::new(3.0);
     // ctx.stroke(&piet_path, &stroke, palette::css::DARK_BLUE.into());
 
@@ -121,14 +119,14 @@ fn draw_tile_areas(document: &mut Document, tiles: &[Tile]) {
 
     for tile in tiles {
         // Draw the points
-        let x = tile.x as u32 * TILE_WIDTH;
-        let y = tile.y as u32 * TILE_HEIGHT;
+        let x = tile.x() * TILE_WIDTH as i32;
+        let y = tile.y() * TILE_HEIGHT as i32;
 
         if seen.contains(&(x, y)) {
             continue;
         }
 
-        let color = if tile.x == 95 && tile.y == 86 {
+        let color = if tile.x() == 95 && tile.y() == 86 {
             "red"
         } else {
             "darkblue"
@@ -209,7 +207,7 @@ fn draw_strips(document: &mut Document, strips: &[Strip], alphas: &[u32]) {
 
             for h in 0..STRIP_HEIGHT {
                 let rect = Rectangle::new()
-                    .set("x", x + i)
+                    .set("x", x + i as i32)
                     .set("y", y * STRIP_HEIGHT as u32 + h as u32)
                     .set("width", 1)
                     .set("height", 1)
@@ -225,11 +223,11 @@ fn draw_strips(document: &mut Document, strips: &[Strip], alphas: &[u32]) {
 fn draw_tile_intersections(document: &mut Document, tiles: &[Tile]) {
     for tile in tiles {
         // Draw the points
-        let x = tile.x as u32 * TILE_WIDTH;
-        let y = tile.y as u32 * TILE_HEIGHT;
+        let x = tile.x() * TILE_WIDTH as i32;
+        let y = tile.y() * TILE_HEIGHT as i32;
 
-        let p0 = tile.p0.unpack();
-        let p1 = tile.p1.unpack();
+        let p0 = tile.p0().unpack();
+        let p1 = tile.p1().unpack();
         for p in [(p0, -0.05, "darkgreen"), (p1, 0.05, "purple")] {
             let circle = Circle::new()
                 .set("cx", x as f32 + p.0.x + p.1)
