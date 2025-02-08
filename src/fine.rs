@@ -32,11 +32,12 @@ impl<'a> Fine<'a> {
 
     #[inline(never)]
     pub(crate) fn clear(&mut self, premul_color: [u8; 4]) {
-        if premul_color[0] == premul_color[1] &&
-            premul_color[1] == premul_color[2] &&
-            premul_color[2] == premul_color[3] {
+        if premul_color[0] == premul_color[1]
+            && premul_color[1] == premul_color[2]
+            && premul_color[2] == premul_color[3]
+        {
             self.scratch.fill(premul_color[0])
-        }   else {
+        } else {
             for z in self.scratch.chunks_exact_mut(4) {
                 z.copy_from_slice(&premul_color);
             }
@@ -162,7 +163,7 @@ pub(crate) fn pack(
 
         for i in 0..max_width {
             let src = &scratch[(i * STRIP_HEIGHT + j) * 4..][..4];
-            dest[i*4..][..4].copy_from_slice(&src[..4]);
+            dest[i * 4..][..4].copy_from_slice(&src[..4]);
         }
     }
 }
