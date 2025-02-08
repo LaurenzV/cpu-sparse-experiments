@@ -430,7 +430,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
 #[cfg(test)]
 mod tests {
-    use crate::tiling::{scale_up, PackedPoint, Tile};
+    use crate::tiling::{make_tiles, scale_up, FlatLine, PackedPoint, Point, Tile};
 
     // TODO: Is this the correct behavior?
     #[test]
@@ -443,5 +443,14 @@ mod tests {
         };
 
         assert_eq!(tile.footprint().0, 0);
+    }
+
+    #[test]
+    #[ignore]
+    // TODO: Fix this
+    fn infinite_loop() {
+        let mut line = FlatLine { p0: Point { x: 22.0, y: 552.0 }, p1: Point { x: 224.0, y: 388.0 } };
+        let mut buf = vec![];
+        make_tiles(&[line], &mut buf);
     }
 }
