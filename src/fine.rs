@@ -30,14 +30,22 @@ impl<'a> Fine<'a> {
         }
     }
 
-    pub(crate) fn clear_scalar(&mut self, premul_color: [u8; 4]) {
-        for z in self.scratch.chunks_exact_mut(4) {
-            z.copy_from_slice(&premul_color);
+    #[inline(never)]
+    pub(crate) fn clear(&mut self, premul_color: [u8; 4]) {
+        if premul_color[0] == premul_color[1] &&
+            premul_color[1] == premul_color[2] &&
+            premul_color[2] == premul_color[3] {
+            self.scratch.fill(premul_color[0])
+        }   else {
+            for z in self.scratch.chunks_exact_mut(4) {
+                z.copy_from_slice(&premul_color);
+            }
         }
     }
 
-    pub(crate) fn pack_scalar(&mut self, x: usize, y: usize) {
-        pack_scalar(
+    #[inline(never)]
+    pub(crate) fn pack(&mut self, x: usize, y: usize) {
+        pack(
             &mut self.out_buf,
             &self.scratch,
             self.width,
@@ -129,9 +137,9 @@ fn div_255(val: u16) -> u16 {
     (val + 1 + (val >> 8)) >> 8
 }
 
-pub(crate) fn pack_scalar(
+pub(crate) fn pack(
     out_buf: &mut [u8],
-    scratch: &[u8],
+    scratch: &[u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
     width: usize,
     height: usize,
     x: usize,
@@ -147,11 +155,14 @@ pub(crate) fn pack_scalar(
 
         // Make sure we don't process columns outside the range of the pixmap.
         let max_width = (width - x * WIDE_TILE_WIDTH).min(WIDE_TILE_WIDTH);
+        let target_len = max_width * 4;
+        // This helps the compiler to understand that any access to `dest` cannot
+        // be out of bounds, and thus saves corresponding checks in the for loop.
+        let dest = &mut out_buf[line_ix..][..target_len];
 
         for i in 0..max_width {
-            let target_ix = line_ix + i * 4;
-
-            out_buf[target_ix..][..4].copy_from_slice(&scratch[(i * STRIP_HEIGHT + j) * 4..][..4]);
+            let src = &scratch[(i * STRIP_HEIGHT + j) * 4..][..4];
+            dest[i*4..][..4].copy_from_slice(&src[..4]);
         }
     }
 }
