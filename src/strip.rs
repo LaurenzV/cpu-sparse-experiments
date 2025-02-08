@@ -25,7 +25,8 @@ pub(crate) struct Footprint(pub(crate) u32);
 
 pub struct Tile {
     x: i32,
-    // TODO: i32 shouldn't be necesary for y?
+    // In practice will always be positive since we can just ignore tiles where y < 0,
+    // but the same does not apply for x, where we do need to preserve tiles where x < 0.
     y: i32,
     // Whether the tile is oob, i.e. x or y where originally a negative value,
     // and thus the tile should not be rendered, but still be considered for computing
