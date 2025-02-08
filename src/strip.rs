@@ -147,7 +147,6 @@ pub fn render_strips_scalar(
     // logic here to process the final strip.
     for i in 1..tiles.len() {
         let tile = &tiles[i];
-        println!("{:?}", tile);
 
         if prev_tile.loc() != tile.loc() {
             let start_delta = delta;
