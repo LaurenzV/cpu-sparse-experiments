@@ -193,17 +193,16 @@ fn issue_12_filling_unclosed_path_2() {
 }
 
 #[test]
-fn issue_28_rectangle_exceeding_viewport() {
+fn issue_28_triangle_exceeding_viewport() {
     let mut path = BezPath::new();
     path.move_to((5.0, 0.0));
-    path.line_to((15.5, 12.5));
-    path.line_to((3.5, 23.0));
-    path.line_to((-7.5, 11.5));
+    path.line_to((12.0, 7.99));
+    path.line_to((-4.0, 7.99));
     path.close_path();
 
-    let mut ctx = get_ctx(15, 25, false);
+    let mut ctx = get_ctx(15, 8, false);
 
     ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
 
-    check_ref(&ctx, "issue_28_rectangle_exceeding_viewport");
+    check_ref(&ctx, "issue_28_triangle_exceeding_viewport");
 }
