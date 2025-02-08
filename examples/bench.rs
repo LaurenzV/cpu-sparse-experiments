@@ -1,4 +1,4 @@
-use bench_gen::{Command, Params, PolyIterator, RectRotIterator, RectUIterator};
+use bench_gen::{Command, Params, PolyIterator, RectAIterator, RectRotIterator, RectUIterator};
 use cpu_sparse::{FillRule, Pixmap, RenderContext};
 use peniko::kurbo::{Cap, Join, Stroke};
 use std::io::BufWriter;
@@ -12,13 +12,14 @@ const STROKE_WIDTH: f64 = 2.0;
 fn main() {
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
 
-    for size in [128].repeat(200) {
+    for size in [256].repeat(300) {
         ctx.reset();
 
         let params = Params {
             width: 512,
             height: 600,
-            stroke: true,
+            alpha: 127,
+            stroke: false,
             size,
         };
 

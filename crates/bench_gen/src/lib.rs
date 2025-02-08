@@ -11,6 +11,7 @@ const SEED: [u8; 32] = [0; 32];
 pub struct Params {
     pub width: usize,
     pub height: usize,
+    pub alpha: u8,
     pub stroke: bool,
     pub size: usize,
 }
@@ -45,7 +46,7 @@ impl Iterator for RectAIterator {
         let x = self.rng.random_range(0..=(self.params.width - size)) as f64;
         let y = self.rng.random_range(0..=(self.params.height - size)) as f64;
 
-        let color = gen_color(&mut self.rng, 127);
+        let color = gen_color(&mut self.rng, self.params.alpha);
 
         if self.params.stroke {
             Some(Command::StrokeRect(
@@ -90,7 +91,7 @@ impl Iterator for RectUIterator {
         x += x_adjustment;
         y += y_adjustment;
 
-        let color = gen_color(&mut self.rng, 127);
+        let color = gen_color(&mut self.rng, self.params.alpha);
 
         if self.params.stroke {
             Some(Command::StrokeRect(
@@ -136,7 +137,7 @@ impl Iterator for RectRotIterator {
             self.angle * PI / 180.0,
             Point::new(x + half_size, y + half_size),
         );
-        let color = gen_color(&mut self.rng, 127);
+        let color = gen_color(&mut self.rng, self.params.alpha);
         let rect = Rect::new(x, y, x + (size as f64), y + (size as f64));
 
         self.angle += 0.01;
@@ -193,7 +194,7 @@ impl Iterator for PolyIterator {
             }
         }
 
-        let color = gen_color(&mut self.rng, 127);
+        let color = gen_color(&mut self.rng, self.params.alpha);
 
         if self.params.stroke {
             Some(Command::StrokePath(path.into(), color))

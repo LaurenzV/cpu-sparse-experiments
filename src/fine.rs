@@ -63,21 +63,29 @@ impl<'a> Fine<'a> {
     pub(crate) fn fill_scalar(&mut self, x: usize, width: usize, paint: &Paint) {
         match paint {
             Paint::Solid(c) => {
-                let premul_color = c.premultiply().to_rgba8().to_u8_array();
+                let (color_buf, alpha) = {
+                    let mut buf = [0; STRIP_HEIGHT_F32];
+                    let premul_color = c.premultiply().to_rgba8().to_u8_array();
 
-                if premul_color[3] == 255 {
-                    for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                        .chunks_exact_mut(4)
-                    {
-                        z.copy_from_slice(&premul_color);
+                    for i in 0..STRIP_HEIGHT {
+                        buf[i * 4..((i + 1) * 4)].copy_from_slice(&premul_color);
+                    }
+
+                    (buf, buf[3])
+                };
+
+                let mut colors = self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+                    .chunks_exact_mut(STRIP_HEIGHT_F32);
+
+                if alpha == 255 {
+                    for z in colors {
+                        z.copy_from_slice(&color_buf);
                     }
                 } else {
-                    let inv_alpha = 255 - premul_color[3] as u16;
-                    for z in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                        .chunks_exact_mut(4)
-                    {
-                        for i in 0..4 {
-                            z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + premul_color[i];
+                    let inv_alpha = 255 - alpha as u16;
+                    for z in colors {
+                        for i in 0..STRIP_HEIGHT_F32 {
+                            z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color_buf[i];
                         }
                     }
                 }
