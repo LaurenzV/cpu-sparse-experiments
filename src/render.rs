@@ -7,10 +7,10 @@
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
 use crate::strip::render_strips_scalar;
-use crate::tiling::Point;
+use crate::tiling::{Point, Tile};
 use crate::{
     fine::Fine,
-    strip::{self, Strip, Tile},
+    strip::{self, Strip},
     tiling::{self, FlatLine},
     wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
     FillRule, Pixmap,

@@ -1,13 +1,115 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::strip::Tile;
+use crate::strip::Footprint;
 
 pub const TILE_WIDTH: u32 = 4;
 pub const TILE_HEIGHT: u32 = 4;
 
 const TILE_SCALE_X: f32 = 1.0 / TILE_WIDTH as f32;
 const TILE_SCALE_Y: f32 = 1.0 / TILE_HEIGHT as f32;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) struct Loc {
+    x: i32,
+    y: i32,
+}
+
+impl Loc {
+    /// Two locations are on the same strip if they are on the same
+    /// row and next to each other.
+    pub(crate) fn same_strip(&self, other: &Self) -> bool {
+        self.same_row(other) && (other.x - self.x) / 2 == 0
+    }
+
+    pub(crate) fn same_row(&self, other: &Self) -> bool {
+        self.y == other.y
+    }
+}
+
+pub struct Tile {
+    x: i32,
+    // In practice will always be positive since we can just ignore tiles where y < 0,
+    // but the same does not apply for x, where we do need to preserve tiles where x < 0.
+    y: i32,
+    // Whether the tile is oob, i.e. x or y where originally a negative value,
+    // and thus the tile should not be rendered, but still be considered for computing
+    // the winding number.
+    p0: PackedPoint,
+    p1: PackedPoint,
+}
+
+impl Tile {
+    pub fn new(x: f32, y: f32, p0: PackedPoint, p1: PackedPoint) -> Self {
+        Self {
+            x: x as i32,
+            y: y as i32,
+            p0,
+            p1,
+        }
+    }
+
+    pub fn new_u16(x: u16, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
+        Self {
+            x: x as i32,
+            y: y as i32,
+            p0,
+            p1,
+        }
+    }
+
+    pub fn p0(&self) -> PackedPoint {
+        self.p0
+    }
+
+    pub fn p1(&self) -> PackedPoint {
+        self.p1
+    }
+
+    pub fn x(&self) -> i32 {
+        self.x
+    }
+
+    pub fn y(&self) -> i32 {
+        self.y
+    }
+
+    pub(crate) fn loc(&self) -> Loc {
+        Loc {
+            x: self.x,
+            y: self.y,
+        }
+    }
+
+    pub(crate) fn footprint(&self) -> Footprint {
+        let x0 = self.p0.unpacked_x();
+        let x1 = self.p1.unpacked_x();
+        // On CPU, might be better to do this as fixed point
+        let xmin = x0.min(x1).floor() as u32;
+        let xmax = (xmin + 1).max(x0.max(x1).ceil() as u32).min(TILE_WIDTH);
+        Footprint((1 << xmax) - (1 << xmin))
+    }
+
+    pub(crate) fn delta(&self) -> i32 {
+        (self.p1.packed_y() == 0) as i32 - (self.p0.packed_y() == 0) as i32
+    }
+
+    pub fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
+        (self.y, self.x).cmp(&(b.y, b.x))
+    }
+}
+
+impl std::fmt::Debug for Tile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let p0 = self.p0.unpack();
+        let p1 = self.p1.unpack();
+        write!(
+            f,
+            "Tile {{ xy: ({}, {}), p0: ({:.4}, {:.4}), p1: ({:.4}, {:.4}) }}",
+            self.x, self.y, p0.x, p0.y, p1.x, p1.y
+        )
+    }
+}
 
 /// This is just Line but f32
 #[derive(Clone, Copy, Debug)]
@@ -327,4 +429,22 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
         PackedPoint::new(0, 0),
         PackedPoint::new(0, 0),
     ));
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tiling::{scale_up, PackedPoint, Tile};
+
+    // TODO: Is this the correct behavior?
+    #[test]
+    fn footprint_at_edge() {
+        let tile = Tile {
+            x: 0,
+            y: 0,
+            p0: PackedPoint::new(scale_up(1.0), scale_up(0.0)),
+            p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
+        };
+
+        assert_eq!(tile.footprint().0, 0);
+    }
 }
