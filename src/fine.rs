@@ -59,6 +59,7 @@ impl<'a> Fine<'a> {
         }
     }
 
+    #[inline(never)]
     pub(crate) fn fill_scalar(&mut self, x: usize, width: usize, paint: &Paint) {
         match paint {
             Paint::Solid(c) => {
@@ -85,6 +86,7 @@ impl<'a> Fine<'a> {
         }
     }
 
+    #[inline(never)]
     pub(crate) fn strip_scalar(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
         match paint {
             Paint::Solid(s) => {
