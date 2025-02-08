@@ -24,10 +24,52 @@ pub(crate) struct Loc {
 pub(crate) struct Footprint(pub(crate) u32);
 
 pub struct Tile {
-    pub x: u16,
-    pub y: u16,
-    pub p0: PackedPoint,
-    pub p1: PackedPoint,
+    x: u16,
+    y: u16,
+    // Whether the tile is oob, i.e. x or y where originally a negative value,
+    // and thus the tile should not be rendered, but still be considered for computing
+    // the winding number.
+    in_viewport: bool,
+    p0: PackedPoint,
+    p1: PackedPoint,
+}
+
+impl Tile {
+    pub fn new(x: f32, y: f32, p0: PackedPoint, p1: PackedPoint) -> Self {
+        Self {
+            x: x as u16,
+            y: y as u16,
+            in_viewport: x >= 0.0 && y >= 0.0,
+            p0,
+            p1,
+        }
+    }
+
+    pub fn new_u16(x: u16, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
+        Self {
+            x,
+            y,
+            in_viewport: true,
+            p0,
+            p1,
+        }
+    }
+
+    pub fn p0(&self) -> PackedPoint {
+        self.p0
+    }
+
+    pub fn p1(&self) -> PackedPoint {
+        self.p1
+    }
+
+    pub fn x(&self) -> u16 {
+        self.x
+    }
+
+    pub fn y(&self) -> u16 {
+        self.y
+    }
 }
 
 impl std::fmt::Debug for Tile {
@@ -36,8 +78,8 @@ impl std::fmt::Debug for Tile {
         let p1 = self.p1.unpack();
         write!(
             f,
-            "Tile {{ xy: ({}, {}), p0: ({:.4}, {:.4}), p1: ({:.4}, {:.4}) }}",
-            self.x, self.y, p0.x, p0.y, p1.x, p1.y
+            "Tile {{ xy: ({}, {}), in_viewport: {} p0: ({:.4}, {:.4}), p1: ({:.4}, {:.4}) }}",
+            self.x, self.y, self.in_viewport, p0.x, p0.y, p1.x, p1.y
         )
     }
 }
@@ -83,13 +125,15 @@ impl Tile {
         (self.p1.packed_y() == 0) as i32 - (self.p0.packed_y() == 0) as i32
     }
 
-    // Comparison function for sorting. Only compares loc, doesn't care
-    // about points. Unpacking code has been validated to be efficient in
-    // Godbolt.
+    // TODO: Check whether this can be improves code-wise.
     pub fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
         let xya = ((self.y as u32) << 16) + (self.x as u32);
         let xyb = ((b.y as u32) << 16) + (b.x as u32);
-        xya.cmp(&xyb)
+        if xya != xyb {
+            xya.cmp(&xyb)
+        } else {
+            self.in_viewport.cmp(&b.in_viewport)
+        }
     }
 }
 
@@ -112,6 +156,7 @@ pub fn render_strips_scalar(
     // logic here to process the final strip.
     for i in 1..tiles.len() {
         let tile = &tiles[i];
+        println!("{:?}", tile);
 
         if prev_tile.loc() != tile.loc() {
             let start_delta = delta;
@@ -127,6 +172,10 @@ pub fn render_strips_scalar(
 
             for tile in &tiles[seg_start..i] {
                 delta += tile.delta();
+
+                if !tile.in_viewport {
+                    continue;
+                }
 
                 let p0 = tile.p0.unpack();
                 let p1 = tile.p1.unpack();
@@ -268,6 +317,7 @@ mod tests {
         let tile = Tile {
             x: 0,
             y: 0,
+            in_viewport: true,
             p0: PackedPoint::new(scale_up(1.0), scale_up(0.0)),
             p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
         };

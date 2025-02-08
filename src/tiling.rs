@@ -184,12 +184,12 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 let yfrac1 = scale_up(s1.y - y);
 
                 // 1x1 tile
-                tile_buf.push(Tile {
-                    x: x as u16,
-                    y: y as u16,
-                    p0: PackedPoint::new(xfrac0, yfrac0),
-                    p1: PackedPoint::new(xfrac1, yfrac1),
-                });
+                tile_buf.push(Tile::new(
+                    x,
+                    y,
+                    PackedPoint::new(xfrac0, yfrac0),
+                    PackedPoint::new(xfrac1, yfrac1),
+                ));
             } else {
                 // vertical column
                 let slope = (s1.x - s0.x) / (s1.y - s0.y);
@@ -206,24 +206,19 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let xclip = xclip0 + i as f32 * sign * slope;
                     let xfrac = scale_up(xclip).max(1);
                     let packed = PackedPoint::new(xfrac, yclip);
-                    tile_buf.push(Tile {
-                        x: x as u16,
-                        y: (y + i as f32 * sign) as u16,
-                        p0: last_packed,
-                        p1: packed,
-                    });
+                    tile_buf.push(Tile::new(x, y + i as f32 * sign, last_packed, packed));
                     // flip y between top and bottom of tile
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
                 }
                 let yfrac1 = scale_up(s1.y - (y + (count_y - 1) as f32 * sign));
                 let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-                tile_buf.push(Tile {
-                    x: x as u16,
-                    y: (y + (count_y - 1) as f32 * sign) as u16,
-                    p0: last_packed,
-                    p1: packed1,
-                });
+                tile_buf.push(Tile::new(
+                    x,
+                    y + (count_y - 1) as f32 * sign,
+                    last_packed,
+                    packed1,
+                ));
             }
         } else if count_y == 1 {
             // horizontal row
@@ -241,12 +236,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 let yclip = yclip0 + i as f32 * sign * slope;
                 let yfrac = scale_up(yclip).max(1);
                 let packed = PackedPoint::new(xclip, yfrac);
-                tile_buf.push(Tile {
-                    x: (x + i as f32 * sign) as u16,
-                    y: y as u16,
-                    p0: last_packed,
-                    p1: packed,
-                });
+                tile_buf.push(Tile::new(x + i as f32 * sign, y, last_packed, packed));
                 // flip x between left and right of tile
                 last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
             }
@@ -254,12 +244,12 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let yfrac1 = scale_up(s1.y - y);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-            tile_buf.push(Tile {
-                x: (x + (count_x - 1) as f32 * sign) as u16,
-                y: y as u16,
-                p0: last_packed,
-                p1: packed1,
-            });
+            tile_buf.push(Tile::new(
+                x + (count_x - 1) as f32 * sign,
+                y,
+                last_packed,
+                packed1,
+            ));
         } else {
             // general case
             let recip_dx = 1.0 / (s1.x - s0.x);
@@ -296,12 +286,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let x_intersect = s0.x + (s1.x - s0.x) * t_clipy - xi;
                     let xfrac = scale_up(x_intersect).max(1); // maybe should clamp?
                     let packed = PackedPoint::new(xfrac, yclip);
-                    tile_buf.push(Tile {
-                        x: xi as u16,
-                        y: yi as u16,
-                        p0: last_packed,
-                        p1: packed,
-                    });
+                    tile_buf.push(Tile::new(xi, yi, last_packed, packed));
                     t_clipy += recip_dy.abs();
                     yi += signy;
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
@@ -310,12 +295,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let y_intersect = s0.y + (s1.y - s0.y) * t_clipx - yi;
                     let yfrac = scale_up(y_intersect).max(1); // maybe should clamp?
                     let packed = PackedPoint::new(xclip, yfrac);
-                    tile_buf.push(Tile {
-                        x: xi as u16,
-                        y: yi as u16,
-                        p0: last_packed,
-                        p1: packed,
-                    });
+                    tile_buf.push(Tile::new(xi, yi, last_packed, packed));
                     t_clipx += recip_dx.abs();
                     xi += signx;
                     last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
@@ -325,43 +305,20 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let yfrac1 = scale_up(s1.y - yi);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-            tile_buf.push(Tile {
-                x: xi as u16,
-                y: yi as u16,
-                p0: last_packed,
-                p1: packed1,
-            });
+            tile_buf.push(Tile::new(xi, yi, last_packed, packed1));
         }
     }
     // This particular choice of sentinel tiles generates a sentinel strip.
-    tile_buf.push(Tile {
-        x: 0x3ffd,
-        y: 0x3fff,
-        p0: PackedPoint::new(0, 0),
-        p1: PackedPoint::new(0, 0),
-    });
-    tile_buf.push(Tile {
-        x: 0x3fff,
-        y: 0x3fff,
-        p0: PackedPoint::new(0, 0),
-        p1: PackedPoint::new(0, 0),
-    });
-}
-
-#[test]
-fn tiling() {
-    let l = FlatLine {
-        p0: Point::new(1.3, 1.4),
-        p1: Point::new(20.1, 50.2),
-    };
-    let mut tiles = vec![];
-    make_tiles(&[l], &mut tiles);
-    for tile in &tiles {
-        let p0 = tile.p0.unpack();
-        let p1 = tile.p1.unpack();
-        println!(
-            "@{}, {}: ({}, {}) - ({}, {})",
-            tile.x, tile.y, p0.x, p0.y, p1.x, p1.y
-        );
-    }
+    tile_buf.push(Tile::new_u16(
+        0x3ffd,
+        0x3fff,
+        PackedPoint::new(0, 0),
+        PackedPoint::new(0, 0),
+    ));
+    tile_buf.push(Tile::new_u16(
+        0x3fff,
+        0x3fff,
+        PackedPoint::new(0, 0),
+        PackedPoint::new(0, 0),
+    ));
 }
