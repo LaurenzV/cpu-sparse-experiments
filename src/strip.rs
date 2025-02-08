@@ -11,77 +11,11 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::tiling::{PackedPoint, TILE_WIDTH};
+use crate::tiling::{PackedPoint, Tile, TILE_WIDTH};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) struct Loc {
-    x: i32,
-    y: i32,
-}
-
 pub(crate) struct Footprint(pub(crate) u32);
-
-pub struct Tile {
-    x: i32,
-    // In practice will always be positive since we can just ignore tiles where y < 0,
-    // but the same does not apply for x, where we do need to preserve tiles where x < 0.
-    y: i32,
-    // Whether the tile is oob, i.e. x or y where originally a negative value,
-    // and thus the tile should not be rendered, but still be considered for computing
-    // the winding number.
-    p0: PackedPoint,
-    p1: PackedPoint,
-}
-
-impl Tile {
-    pub fn new(x: f32, y: f32, p0: PackedPoint, p1: PackedPoint) -> Self {
-        Self {
-            x: x as i32,
-            y: y as i32,
-            p0,
-            p1,
-        }
-    }
-
-    pub fn new_u16(x: u16, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
-        Self {
-            x: x as i32,
-            y: y as i32,
-            p0,
-            p1,
-        }
-    }
-
-    pub fn p0(&self) -> PackedPoint {
-        self.p0
-    }
-
-    pub fn p1(&self) -> PackedPoint {
-        self.p1
-    }
-
-    pub fn x(&self) -> i32 {
-        self.x
-    }
-
-    pub fn y(&self) -> i32 {
-        self.y
-    }
-}
-
-impl std::fmt::Debug for Tile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let p0 = self.p0.unpack();
-        let p1 = self.p1.unpack();
-        write!(
-            f,
-            "Tile {{ xy: ({}, {}), p0: ({:.4}, {:.4}), p1: ({:.4}, {:.4}) }}",
-            self.x, self.y, p0.x, p0.y, p1.x, p1.y
-        )
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
@@ -89,44 +23,6 @@ pub struct Strip {
     pub y: i32,
     pub col: u32,
     pub winding: i32,
-}
-
-impl Loc {
-    /// Two locations are on the same strip if they are on the same
-    /// row and next to each other.
-    pub(crate) fn same_strip(&self, other: &Self) -> bool {
-        self.same_row(other) && (other.x - self.x) / 2 == 0
-    }
-
-    pub(crate) fn same_row(&self, other: &Self) -> bool {
-        self.y == other.y
-    }
-}
-
-impl Tile {
-    pub(crate) fn loc(&self) -> Loc {
-        Loc {
-            x: self.x,
-            y: self.y,
-        }
-    }
-
-    pub(crate) fn footprint(&self) -> Footprint {
-        let x0 = self.p0.unpacked_x();
-        let x1 = self.p1.unpacked_x();
-        // On CPU, might be better to do this as fixed point
-        let xmin = x0.min(x1).floor() as u32;
-        let xmax = (xmin + 1).max(x0.max(x1).ceil() as u32).min(TILE_WIDTH);
-        Footprint((1 << xmax) - (1 << xmin))
-    }
-
-    pub(crate) fn delta(&self) -> i32 {
-        (self.p1.packed_y() == 0) as i32 - (self.p0.packed_y() == 0) as i32
-    }
-
-    pub fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
-        (self.y, self.x).cmp(&(b.y, b.x))
-    }
 }
 
 pub fn render_strips_scalar(
@@ -164,8 +60,8 @@ pub fn render_strips_scalar(
             for tile in &tiles[seg_start..i] {
                 delta += tile.delta();
 
-                let p0 = tile.p0.unpack();
-                let p1 = tile.p1.unpack();
+                let p0 = tile.p0().unpack();
+                let p1 = tile.p1().unpack();
                 let inv_slope = (p1.x - p0.x) / (p1.y - p0.y);
 
                 // Note: We are iterating in column-major order because the inner loop always
@@ -253,8 +149,8 @@ pub fn render_strips_scalar(
 
             if strip_start {
                 let strip = Strip {
-                    x: 4 * prev_tile.x + x0 as i32,
-                    y: 4 * prev_tile.y,
+                    x: 4 * prev_tile.x() + x0 as i32,
+                    y: 4 * prev_tile.y(),
                     col: cols,
                     winding: start_delta,
                 };
@@ -291,24 +187,5 @@ impl Strip {
     pub fn strip_y(&self) -> u32 {
         // TODO: Don't convert?
         self.y as u32 / STRIP_HEIGHT as u32
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::strip::Tile;
-    use crate::tiling::{scale_up, PackedPoint};
-
-    // TODO: Is this the correct behavior?
-    #[test]
-    fn footprint_at_edge() {
-        let tile = Tile {
-            x: 0,
-            y: 0,
-            p0: PackedPoint::new(scale_up(1.0), scale_up(0.0)),
-            p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
-        };
-
-        assert_eq!(tile.footprint().0, 0);
     }
 }
