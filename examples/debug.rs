@@ -1,5 +1,5 @@
 use cpu_sparse::paint::Paint;
-use cpu_sparse::strip::{Strip};
+use cpu_sparse::strip::Strip;
 use cpu_sparse::svg::{render_tree, SVGContext};
 use cpu_sparse::tiling::{FlatLine, Point, Tile, TILE_HEIGHT, TILE_WIDTH};
 use cpu_sparse::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
