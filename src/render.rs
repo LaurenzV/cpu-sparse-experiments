@@ -161,7 +161,10 @@ impl RenderContext {
             let strip_width = next_strip.col.saturating_sub(col);
             let x1 = x0 + strip_width;
             let xtile0 = x0 as usize / WIDE_TILE_WIDTH;
-            let xtile1 = (x1 as usize + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
+            // It's possible that a strip extends into a new wide tile, but we don't actually
+            // have as many wide tiles (e.g. because the pixmap width is only 512, but
+            // strip ends at 513), so take the minimum between the rounded values and `width_tiles`.
+            let xtile1 = ((x1 as usize + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH).min(width_tiles);
             let mut x = x0;
 
             for xtile in xtile0..xtile1 {

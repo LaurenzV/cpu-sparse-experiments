@@ -221,3 +221,19 @@ fn issue_28_triangle_exceeding_viewport_2() {
 
     check_ref(&ctx, "issue_28_triangle_exceeding_viewport_2");
 }
+
+#[test]
+fn issue_30_shape_at_wide_tile_boundary() {
+    let mut ctx = get_ctx(256, 4, false);
+    let mut path = BezPath::new();
+    path.move_to((248.0, 0.0));
+    path.line_to((257.0, 0.0));
+    path.line_to((257.0, 2.0));
+    path.line_to((248.0, 2.0));
+    path.close_path();
+
+    ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
+
+    // Just make sure we don't panic.
+    render_pixmap(&ctx);
+}
