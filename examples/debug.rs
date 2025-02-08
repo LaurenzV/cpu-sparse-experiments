@@ -1,7 +1,7 @@
 use cpu_sparse::paint::Paint;
-use cpu_sparse::strip::{Strip, Tile};
+use cpu_sparse::strip::{Strip};
 use cpu_sparse::svg::{render_tree, SVGContext};
-use cpu_sparse::tiling::{FlatLine, Point, TILE_HEIGHT, TILE_WIDTH};
+use cpu_sparse::tiling::{FlatLine, Point, Tile, TILE_HEIGHT, TILE_WIDTH};
 use cpu_sparse::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
 use cpu_sparse::{FillRule, RenderContext};
 use peniko::color::palette;
