@@ -6,13 +6,91 @@
 //! strips", but can instead straight away generate appropriate strip and fill commands for the
 //! corresponding wide tiles, based on the coordinates of the rectangle.
 
+use crate::paint::Paint;
+use crate::render::DEFAULT_TOLERANCE;
 use crate::strip::Strip;
 use crate::tiling::FlatLine;
 use crate::wide_tile::STRIP_HEIGHT;
-use crate::RenderContext;
-use peniko::kurbo::Rect;
+use crate::{FillRule, RenderContext};
+use peniko::kurbo;
+use peniko::kurbo::{Affine, Join, Rect, Shape};
 
 impl RenderContext {
+    /// Fill a rectangle.
+    pub fn fill_rect(&mut self, rect: &Rect, paint: Paint) {
+        let affine = self.current_transform();
+
+        if !affine.has_skew() {
+            // If there is no skewing transform, we can use the rectangle fast path and transform
+            // the points manually.
+            let rect = transform_non_skewed_rect(rect, affine);
+            self.render_filled_rect(&rect, paint);
+        } else {
+            self.fill_path(
+                &rect.to_path(DEFAULT_TOLERANCE).into(),
+                FillRule::NonZero,
+                paint,
+            );
+        }
+    }
+
+    /// Stroke a rectangle.
+    pub fn stroke_rect(&mut self, rect: &Rect, stroke: &kurbo::Stroke, paint: Paint) {
+        let affine = self.current_transform();
+
+        // If we have no skew and miter join, we can use a fast path
+        // to render the rectangle as a combination of four sub-rectangles, one for each side,
+        // instead of using the expensive path.
+        if !affine.has_skew() && stroke.join == Join::Miter {
+            // Note that we currently assume that all rects have a positive area.
+            let outer_rect = rect.inflate(stroke.width / 2.0, stroke.width / 2.0);
+            let inner_rect = rect.inflate(-stroke.width / 2.0, -stroke.width / 2.0);
+
+            if inner_rect.area() <= 0.0 {
+                // Stroke is so big that inner part of rect is completely filled, so we can just fill the outer rect.
+                self.fill_rect(&outer_rect, paint);
+            } else if inner_rect.y0.fract() == 0.0 && inner_rect.y1.fract() == 0.0 {
+                // If the inner rect is y-aligned, we can draw the stroke as a combination of 4 rectangles,
+                // which is also very inefficient. This unfortunately doesn't work for unaligned y,
+                // because we would get aliasing artifacts at the intersection of the rectangles.
+                self.draw_rect_strokes(&outer_rect, &inner_rect, paint);
+            } else {
+                self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into(), stroke, paint);
+            }
+        } else {
+            self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into(), stroke, paint);
+        }
+    }
+
+    fn draw_rect_strokes(&mut self, outer: &Rect, inner: &Rect, paint: Paint) {
+        // We draw four rectangles: Two that horizontal ones that cover the top/bottom
+        // lines of the rectangle over the whole width, and two vertical ones, but we only draw
+        // them up to the border of the horizontal ones (which might be anti-aliased) and
+        // not the full height. Note that it might lead to small artifacts in the corners of the
+        // overlapping strokes, so I'm not sure whether it should stay like that in the long term,
+        // but given the speed boost it gives us, worth trying for now, until someone complains.
+
+        let r1 = Rect::new(outer.x0, outer.y0, outer.x1, inner.y0);
+        self.fill_rect(&r1, paint.clone());
+
+        let r2 = Rect::new(outer.x0, inner.y1, outer.x1, outer.y1);
+        self.fill_rect(&r2, paint.clone());
+
+        let r3 = Rect::new(outer.x0, inner.y0, inner.x0, inner.y1);
+        self.fill_rect(&r3, paint.clone());
+
+        let r4 = Rect::new(inner.x1, inner.y0, outer.x1, inner.y1);
+        self.fill_rect(&r4, paint.clone());
+    }
+
+    /// Render the given rectangle with a fill. This involves first stripping it
+    /// using the optimized strip kernel, and then generating the tile commands, like for
+    /// normal paths.
+    pub(crate) fn render_filled_rect(&mut self, rect: &Rect, paint: Paint) {
+        self.strip_filled_rect(&rect);
+        self.generate_commands(FillRule::NonZero, paint);
+    }
+
     /// When filling a non-skewed rectangle, there are quite a few simplifying assumptions
     /// we can make, and thus we can avoid the expensive tiling + strip generation stage, and
     /// instead run a customized, much more efficient strip generation algorithm.
@@ -25,15 +103,17 @@ impl RenderContext {
         self.strip_buf.clear();
 
         // Don't try to draw empty rects
-        if rect.x0 >= rect.x1 || rect.y0 >= rect.y1 {
+        if rect.is_zero_area() {
             return;
         }
 
+        // Note that we currently deal with negative-area rects as positive-area rects.
+        // Shouldn't be a problem for solid fill, but might be for gradients and patterns.
         let (x0, x1, y0, y1) = (
-            rect.x0 as f32,
-            rect.x1 as f32,
-            rect.y0 as f32,
-            rect.y1 as f32,
+            rect.min_x() as f32,
+            rect.max_x() as f32,
+            rect.min_y() as f32,
+            rect.max_y() as f32,
         );
 
         let top_strip_index = y0 as u32 / STRIP_HEIGHT as u32;
@@ -104,7 +184,7 @@ impl RenderContext {
             // except for the last one with the same opacity as in `alphas`.
             // If the rect is within one pixel horizontally, then right_alpha == left_alpha, and thus
             // the alpha we pushed above is enough.
-            if x_end - x_start > 1 {
+            if x_end - x_start >= 1 {
                 for _ in (x_start + 1)..x_end {
                     alpha_buf.push(alpha(&alphas, 1.0));
                 }
@@ -179,6 +259,25 @@ impl RenderContext {
             col: self.alphas.len() as u32,
             winding: 0,
         })
+    }
+}
+
+fn transform_non_skewed_rect(rect: &Rect, affine: Affine) -> Rect {
+    let p1 = affine * kurbo::Point::new(rect.x0, rect.y0);
+    let p2 = affine * kurbo::Point::new(rect.x1, rect.y1);
+
+    Rect::from_points(p1, p2)
+}
+
+trait AffineExt {
+    fn has_skew(&self) -> bool;
+}
+
+impl AffineExt for Affine {
+    fn has_skew(&self) -> bool {
+        let coeffs = self.as_coeffs();
+
+        coeffs[1] != 0.0 || coeffs[2] != 0.0
     }
 }
 
