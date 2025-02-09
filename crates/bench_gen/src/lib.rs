@@ -1,11 +1,34 @@
 use peniko::color::{AlphaColor, Rgba8, Srgb};
-use peniko::kurbo::{Affine, BezPath, Point, Rect, Shape};
+use peniko::kurbo::{Affine, BezPath, Point, Rect, RoundedRectRadii, Shape};
 use rand::prelude::ThreadRng;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::f64::consts::PI;
 
 const SEED: [u8; 32] = [0; 32];
+
+#[derive(Clone, Copy)]
+pub enum RectType {
+    Aligned,
+    Unaligned,
+    Rotated,
+    RoundUnaligned,
+    RoundRotated
+}
+
+impl RectType {
+    pub fn is_rotated(&self) -> bool {
+        matches!(self, RectType::Rotated | RectType::RoundRotated)
+    }
+
+    pub fn is_unaligned(&self) -> bool {
+        matches!(self, RectType::Unaligned | RectType::RoundUnaligned)
+    }
+
+    pub fn is_rounded(&self) -> bool {
+        matches!(self, RectType::RoundRotated | RectType::RoundUnaligned)
+    }
+}
 
 #[derive(Copy, Clone)]
 pub struct Params {
@@ -24,128 +47,92 @@ pub enum Command {
     StrokePath(BezPath, AlphaColor<Srgb>),
 }
 
-pub struct RectAIterator {
-    params: Params,
-    rng: StdRng,
-}
-
-impl RectAIterator {
-    pub fn new(params: Params) -> Self {
-        Self {
-            params,
-            rng: StdRng::from_seed(SEED),
-        }
-    }
-}
-
-impl Iterator for RectAIterator {
-    type Item = Command;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let size = self.params.size;
-        let x = self.rng.random_range(0..=(self.params.width - size)) as f64;
-        let y = self.rng.random_range(0..=(self.params.height - size)) as f64;
-
-        let color = gen_color(&mut self.rng, self.params.alpha);
-
-        if self.params.stroke {
-            Some(Command::StrokeRect(
-                Rect::new(x, y, x + (size as f64), y + (size as f64)),
-                color,
-            ))
-        } else {
-            Some(Command::FillRect(
-                Rect::new(x, y, x + (size as f64), y + (size as f64)),
-                color,
-            ))
-        }
-    }
-}
-
-pub struct RectUIterator {
-    params: Params,
-    rng: StdRng,
-}
-
-impl RectUIterator {
-    pub fn new(params: Params) -> Self {
-        Self {
-            params,
-            rng: StdRng::from_seed(SEED),
-        }
-    }
-}
-
-impl Iterator for RectUIterator {
-    type Item = Command;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let size = self.params.size;
-
-        let mut x = self.rng.random_range(0..=(self.params.width - size)) as f64;
-        let mut y = self.rng.random_range(0..=(self.params.height - size)) as f64;
-
-        let x_adjustment: f64 = self.rng.random();
-        let y_adjustment: f64 = self.rng.random();
-
-        x += x_adjustment;
-        y += y_adjustment;
-
-        let color = gen_color(&mut self.rng, self.params.alpha);
-
-        if self.params.stroke {
-            Some(Command::StrokeRect(
-                Rect::new(x, y, x + (size as f64), y + (size as f64)),
-                color,
-            ))
-        } else {
-            Some(Command::FillRect(
-                Rect::new(x, y, x + (size as f64), y + (size as f64)),
-                color,
-            ))
-        }
-    }
-}
-
-pub struct RectRotIterator {
+pub struct RectIterator {
     params: Params,
     angle: f64,
+    rect_type: RectType,
     rng: StdRng,
 }
 
-impl RectRotIterator {
-    pub fn new(params: Params) -> Self {
+impl RectIterator {
+    pub fn new(params: Params, rect_type: RectType) -> Self {
         Self {
             params,
             angle: 0.0,
+            rect_type,
             rng: StdRng::from_seed(SEED),
         }
     }
 }
 
-impl Iterator for RectRotIterator {
+impl Iterator for RectIterator {
     type Item = Command;
 
     fn next(&mut self) -> Option<Self::Item> {
         let size = self.params.size;
-        let half_size = size as f64 / 2.0;
-
+        let radius = RoundedRectRadii::from_single_radius(self.rng.random_range(4.0..=40.0));
         let mut x = self.rng.random_range(0..=(self.params.width - size)) as f64;
         let mut y = self.rng.random_range(0..=(self.params.height - size)) as f64;
+        let half_size = size as f64 / 2.0;
 
-        let affine = Affine::rotate_about(
-            self.angle * PI / 180.0,
-            Point::new(x + half_size, y + half_size),
-        );
+        if self.rect_type.is_unaligned() {
+            let x_adjustment: f64 = self.rng.random();
+            let y_adjustment: f64 = self.rng.random();
+
+            x += x_adjustment;
+            y += y_adjustment;
+        }
+
         let color = gen_color(&mut self.rng, self.params.alpha);
         let rect = Rect::new(x, y, x + (size as f64), y + (size as f64));
 
-        self.angle += 0.01;
+        if self.rect_type.is_rotated() {
+            let affine = Affine::rotate_about(
+                self.angle * PI / 180.0,
+                Point::new(x + half_size, y + half_size),
+            );
 
-        if self.params.stroke {
-            Some(Command::StrokePath(affine * rect.to_path(0.1), color))
-        } else {
-            Some(Command::FillPath(affine * rect.to_path(0.1), color))
+            self.angle += 0.01;
+
+            if self.rect_type.is_rounded() {
+                if self.params.stroke {
+                    Some(Command::StrokePath(affine * rect.to_rounded_rect(radius).to_path(0.1), color))
+                } else {
+                    Some(Command::FillPath(affine * rect.to_rounded_rect(radius).to_path(0.1), color))
+                }
+            }   else {
+                if self.params.stroke {
+                    Some(Command::StrokePath(affine * rect.to_path(0.1), color))
+                } else {
+                    Some(Command::FillPath(affine * rect.to_path(0.1), color))
+                }
+            }
+        }   else {
+            if self.rect_type.is_rounded() {
+                if self.params.stroke {
+                    Some(Command::StrokePath(
+                        rect.to_rounded_rect(radius).to_path(0.1),
+                        color,
+                    ))
+                } else {
+                    Some(Command::FillPath(
+                        rect.to_rounded_rect(radius).to_path(0.1),
+                        color,
+                    ))
+                }
+            }   else {
+                if self.params.stroke {
+                    Some(Command::StrokeRect(
+                        rect,
+                        color,
+                    ))
+                } else {
+                    Some(Command::FillRect(
+                        rect,
+                        color,
+                    ))
+                }
+            }
         }
     }
 }
