@@ -54,7 +54,7 @@ impl RenderContext {
                 // which is also very inefficient. This unfortunately doesn't work for unaligned y,
                 // because we would get aliasing artifacts at the intersection of the rectangles.
                 self.draw_rect_strokes(&outer_rect, &inner_rect, paint);
-            }   else {
+            } else {
                 self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into(), stroke, paint);
             }
         } else {
