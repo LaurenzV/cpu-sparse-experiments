@@ -6,7 +6,7 @@
 
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
-use crate::strip::render_strips_scalar;
+use crate::strip::{render_strips_scalar, render_strips_simd};
 use crate::tiling::{Point, Tile};
 use crate::{
     fine::Fine,
@@ -103,12 +103,20 @@ impl RenderContext {
             tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
             self.tile_buf.sort_unstable_by(Tile::cmp);
 
-            render_strips_scalar(
-                &self.tile_buf,
-                &mut self.strip_buf,
-                &mut self.alphas,
-                fill_rule,
-            );
+            // render_strips_scalar(
+            //     &self.tile_buf,
+            //     &mut self.strip_buf,
+            //     &mut self.alphas,
+            //     fill_rule,
+            // );
+
+            unsafe {
+                render_strips_simd(
+                    &self.tile_buf,
+                    &mut self.strip_buf,
+                    &mut self.alphas,
+                );
+            }
 
             self.generate_commands(fill_rule, paint);
         }
