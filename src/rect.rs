@@ -6,13 +6,44 @@
 //! strips", but can instead straight away generate appropriate strip and fill commands for the
 //! corresponding wide tiles, based on the coordinates of the rectangle.
 
+use crate::paint::Paint;
+use crate::render::DEFAULT_TOLERANCE;
 use crate::strip::Strip;
 use crate::tiling::FlatLine;
 use crate::wide_tile::STRIP_HEIGHT;
-use crate::RenderContext;
-use peniko::kurbo::Rect;
+use crate::{FillRule, RenderContext};
+use peniko::kurbo;
+use peniko::kurbo::{Rect, Shape};
 
 impl RenderContext {
+    /// Fill a rectangle.
+    pub fn fill_rect(&mut self, rect: &Rect, paint: Paint) {
+        let affine = self.current_transform();
+        let coeffs = affine.as_coeffs();
+
+        if coeffs[1] == 0.0 && coeffs[2] == 0.0 {
+            // If there is no skewing transform, we can use the rectangle fast path and transform
+            // the points manually.
+            let p1 = affine * kurbo::Point::new(rect.x0, rect.y0);
+            let p2 = affine * kurbo::Point::new(rect.x1, rect.y1);
+
+            let rect = Rect::from_points(p1, p2);
+            self.render_rect(&rect, paint);
+        } else {
+            self.fill_path(
+                &rect.to_path(DEFAULT_TOLERANCE).into(),
+                FillRule::NonZero,
+                paint,
+            );
+        }
+    }
+
+    /// Render the given rectangle.
+    pub(crate) fn render_rect(&mut self, rect: &Rect, paint: Paint) {
+        self.strip_filled_rect(&rect);
+        self.generate_commands(FillRule::NonZero, paint);
+    }
+
     /// When filling a non-skewed rectangle, there are quite a few simplifying assumptions
     /// we can make, and thus we can avoid the expensive tiling + strip generation stage, and
     /// instead run a customized, much more efficient strip generation algorithm.
