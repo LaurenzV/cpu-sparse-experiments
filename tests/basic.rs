@@ -373,6 +373,15 @@ fn strip_inscribed_rect() {
     check_ref(&ctx, "strip_inscribed_rect");
 }
 
+#[test]
+fn filled_vertical_hairline_rect() {
+    let mut ctx = get_ctx(5, 8, false);
+    let rect = Rect::new(2.25, 0.0, 2.75, 8.0);
+    ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "filled_vertical_hairline_rect");
+}
+
 fn miter_stroke_2() -> Stroke {
     Stroke {
         width: 2.0,
