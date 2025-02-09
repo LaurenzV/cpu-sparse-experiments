@@ -13,7 +13,7 @@ pub enum RectType {
     Unaligned,
     Rotated,
     RoundUnaligned,
-    RoundRotated
+    RoundRotated,
 }
 
 impl RectType {
@@ -96,18 +96,24 @@ impl Iterator for RectIterator {
 
             if self.rect_type.is_rounded() {
                 if self.params.stroke {
-                    Some(Command::StrokePath(affine * rect.to_rounded_rect(radius).to_path(0.1), color))
+                    Some(Command::StrokePath(
+                        affine * rect.to_rounded_rect(radius).to_path(0.1),
+                        color,
+                    ))
                 } else {
-                    Some(Command::FillPath(affine * rect.to_rounded_rect(radius).to_path(0.1), color))
+                    Some(Command::FillPath(
+                        affine * rect.to_rounded_rect(radius).to_path(0.1),
+                        color,
+                    ))
                 }
-            }   else {
+            } else {
                 if self.params.stroke {
                     Some(Command::StrokePath(affine * rect.to_path(0.1), color))
                 } else {
                     Some(Command::FillPath(affine * rect.to_path(0.1), color))
                 }
             }
-        }   else {
+        } else {
             if self.rect_type.is_rounded() {
                 if self.params.stroke {
                     Some(Command::StrokePath(
@@ -120,17 +126,11 @@ impl Iterator for RectIterator {
                         color,
                     ))
                 }
-            }   else {
+            } else {
                 if self.params.stroke {
-                    Some(Command::StrokeRect(
-                        rect,
-                        color,
-                    ))
+                    Some(Command::StrokeRect(rect, color))
                 } else {
-                    Some(Command::FillRect(
-                        rect,
-                        color,
-                    ))
+                    Some(Command::FillRect(rect, color))
                 }
             }
         }
