@@ -50,40 +50,30 @@ impl RenderContext {
         // of the rectangle, which should still be stripped.
         let x_end = x1_floored as u32;
 
+        // Calculate the vertical/horizontal coverage of a pixel, using a start
+        // and end point whose area in-between should be considered covered.
+        let pixel_coverage = |pixel_pos: u32, start: f32, end: f32| {
+            let pixel_pos = pixel_pos as f32;
+            let end = (end - pixel_pos).clamp(0.0, 1.0);
+            let start = (start - pixel_pos).clamp(0.0, 1.0);
+
+            end - start
+        };
+
         // Calculate the alpha coverages of the top/bottom borders of the rectangle.
         let horizontal_alphas = |strip_y: u32| {
             let mut buf = [0.0f32; STRIP_HEIGHT];
 
-            // Calculate the relative distance of y0 and y1 from the strip we are currently
-            // analyzing.
-            let height_start = y0 - strip_y as f32;
-            let height_end = y1 - strip_y as f32;
-
             // For each row in the strip, calculate how much it is covered by y0/y1.
             for i in 0..STRIP_HEIGHT {
-                let fi = i as f32;
-                let upper_coverage = (fi + 1.0 - height_start).clamp(0.0, 1.0);
-                let bottom_coverage = (height_end - fi).clamp(0.0, 1.0);
-
-                buf[i] = upper_coverage * bottom_coverage;
+                buf[i] = pixel_coverage(strip_y + i as u32, y0, y1);
             }
 
             buf
         };
 
-        let left_alpha = {
-            let end = (x1 - x0_floored).min(1.0);
-            let start = x0 - x0_floored;
-
-            end - start
-        };
-
-        let right_alpha = {
-            let start = (x0 - x1_floored).max(0.0);
-            let end = x1 - x1_floored;
-
-            end - start
-        };
+        let left_alpha = pixel_coverage(x_start, x0, x1);
+        let right_alpha = pixel_coverage(x_end, x0, x1);
 
         // Calculate the alpha coverage of a strip using an alpha mask. For example, if we
         // want to calculate the coverage of the very first column of the top line in the
@@ -172,6 +162,7 @@ impl RenderContext {
                 }
             }
 
+            // Strip the bottom part of the rectangle.
             let bottom_alphas = horizontal_alphas(bottom_strip_y);
             horizontal_strip(
                 &mut self.alphas,
