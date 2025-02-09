@@ -40,8 +40,7 @@ impl RenderContext {
 
         // If we have no skew and miter join, we can use a fast path
         // to render the rectangle as a combination of four sub-rectangles, one for each side,
-        // instead of using the expensive path. This can result in artifacts in the corners of
-        // the rectangle due to overlapping shapes, but it is probably worth the trade-off.
+        // instead of using the expensive path.
         if !affine.has_skew() && stroke.join == Join::Miter {
             // Note that we currently assume that all rects have a positive area.
             let outer_rect = rect.inflate(stroke.width / 2.0, stroke.width / 2.0);
