@@ -204,9 +204,6 @@ fn filled_aligned_rect() {
 }
 
 #[test]
-// Note that due to our rectangle optimization, this one has a slight aliasing artifact
-// that wouldn't occur if we didn't add the optimization. See test `stroked_unaligned_rect_as_path`
-// for comparison.
 fn stroked_unaligned_rect() {
     let mut ctx = get_ctx(30, 30, false);
     let rect = Rect::new(5.0, 5.0, 25.0, 25.0);
