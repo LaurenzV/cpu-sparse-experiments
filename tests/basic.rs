@@ -3,7 +3,8 @@ use cpu_sparse::{FillRule, Pixmap, RenderContext};
 use oxipng::{InFile, OutFile};
 use peniko::color::palette::css::{BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED};
 use peniko::color::{palette, AlphaColor};
-use peniko::kurbo::{BezPath, Circle, Rect, Shape, Stroke};
+use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
+use std::f64::consts::PI;
 
 mod util;
 
@@ -194,31 +195,173 @@ fn filling_evenodd_rule() {
 }
 
 #[test]
-fn aligned_rect() {
+fn filled_aligned_rect() {
     let mut ctx = get_ctx(30, 20, false);
     let rect = Rect::new(1.0, 1.0, 29.0, 19.0);
     ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
 
-    check_ref(&ctx, "aligned_rect");
+    check_ref(&ctx, "filled_aligned_rect");
 }
 
 #[test]
-fn stroked_rect() {
+fn stroked_unaligned_rect() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(5.0, 5.0, 25.0, 25.0);
+    let stroke = Stroke {
+        width: 1.0,
+        join: Join::Miter,
+        ..Default::default()
+    };
+    ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "stroked_unaligned_rect");
+}
+
+#[test]
+fn stroked_aligned_rect() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(5.0, 5.0, 25.0, 25.0);
+    let stroke = miter_stroke_2();
+    ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "stroked_aligned_rect");
+}
+
+#[test]
+fn overflowing_stroked_rect() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(12.5, 12.5, 17.5, 17.5);
+    let stroke = Stroke {
+        width: 5.0,
+        join: Join::Miter,
+        ..Default::default()
+    };
+    ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "overflowing_stroked_rect");
+}
+
+#[test]
+fn round_stroked_rect() {
     let mut ctx = get_ctx(30, 30, false);
     let rect = Rect::new(5.0, 5.0, 25.0, 25.0);
     let stroke = Stroke::new(3.0);
     ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
 
-    check_ref(&ctx, "stroked_rect");
+    check_ref(&ctx, "round_stroked_rect");
 }
 
 #[test]
-fn unaligned_rect() {
+fn bevel_stroked_rect() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(5.0, 5.0, 25.0, 25.0);
+    let stroke = Stroke {
+        width: 3.0,
+        join: Join::Bevel,
+        ..Default::default()
+    };
+    ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "bevel_stroked_rect");
+}
+
+#[test]
+fn filled_unaligned_rect() {
     let mut ctx = get_ctx(30, 20, false);
     let rect = Rect::new(1.5, 1.5, 28.5, 18.5);
     ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
 
-    check_ref(&ctx, "unaligned_rect");
+    check_ref(&ctx, "filled_unaligned_rect");
+}
+
+#[test]
+fn filled_transformed_rect_1() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(0.0, 0.0, 10.0, 10.0);
+    ctx.transform(Affine::translate((10.0, 10.0)));
+    ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "filled_transformed_rect_1");
+}
+
+#[test]
+fn filled_transformed_rect_2() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(5.0, 5.0, 10.0, 10.0);
+    ctx.transform(Affine::scale(2.0));
+    ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "filled_transformed_rect_2");
+}
+
+#[test]
+fn filled_transformed_rect_3() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(0.0, 0.0, 10.0, 10.0);
+    ctx.transform(Affine::new([2.0, 0.0, 0.0, 2.0, 5.0, 5.0]));
+    ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "filled_transformed_rect_3");
+}
+
+#[test]
+fn filled_transformed_rect_4() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(10.0, 10.0, 20.0, 20.0);
+    ctx.transform(Affine::rotate_about(
+        45.0 * PI / 180.0,
+        Point::new(15.0, 15.0),
+    ));
+    ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "filled_transformed_rect_4");
+}
+
+#[test]
+fn stroked_transformed_rect_1() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(0.0, 0.0, 10.0, 10.0);
+    let stroke = miter_stroke_2();
+    ctx.transform(Affine::translate((10.0, 10.0)));
+    ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "stroked_transformed_rect_1");
+}
+
+#[test]
+fn stroked_transformed_rect_2() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(5.0, 5.0, 10.0, 10.0);
+    let stroke = miter_stroke_2();
+    ctx.transform(Affine::scale(2.0));
+    ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "stroked_transformed_rect_2");
+}
+
+#[test]
+fn stroked_transformed_rect_3() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(0.0, 0.0, 10.0, 10.0);
+    let stroke = miter_stroke_2();
+    ctx.transform(Affine::new([2.0, 0.0, 0.0, 2.0, 5.0, 5.0]));
+    ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "stroked_transformed_rect_3");
+}
+
+#[test]
+fn stroked_transformed_rect_4() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(10.0, 10.0, 20.0, 20.0);
+    let stroke = miter_stroke_2();
+    ctx.transform(Affine::rotate_about(
+        45.0 * PI / 180.0,
+        Point::new(15.0, 15.0),
+    ));
+    ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "stroked_transformed_rect_4");
 }
 
 #[test]
@@ -228,4 +371,12 @@ fn strip_inscribed_rect() {
     ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
 
     check_ref(&ctx, "strip_inscribed_rect");
+}
+
+fn miter_stroke_2() -> Stroke {
+    Stroke {
+        width: 2.0,
+        join: Join::Miter,
+        ..Default::default()
+    }
 }
