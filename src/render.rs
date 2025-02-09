@@ -121,7 +121,7 @@ impl RenderContext {
 
     /// Render the given rectangle.
     fn render_rect(&mut self, rect: &Rect, paint: Paint) {
-        self.strip_rect(&rect);
+        self.strip_filled_rect(&rect);
         self.generate_commands(FillRule::NonZero, paint);
     }
 
@@ -132,6 +132,10 @@ impl RenderContext {
     /// Generate the strip and fill commands for each wide tile using the current `strip_buf`.
     fn generate_commands(&mut self, fill_rule: FillRule, paint: Paint) {
         let width_tiles = self.wide_tiles_per_row();
+
+        if self.strip_buf.is_empty() {
+            return;
+        }
 
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
