@@ -3,7 +3,7 @@ use cpu_sparse::{FillRule, Pixmap, RenderContext};
 use oxipng::{InFile, OutFile};
 use peniko::color::palette::css::{BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED};
 use peniko::color::{palette, AlphaColor};
-use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
+use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke, DEFAULT_ACCURACY};
 use std::f64::consts::PI;
 
 mod util;
@@ -204,6 +204,9 @@ fn filled_aligned_rect() {
 }
 
 #[test]
+// Note that due to our rectangle optimization, this one has a slight aliasing artifact
+// that wouldn't occur if we didn't add the optimization. See test `stroked_unaligned_rect_as_path`
+// for comparison.
 fn stroked_unaligned_rect() {
     let mut ctx = get_ctx(30, 30, false);
     let rect = Rect::new(5.0, 5.0, 25.0, 25.0);
@@ -215,6 +218,20 @@ fn stroked_unaligned_rect() {
     ctx.stroke_rect(&rect, &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
 
     check_ref(&ctx, "stroked_unaligned_rect");
+}
+
+#[test]
+fn stroked_unaligned_rect_as_path() {
+    let mut ctx = get_ctx(30, 30, false);
+    let rect = Rect::new(5.0, 5.0, 25.0, 25.0).to_path(0.1);
+    let stroke = Stroke {
+        width: 1.0,
+        join: Join::Miter,
+        ..Default::default()
+    };
+    ctx.stroke_path(&rect.into(), &stroke, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "stroked_unaligned_rect_as_path");
 }
 
 #[test]
@@ -380,6 +397,15 @@ fn filled_vertical_hairline_rect() {
     ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
 
     check_ref(&ctx, "filled_vertical_hairline_rect");
+}
+
+#[test]
+fn filled_vertical_hairline_rect_2() {
+    let mut ctx = get_ctx(10, 10, false);
+    let rect = Rect::new(4.5, 0.5, 5.5, 9.5);
+    ctx.fill_rect(&rect, REBECCA_PURPLE.with_alpha(0.5).into());
+
+    check_ref(&ctx, "filled_vertical_hairline_rect_2");
 }
 
 fn miter_stroke_2() -> Stroke {

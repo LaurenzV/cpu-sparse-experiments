@@ -98,7 +98,7 @@ impl RenderContext {
     fn render_path(&mut self, fill_rule: FillRule, paint: Paint) {
         if let Some(rect) = lines_to_rect(&self.line_buf, self.width, self.height) {
             // Path is actually a rectangle, so used fast path for rectangles.
-            self.render_rect(&rect, paint);
+            self.render_filled_rect(&rect, paint);
         } else {
             tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
             self.tile_buf.sort_unstable_by(Tile::cmp);
@@ -205,11 +205,6 @@ impl RenderContext {
         let affine = self.current_transform();
         crate::flatten::stroke(&path.path, stroke, affine, &mut self.line_buf);
         self.render_path(FillRule::NonZero, paint);
-    }
-
-    /// Stroke a rectangle.
-    pub fn stroke_rect(&mut self, rect: &Rect, stroke: &kurbo::Stroke, paint: Paint) {
-        self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into(), stroke, paint)
     }
 
     /// Pre-concatenate a new transform to the current transformation matrix.
