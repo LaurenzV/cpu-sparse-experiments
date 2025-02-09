@@ -50,8 +50,13 @@ impl RenderContext {
             if inner_rect.area() <= 0.0 {
                 // Stroke is so big that inner part of rect is completely filled, so we can just fill the outer rect.
                 self.fill_rect(&outer_rect, paint);
-            } else {
+            } else if inner_rect.y0.fract() == 0.0 && inner_rect.y1.fract() == 0.0 {
+                // If the inner rect is y-aligned, we can draw the stroke as a combination of 4 rectangles,
+                // which is also very inefficient. This unfortunately doesn't work for unaligned y,
+                // because we would get aliasing artifacts at the intersection of the rectangles.
                 self.draw_rect_strokes(&outer_rect, &inner_rect, paint);
+            }   else {
+                self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into(), stroke, paint);
             }
         } else {
             self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into(), stroke, paint);
