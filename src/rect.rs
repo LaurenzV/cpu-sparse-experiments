@@ -43,8 +43,14 @@ impl RenderContext {
         // instead of using the expensive path.
         if !affine.has_skew() && stroke.join == Join::Miter {
             // Note that we currently assume that all rects have a positive area.
-            let outer_rect = rect.inflate(stroke.width / 2.0, stroke.width / 2.0);
-            let inner_rect = rect.inflate(-stroke.width / 2.0, -stroke.width / 2.0);
+            let outer_rect = transform_non_skewed_rect(
+                &rect.inflate(stroke.width / 2.0, stroke.width / 2.0),
+                affine,
+            );
+            let inner_rect = transform_non_skewed_rect(
+                &rect.inflate(-stroke.width / 2.0, -stroke.width / 2.0),
+                affine,
+            );
 
             if inner_rect.area() <= 0.0 {
                 // Stroke is so big that inner part of rect is completely filled, so we can just fill the outer rect.
@@ -71,16 +77,16 @@ impl RenderContext {
         // but given the speed boost it gives us, worth trying for now, until someone complains.
 
         let r1 = Rect::new(outer.x0, outer.y0, outer.x1, inner.y0);
-        self.fill_rect(&r1, paint.clone());
+        self.render_filled_rect(&r1, paint.clone());
 
         let r2 = Rect::new(outer.x0, inner.y1, outer.x1, outer.y1);
-        self.fill_rect(&r2, paint.clone());
+        self.render_filled_rect(&r2, paint.clone());
 
         let r3 = Rect::new(outer.x0, inner.y0, inner.x0, inner.y1);
-        self.fill_rect(&r3, paint.clone());
+        self.render_filled_rect(&r3, paint.clone());
 
         let r4 = Rect::new(inner.x1, inner.y0, outer.x1, inner.y1);
-        self.fill_rect(&r4, paint.clone());
+        self.render_filled_rect(&r4, paint.clone());
     }
 
     /// Render the given rectangle with a fill. This involves first stripping it
