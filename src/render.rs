@@ -6,7 +6,7 @@
 
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
-use crate::strip::render_strips_scalar;
+use crate::strip::{render_strips_scalar, render_strips_simd};
 use crate::tiling::{Point, Tile};
 use crate::{
     fine::Fine,
@@ -31,6 +31,7 @@ pub struct RenderContext {
     pub height: usize,
     pub tiles: Vec<WideTile>,
     pub alphas: Vec<u32>,
+    use_simd: bool,
 
     /// These are all scratch buffers, to be used for path rendering. They're here solely
     /// so the allocations can be reused.
@@ -63,6 +64,7 @@ impl RenderContext {
             height,
             tiles,
             alphas,
+            use_simd: option_env!("SIMD").is_some(),
             line_buf,
             tile_buf,
             strip_buf,
@@ -80,7 +82,7 @@ impl RenderContext {
 
     /// Render the current render context into a pixmap.
     pub fn render_to_pixmap(&self, pixmap: &mut Pixmap) {
-        let mut fine = Fine::new(pixmap.width, pixmap.height, &mut pixmap.buf);
+        let mut fine = Fine::new(pixmap.width, pixmap.height, &mut pixmap.buf, self.use_simd);
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         let height_tiles = (self.height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
         for y in 0..height_tiles {
@@ -103,12 +105,18 @@ impl RenderContext {
             tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
             self.tile_buf.sort_unstable_by(Tile::cmp);
 
-            render_strips_scalar(
-                &self.tile_buf,
-                &mut self.strip_buf,
-                &mut self.alphas,
-                fill_rule,
-            );
+            if self.use_simd {
+                unsafe {
+                    render_strips_simd(&self.tile_buf, &mut self.strip_buf, &mut self.alphas);
+                }
+            } else {
+                render_strips_scalar(
+                    &self.tile_buf,
+                    &mut self.strip_buf,
+                    &mut self.alphas,
+                    fill_rule,
+                );
+            }
 
             self.generate_commands(fill_rule, paint);
         }

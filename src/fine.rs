@@ -11,6 +11,7 @@ pub(crate) const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
 pub(crate) struct Fine<'a> {
     pub(crate) width: usize,
     pub(crate) height: usize,
+    use_simd: bool,
     // rgba pixels
     pub(crate) out_buf: &'a mut [u8],
     // f32 RGBA pixels
@@ -20,11 +21,12 @@ pub(crate) struct Fine<'a> {
 }
 
 impl<'a> Fine<'a> {
-    pub(crate) fn new(width: usize, height: usize, out_buf: &'a mut [u8]) -> Self {
+    pub(crate) fn new(width: usize, height: usize, out_buf: &'a mut [u8], use_simd: bool) -> Self {
         let scratch = [0; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4];
         Self {
             width,
             height,
+            use_simd,
             out_buf,
             scratch,
         }
@@ -59,11 +61,18 @@ impl<'a> Fine<'a> {
     pub(crate) fn run_cmd(&mut self, cmd: &Cmd, alphas: &[u32]) {
         match cmd {
             Cmd::Fill(f) => {
+                // unsafe { self.fill_simd(f.x as usize, f.width as usize, &f.paint); }
                 self.fill_scalar(f.x as usize, f.width as usize, &f.paint);
             }
             Cmd::Strip(s) => {
                 let aslice = &alphas[s.alpha_ix..];
-                self.strip_scalar(s.x as usize, s.width as usize, aslice, &s.paint);
+                if self.use_simd {
+                    unsafe {
+                        self.strip_simd(s.x as usize, s.width as usize, aslice, &s.paint);
+                    }
+                } else {
+                    self.strip_scalar(s.x as usize, s.width as usize, aslice, &s.paint);
+                }
             }
         }
     }
@@ -165,5 +174,145 @@ pub(crate) fn pack(
             let src = &scratch[(i * STRIP_HEIGHT + j) * 4..][..4];
             dest[i * 4..][..4].copy_from_slice(&src[..4]);
         }
+    }
+}
+
+mod simd {
+    use crate::fine::{div_255, Fine, STRIP_HEIGHT_F32};
+    use crate::paint::Paint;
+    use crate::wide_tile::STRIP_HEIGHT;
+    use std::arch::aarch64::*;
+
+    impl Fine<'_> {
+        #[inline(never)]
+        pub(crate) unsafe fn fill_simd(&mut self, x: usize, width: usize, paint: &Paint) {
+            use std::arch::aarch64::*;
+
+            match paint {
+                Paint::Solid(c) => {
+                    let (color_buf, alpha) = {
+                        let mut buf = [0; STRIP_HEIGHT_F32];
+                        let premul_color = c.premultiply().to_rgba8().to_u8_array();
+
+                        for i in 0..STRIP_HEIGHT {
+                            buf[i * 4..((i + 1) * 4)].copy_from_slice(&premul_color);
+                        }
+
+                        (buf, buf[3])
+                    };
+
+                    let color_buf_simd = vld1_u8(color_buf[0..].as_ptr());
+
+                    let mut strip_cols = self.scratch[x * STRIP_HEIGHT_F32..]
+                        [..STRIP_HEIGHT_F32 * width]
+                        .chunks_exact_mut(STRIP_HEIGHT_F32);
+
+                    if alpha == 255 {
+                        for col in strip_cols {
+                            col.copy_from_slice(&color_buf);
+                        }
+                    } else {
+                        let inv_alpha = vdupq_n_u16(255 - alpha as u16);
+
+                        for z in strip_cols {
+                            for i in 0..2 {
+                                let index = i * 8;
+                                let z_vals = vmovl_u8(vld1_u8(z.as_mut_ptr().add(index)));
+                                let im_1 = vmulq_u16(z_vals, inv_alpha);
+                                let im_2 = div_255_simd(im_1);
+                                let im_3 = vmovn_u16(im_2);
+                                let im_4 = vadd_u8(im_3, color_buf_simd);
+                                vst1_u8(z.as_mut_ptr().add(index), im_4);
+                            }
+                        }
+                    }
+                }
+                Paint::Pattern(_) => unimplemented!(),
+            }
+        }
+
+        #[inline(never)]
+        pub(crate) unsafe fn strip_simd(
+            &mut self,
+            x: usize,
+            width: usize,
+            alphas: &[u32],
+            paint: &Paint,
+        ) {
+            // Paint::Solid(s) => {
+            //     let color = s.premultiply().to_rgba8().to_u8_array();
+            //
+            //     debug_assert!(alphas.len() >= width);
+            //     for (z, a) in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+            //         .chunks_exact_mut(16)
+            //         .zip(alphas)
+            //     {
+            //         for j in 0..4 {
+            //             let mask_alpha = ((*a >> (j * 8)) & 0xff) as u16;
+            //             let inv_alpha = 255 - (mask_alpha * color[3] as u16) / 255;
+            //             for i in 0..4 {
+            //                 let im1 = z[j * 4 + i] as u16 * inv_alpha;
+            //                 let im2 = mask_alpha * color[i] as u16;
+            //                 let im3 = div_255(im1 + im2);
+            //                 z[j * 4 + i] = im3 as u8;
+            //             }
+            //         }
+            //     }
+            // }
+
+            match paint {
+                Paint::Solid(s) => {
+                    let color = s.premultiply().to_rgba8().to_u8_array();
+                    let color_alpha = vdupq_n_u16(color[3] as u16);
+                    let simd_color = {
+                        let color = u32::from_le_bytes(color) as u64;
+                        let color = color | (color << 32);
+                        vmovl_u8(vcreate_u8(color))
+                    };
+
+                    let tff = vdupq_n_u16(255);
+
+                    debug_assert!(alphas.len() >= width);
+                    for (z, a) in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+                        .chunks_exact_mut(16)
+                        .zip(alphas)
+                    {
+                        for j in 0..2 {
+                            let index = j * 8;
+
+                            let mask_alpha = {
+                                let first_mask = vdup_n_u16(((*a >> 2 * index) & 0xff) as u16);
+                                let second_mask =
+                                    vdup_n_u16(((*a >> (2 * index + 8)) & 0xff) as u16);
+                                vcombine_u16(first_mask, second_mask)
+                            };
+
+                            let inv_alpha = {
+                                let im1 = vmulq_u16(mask_alpha, color_alpha);
+                                let im2 = div_255_simd(im1);
+                                vsubq_u16(tff, im2)
+                            };
+
+                            let im1 =
+                                vmulq_u16(vmovl_u8(vld1_u8(z.as_mut_ptr().add(index))), inv_alpha);
+                            let im2 = vmulq_u16(mask_alpha, simd_color);
+                            let im3 = vmovn_u16(div_255_simd(vaddq_u16(im1, im2)));
+                            vst1_u8(z.as_mut_ptr().add(index), im3);
+                        }
+                    }
+                }
+                Paint::Pattern(_) => unimplemented!(),
+            }
+        }
+    }
+
+    #[inline(always)]
+    unsafe fn div_255_simd(val: uint16x8_t) -> uint16x8_t {
+        let val_shifted = vshrq_n_u16::<8>(val);
+        let one = vdupq_n_u16(1);
+        let added = vaddq_u16(val, one);
+        let added = vaddq_u16(added, val_shifted);
+
+        vshrq_n_u16::<8>(added)
     }
 }
