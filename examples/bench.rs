@@ -8,11 +8,12 @@ const WIDTH: usize = 512;
 const HEIGHT: usize = 600;
 const RENDER_CALLS: u32 = 1000;
 const STROKE_WIDTH: f64 = 2.0;
+const NUM_REPETITIONS: u32 = 3000;
 
 fn main() {
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
 
-    for size in [8, 16, 32, 64, 128, 256].repeat(1) {
+    for size in [16] {
         ctx.reset();
 
         let params = Params {
@@ -23,23 +24,31 @@ fn main() {
             size,
         };
 
-        let commands = PolyIterator::new(params, 40, false)
+        let commands = RectIterator::new(params, RectType::Rotated)
             .take(RENDER_CALLS as usize)
             .collect::<Vec<_>>();
 
         let start = Instant::now();
         let mut pixmap = Pixmap::new(WIDTH, HEIGHT);
+        for _ in 0..NUM_REPETITIONS {
+            ctx.reset();
 
-        for cmd in &commands {
-            run_cmd(&mut ctx, cmd);
+            for cmd in &commands {
+                run_cmd(&mut ctx, cmd);
+            }
+
+            ctx.render_to_pixmap(&mut pixmap);
         }
-
-        ctx.render_to_pixmap(&mut pixmap);
 
         let elapsed = start.elapsed();
 
-        println!("Runtime for {}x{}: {:?}", size, size, elapsed);
-        write_pixmap(&mut pixmap, size);
+        println!(
+            "Runtime for {}x{}: {:?}",
+            size,
+            size,
+            elapsed / NUM_REPETITIONS
+        );
+        // write_pixmap(&mut pixmap, size);
     }
 }
 
