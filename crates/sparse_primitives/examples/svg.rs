@@ -16,7 +16,7 @@ use usvg::{Node, Paint};
 
 pub fn main() {
     let scale = 1.0;
-    let svg = std::fs::read_to_string("svgs/coat_of_arms.svg").expect("error reading file");
+    let svg = std::fs::read_to_string("../../svgs/coat_of_arms.svg").expect("error reading file");
     let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
     let width = (tree.size().width() * scale).ceil() as usize;
     let height = (tree.size().height() * scale).ceil() as usize;
