@@ -6,7 +6,7 @@
 
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
-use crate::strip::render_strips_scalar;
+use crate::strip::render_strips;
 use crate::tiling::{Point, Tile};
 use crate::{
     fine::Fine,
@@ -37,6 +37,7 @@ pub struct RenderContext {
     pub line_buf: Vec<FlatLine>,
     pub tile_buf: Vec<Tile>,
     pub strip_buf: Vec<Strip>,
+    use_simd: bool,
 
     transform: Affine,
 }
@@ -66,6 +67,7 @@ impl RenderContext {
             line_buf,
             tile_buf,
             strip_buf,
+            use_simd: option_env!("SIMD").is_some(),
             transform: Affine::IDENTITY,
         }
     }
@@ -103,11 +105,12 @@ impl RenderContext {
             tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
             self.tile_buf.sort_unstable_by(Tile::cmp);
 
-            render_strips_scalar(
+            render_strips(
                 &self.tile_buf,
                 &mut self.strip_buf,
                 &mut self.alphas,
                 fill_rule,
+                self.use_simd,
             );
 
             self.generate_commands(fill_rule, paint);
