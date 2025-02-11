@@ -1,6 +1,6 @@
 use bench_gen::{Command, Params, PolyIterator, RectIterator, RectType};
-use cpu_sparse::{FillRule, Pixmap, RenderContext};
 use peniko::kurbo::{Cap, Join, Stroke};
+use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
 use std::time::Instant;
 

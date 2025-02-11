@@ -1,12 +1,12 @@
-use cpu_sparse::paint::Paint;
-use cpu_sparse::strip::Strip;
-use cpu_sparse::svg::{render_tree, SVGContext};
-use cpu_sparse::tiling::{FlatLine, Point, Tile, TILE_HEIGHT, TILE_WIDTH};
-use cpu_sparse::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
-use cpu_sparse::{FillRule, RenderContext};
 use peniko::color::palette;
 use peniko::kurbo::{Affine, BezPath, Stroke};
 use rand::Rng;
+use sparse_primitives::paint::Paint;
+use sparse_primitives::strip::Strip;
+use sparse_primitives::svg::{render_tree, SVGContext};
+use sparse_primitives::tiling::{FlatLine, Point, Tile, TILE_HEIGHT, TILE_WIDTH};
+use sparse_primitives::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
+use sparse_primitives::{FillRule, RenderContext};
 use std::collections::HashSet;
 use svg::node::element::path::Data;
 use svg::node::element::{Circle, Path, Rectangle};
