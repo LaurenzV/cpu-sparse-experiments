@@ -1,9 +1,9 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use cpu_sparse::{FillRule, Pixmap, RenderContext};
 use peniko::color::palette;
 use peniko::kurbo::{BezPath, Stroke};
+use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
 use std::time::Instant;
 

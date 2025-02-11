@@ -4,19 +4,19 @@
 use std::io::BufWriter;
 use std::str::FromStr;
 
-use cpu_sparse::render::Path;
-use cpu_sparse::svg::{render_tree, SVGContext};
-use cpu_sparse::{Pixmap, RenderContext};
 use peniko::color::{palette, AlphaColor, Srgb};
 use peniko::kurbo::{Affine, BezPath, Point, Shape, Size, Stroke, Vec2};
 use peniko::{BrushRef, Color};
 use roxmltree::Document;
+use sparse_primitives::render::Path;
+use sparse_primitives::svg::{render_tree, SVGContext};
+use sparse_primitives::{Pixmap, RenderContext};
 use usvg::tiny_skia_path::PathSegment;
 use usvg::{Node, Paint};
 
 pub fn main() {
     let scale = 1.0;
-    let svg = std::fs::read_to_string("svgs/coat_of_arms.svg").expect("error reading file");
+    let svg = std::fs::read_to_string("../../svgs/coat_of_arms.svg").expect("error reading file");
     let tree = usvg::Tree::from_str(&svg, &usvg::Options::default()).unwrap();
     let width = (tree.size().width() * scale).ceil() as usize;
     let height = (tree.size().height() * scale).ceil() as usize;

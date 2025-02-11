@@ -1,7 +1,7 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use cpu_sparse::FillRule;
 use peniko::color::palette;
 use peniko::kurbo::{Affine, BezPath, Circle, Stroke};
+use sparse_primitives::FillRule;
 
 mod util;
 

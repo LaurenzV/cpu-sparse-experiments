@@ -1,8 +1,8 @@
-use cpu_sparse::{FillRule, Pixmap, RenderContext};
 use image::{load_from_memory, Rgba, RgbaImage};
 use once_cell::sync::Lazy;
 use peniko::color::palette;
 use peniko::kurbo::{Rect, Shape};
+use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::cmp::max;
 use std::path::PathBuf;
 use std::sync::LazyLock;
