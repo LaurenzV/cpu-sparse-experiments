@@ -14,7 +14,6 @@
 use crate::tiling::{PackedPoint, Tile, TILE_WIDTH};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
-use std::arch::is_aarch64_feature_detected;
 
 pub(crate) struct Footprint(pub(crate) u32);
 
@@ -36,7 +35,7 @@ pub fn render_strips(
 ) {
     if use_simd {
         #[cfg(target_arch = "aarch64")]
-        if is_aarch64_feature_detected!("neon") {
+        if std::arch::is_aarch64_feature_detected!("neon") {
             // SAFETY: We checked that the target feature `neon` is available.
             return unsafe { neon::render_strips(tiles, strip_buf, alpha_buf) };
         }
@@ -216,7 +215,7 @@ mod neon {
     use crate::tiling::Tile;
     use std::arch::aarch64::*;
 
-    /// SAFETY: Caller must ensure that target feature 'neon' is available.
+    /// SAFETY: Caller must ensure that target feature `neon` is available.
     pub unsafe fn render_strips(
         tiles: &[Tile],
         strip_buf: &mut Vec<Strip>,
