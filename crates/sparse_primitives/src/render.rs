@@ -37,6 +37,7 @@ pub struct RenderContext {
     pub line_buf: Vec<FlatLine>,
     pub tile_buf: Vec<Tile>,
     pub strip_buf: Vec<Strip>,
+    #[cfg(feature = "simd")]
     use_simd: bool,
 
     transform: Affine,
@@ -67,6 +68,7 @@ impl RenderContext {
             line_buf,
             tile_buf,
             strip_buf,
+            #[cfg(feature = "simd")]
             use_simd: option_env!("SIMD").is_some(),
             transform: Affine::IDENTITY,
         }
@@ -82,7 +84,14 @@ impl RenderContext {
 
     /// Render the current render context into a pixmap.
     pub fn render_to_pixmap(&self, pixmap: &mut Pixmap) {
-        let mut fine = Fine::new(pixmap.width, pixmap.height, &mut pixmap.buf, self.use_simd);
+        let mut fine = Fine::new(
+            pixmap.width,
+            pixmap.height,
+            &mut pixmap.buf,
+            #[cfg(feature = "simd")]
+            self.use_simd,
+        );
+
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         let height_tiles = (self.height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
         for y in 0..height_tiles {
@@ -110,6 +119,7 @@ impl RenderContext {
                 &mut self.strip_buf,
                 &mut self.alphas,
                 fill_rule,
+                #[cfg(feature = "simd")]
                 self.use_simd,
             );
 

@@ -31,7 +31,7 @@ pub fn render_strips(
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
     fill_rule: FillRule,
-    use_simd: bool,
+    #[cfg(feature = "simd")] use_simd: bool,
 ) {
     #[cfg(feature = "simd")]
     if use_simd {

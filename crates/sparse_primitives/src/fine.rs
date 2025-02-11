@@ -17,17 +17,24 @@ pub(crate) struct Fine<'a> {
     // That said, if we use u8, then this is basically a block of
     // untyped memory.
     pub(crate) scratch: [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+    #[cfg(feature = "simd")]
     use_simd: bool,
 }
 
 impl<'a> Fine<'a> {
-    pub(crate) fn new(width: usize, height: usize, out_buf: &'a mut [u8], use_simd: bool) -> Self {
+    pub(crate) fn new(
+        width: usize,
+        height: usize,
+        out_buf: &'a mut [u8],
+        #[cfg(feature = "simd")] use_simd: bool,
+    ) -> Self {
         let scratch = [0; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4];
         Self {
             width,
             height,
             out_buf,
             scratch,
+            #[cfg(feature = "simd")]
             use_simd,
         }
     }
