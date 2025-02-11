@@ -211,9 +211,10 @@ impl Strip {
 
 #[cfg(target_arch = "aarch64")]
 mod neon {
+    use std::arch::aarch64::*;
+
     use crate::strip::Strip;
     use crate::tiling::Tile;
-    use std::arch::aarch64::*;
 
     /// SAFETY: Caller must ensure that target feature `neon` is available.
     pub unsafe fn render_strips(

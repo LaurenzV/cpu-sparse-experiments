@@ -190,10 +190,11 @@ fn pack(
 
 #[cfg(target_arch = "aarch64")]
 mod neon {
+    use std::arch::aarch64::*;
+
     use crate::fine::STRIP_HEIGHT_F32;
     use crate::paint::Paint;
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
-    use std::arch::aarch64::{uint16x8_t, vaddq_u16, vdupq_n_u16, vshrq_n_u16};
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
     // Note: This method currently seems to be slower than the scalar version.
