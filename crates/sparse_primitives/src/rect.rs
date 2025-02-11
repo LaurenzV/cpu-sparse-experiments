@@ -95,7 +95,11 @@ impl RenderContext {
     pub(crate) fn render_filled_rect(&mut self, rect: &Rect, paint: Paint) {
         // TODO: Negative area rects? Come up with a principled way of dealing with them (also in
         // other areas of the code)
-        if rect.x0 <= 0.0 && rect.y0 <= 0.0 && rect.x1 >= self.width as f64 && rect.y1 >= self.height as f64 {
+        if rect.x0 <= 0.0
+            && rect.y0 <= 0.0
+            && rect.x1 >= self.width as f64
+            && rect.y1 >= self.height as f64
+        {
             // Another optimization: Rectangle covers the full viewport, so we can just fill all
             // wide tiles with the color as a background color, instead of stripping and generating
             // commands. Since this is a quite common action (for example to fill a page completely
@@ -103,7 +107,7 @@ impl RenderContext {
             for tile in &mut self.tiles {
                 tile.fill(0, WIDE_TILE_WIDTH as u32, paint.clone());
             }
-        }   else {
+        } else {
             self.strip_filled_rect(&rect);
             self.generate_commands(FillRule::NonZero, paint);
         }
