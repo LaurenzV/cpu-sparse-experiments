@@ -34,17 +34,15 @@ pub fn render_strips(
     fill_rule: FillRule,
     use_simd: bool,
 ) {
-    if !use_simd {
-        render_strips_scalar(tiles, strip_buf, alpha_buf, fill_rule);
-    } else {
+    if use_simd {
         #[cfg(target_arch = "aarch64")]
         if is_aarch64_feature_detected!("neon") {
             // SAFETY: We checked that the target feature `neon` is available.
             return unsafe { neon::render_strips(tiles, strip_buf, alpha_buf) };
         }
-
-        render_strips_scalar(tiles, strip_buf, alpha_buf, fill_rule);
     }
+
+    render_strips_scalar(tiles, strip_buf, alpha_buf, fill_rule);
 }
 
 fn render_strips_scalar(
