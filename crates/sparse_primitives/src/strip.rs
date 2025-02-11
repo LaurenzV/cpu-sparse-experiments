@@ -33,6 +33,7 @@ pub fn render_strips(
     fill_rule: FillRule,
     use_simd: bool,
 ) {
+    #[cfg(feature = "simd")]
     if use_simd {
         #[cfg(target_arch = "aarch64")]
         if std::arch::is_aarch64_feature_detected!("neon") {
@@ -209,7 +210,7 @@ impl Strip {
     }
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
 mod neon {
     use std::arch::aarch64::*;
 

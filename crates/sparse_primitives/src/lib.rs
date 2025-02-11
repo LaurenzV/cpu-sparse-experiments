@@ -1,6 +1,8 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![cfg_attr(not(feature = "simd"), forbid(unsafe_code))]
+
 pub mod fine;
 pub mod flatten;
 pub mod paint;

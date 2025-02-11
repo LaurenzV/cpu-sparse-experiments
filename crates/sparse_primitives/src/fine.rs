@@ -73,6 +73,7 @@ impl<'a> Fine<'a> {
 
     #[inline(never)]
     pub(crate) fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
+        #[cfg(feature = "simd")]
         if self.use_simd {
             #[cfg(target_arch = "aarch64")]
             if std::arch::is_aarch64_feature_detected!("neon") {
@@ -86,6 +87,7 @@ impl<'a> Fine<'a> {
 
     #[inline(never)]
     pub(crate) fn strip(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
+        #[cfg(feature = "simd")]
         if self.use_simd {
             #[cfg(target_arch = "aarch64")]
             if std::arch::is_aarch64_feature_detected!("neon") {
@@ -206,7 +208,7 @@ fn pack(
     }
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
 mod neon {
     use std::arch::aarch64::*;
 

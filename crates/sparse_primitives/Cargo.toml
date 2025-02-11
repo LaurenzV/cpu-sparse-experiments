@@ -20,5 +20,8 @@ bench_gen = { workspace = true }
 svg = { workspace = true }
 rand = { workspace = true }
 
+[features]
+simd = []
+
 [profile.release]
 debug = true
