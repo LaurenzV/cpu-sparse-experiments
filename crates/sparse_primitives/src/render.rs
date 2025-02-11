@@ -6,7 +6,7 @@
 
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
-use crate::strip::render_strips_scalar;
+use crate::strip::render_strips;
 use crate::tiling::{Point, Tile};
 use crate::{
     fine::Fine,
@@ -37,6 +37,8 @@ pub struct RenderContext {
     pub line_buf: Vec<FlatLine>,
     pub tile_buf: Vec<Tile>,
     pub strip_buf: Vec<Strip>,
+    #[cfg(feature = "simd")]
+    use_simd: bool,
 
     transform: Affine,
 }
@@ -66,6 +68,8 @@ impl RenderContext {
             line_buf,
             tile_buf,
             strip_buf,
+            #[cfg(feature = "simd")]
+            use_simd: option_env!("SIMD").is_some(),
             transform: Affine::IDENTITY,
         }
     }
@@ -80,7 +84,14 @@ impl RenderContext {
 
     /// Render the current render context into a pixmap.
     pub fn render_to_pixmap(&self, pixmap: &mut Pixmap) {
-        let mut fine = Fine::new(pixmap.width, pixmap.height, &mut pixmap.buf);
+        let mut fine = Fine::new(
+            pixmap.width,
+            pixmap.height,
+            &mut pixmap.buf,
+            #[cfg(feature = "simd")]
+            self.use_simd,
+        );
+
         let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         let height_tiles = (self.height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
         for y in 0..height_tiles {
@@ -103,11 +114,13 @@ impl RenderContext {
             tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
             self.tile_buf.sort_unstable_by(Tile::cmp);
 
-            render_strips_scalar(
+            render_strips(
                 &self.tile_buf,
                 &mut self.strip_buf,
                 &mut self.alphas,
                 fill_rule,
+                #[cfg(feature = "simd")]
+                self.use_simd,
             );
 
             self.generate_commands(fill_rule, paint);
