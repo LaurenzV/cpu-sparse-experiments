@@ -10,7 +10,7 @@ use crate::paint::Paint;
 use crate::render::DEFAULT_TOLERANCE;
 use crate::strip::Strip;
 use crate::tiling::FlatLine;
-use crate::wide_tile::STRIP_HEIGHT;
+use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use crate::{FillRule, RenderContext};
 use peniko::kurbo;
 use peniko::kurbo::{Affine, Join, Rect, Shape};
@@ -93,8 +93,24 @@ impl RenderContext {
     /// using the optimized strip kernel, and then generating the tile commands, like for
     /// normal paths.
     pub(crate) fn render_filled_rect(&mut self, rect: &Rect, paint: Paint) {
-        self.strip_filled_rect(&rect);
-        self.generate_commands(FillRule::NonZero, paint);
+        // TODO: Negative area rects? Come up with a principled way of dealing with them (also in
+        // other areas of the code)
+        if rect.x0 <= 0.0
+            && rect.y0 <= 0.0
+            && rect.x1 >= self.width as f64
+            && rect.y1 >= self.height as f64
+        {
+            // Another optimization: Rectangle covers the full viewport, so we can just fill all
+            // wide tiles with the color as a background color, instead of stripping and generating
+            // commands. Since this is a quite common action (for example to fill a page completely
+            // white), it's a worthwhile optimization.
+            for tile in &mut self.tiles {
+                tile.fill(0, WIDE_TILE_WIDTH as u32, paint.clone());
+            }
+        } else {
+            self.strip_filled_rect(&rect);
+            self.generate_commands(FillRule::NonZero, paint);
+        }
     }
 
     /// When filling a non-skewed rectangle, there are quite a few simplifying assumptions
