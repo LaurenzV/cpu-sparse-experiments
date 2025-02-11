@@ -26,6 +26,7 @@ pub struct Strip {
     pub winding: i32,
 }
 
+#[inline(never)]
 pub fn render_strips(
     tiles: &[Tile],
     strip_buf: &mut Vec<Strip>,
@@ -218,7 +219,6 @@ mod neon {
     use std::arch::aarch64::*;
 
     /// SAFETY: Caller must ensure that target feature 'neon' is available.
-    #[inline(never)]
     pub unsafe fn render_strips(
         tiles: &[Tile],
         strip_buf: &mut Vec<Strip>,
