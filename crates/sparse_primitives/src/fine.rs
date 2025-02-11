@@ -66,7 +66,7 @@ impl<'a> Fine<'a> {
             }
             Cmd::Strip(s) => {
                 let aslice = &alphas[s.alpha_ix..];
-                self.strip_scalar(s.x as usize, s.width as usize, aslice, &s.paint);
+                self.strip(s.x as usize, s.width as usize, aslice, &s.paint);
             }
         }
     }
@@ -85,30 +85,16 @@ impl<'a> Fine<'a> {
     }
 
     #[inline(never)]
-    pub(crate) fn strip_scalar(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
-        match paint {
-            Paint::Solid(s) => {
-                let color = s.premultiply().to_rgba8().to_u8_array();
-
-                debug_assert!(alphas.len() >= width);
-                for (z, a) in self.scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(16)
-                    .zip(alphas)
-                {
-                    for j in 0..4 {
-                        let mask_alpha = ((*a >> (j * 8)) & 0xff) as u16;
-                        let inv_alpha = 255 - (mask_alpha * color[3] as u16) / 255;
-                        for i in 0..4 {
-                            let im1 = z[j * 4 + i] as u16 * inv_alpha;
-                            let im2 = mask_alpha * color[i] as u16;
-                            let im3 = div_255(im1 + im2);
-                            z[j * 4 + i] = im3 as u8;
-                        }
-                    }
-                }
+    pub(crate) fn strip(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
+        if self.use_simd {
+            #[cfg(target_arch = "aarch64")]
+            if std::arch::is_aarch64_feature_detected!("neon") {
+                // SAFETY: We ensured that the `neon` target feature is available.
+                return unsafe { neon::strip_simd(&mut self.scratch, x, width, alphas, paint) };
             }
-            Paint::Pattern(_) => unimplemented!(),
         }
+
+        strip_scalar(&mut self.scratch, x, width, alphas, paint);
     }
 }
 
@@ -150,6 +136,38 @@ fn fill_scalar(
                 for z in colors {
                     for i in 0..STRIP_HEIGHT_F32 {
                         z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color_buf[i];
+                    }
+                }
+            }
+        }
+        Paint::Pattern(_) => unimplemented!(),
+    }
+}
+
+fn strip_scalar(
+    scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+    x: usize,
+    width: usize,
+    alphas: &[u32],
+    paint: &Paint,
+) {
+    match paint {
+        Paint::Solid(s) => {
+            let color = s.premultiply().to_rgba8().to_u8_array();
+
+            debug_assert!(alphas.len() >= width);
+            for (z, a) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+                .chunks_exact_mut(16)
+                .zip(alphas)
+            {
+                for j in 0..4 {
+                    let mask_alpha = ((*a >> (j * 8)) & 0xff) as u16;
+                    let inv_alpha = 255 - (mask_alpha * color[3] as u16) / 255;
+                    for i in 0..4 {
+                        let im1 = z[j * 4 + i] as u16 * inv_alpha;
+                        let im2 = mask_alpha * color[i] as u16;
+                        let im3 = div_255(im1 + im2);
+                        z[j * 4 + i] = im3 as u8;
                     }
                 }
             }
@@ -236,7 +254,7 @@ mod neon {
                             let index = i * 8;
                             let z_vals = vmovl_u8(vld1_u8(z.as_mut_ptr().add(index)));
                             let im_1 = vmulq_u16(z_vals, inv_alpha);
-                            let im_2 = div_255_simd(im_1);
+                            let im_2 = div_255(im_1);
                             let im_3 = vmovn_u16(im_2);
                             let im_4 = vadd_u8(im_3, color_buf_simd);
                             vst1_u8(z.as_mut_ptr().add(index), im_4);
@@ -248,7 +266,61 @@ mod neon {
         }
     }
 
-    unsafe fn div_255_simd(val: uint16x8_t) -> uint16x8_t {
+    /// SAFETY: Caller must ensure target feature `neon` is available.
+    #[inline(never)]
+    pub(super) unsafe fn strip_simd(
+        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+        x: usize,
+        width: usize,
+        alphas: &[u32],
+        paint: &Paint,
+    ) {
+        match paint {
+            Paint::Solid(s) => {
+                let color = s.premultiply().to_rgba8().to_u8_array();
+                let color_alpha = vdupq_n_u16(color[3] as u16);
+                let simd_color = {
+                    let color = u32::from_le_bytes(color) as u64;
+                    let color = color | (color << 32);
+                    vmovl_u8(vcreate_u8(color))
+                };
+
+                let tff = vdupq_n_u16(255);
+
+                debug_assert!(alphas.len() >= width);
+
+                for (z, a) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+                    .chunks_exact_mut(16)
+                    .zip(alphas)
+                {
+                    for j in 0..2 {
+                        let index = j * 8;
+
+                        let mask_alpha = {
+                            let first_mask = vdup_n_u16(((*a >> 2 * index) & 0xff) as u16);
+                            let second_mask = vdup_n_u16(((*a >> (2 * index + 8)) & 0xff) as u16);
+                            vcombine_u16(first_mask, second_mask)
+                        };
+
+                        let inv_alpha = {
+                            let im1 = vmulq_u16(mask_alpha, color_alpha);
+                            let im2 = div_255(im1);
+                            vsubq_u16(tff, im2)
+                        };
+
+                        let im1 =
+                            vmulq_u16(vmovl_u8(vld1_u8(z.as_mut_ptr().add(index))), inv_alpha);
+                        let im2 = vmulq_u16(mask_alpha, simd_color);
+                        let im3 = vmovn_u16(div_255(vaddq_u16(im1, im2)));
+                        vst1_u8(z.as_mut_ptr().add(index), im3);
+                    }
+                }
+            }
+            Paint::Pattern(_) => unimplemented!(),
+        }
+    }
+
+    unsafe fn div_255(val: uint16x8_t) -> uint16x8_t {
         let val_shifted = vshrq_n_u16::<8>(val);
         let one = vdupq_n_u16(1);
         let added = vaddq_u16(val, one);
