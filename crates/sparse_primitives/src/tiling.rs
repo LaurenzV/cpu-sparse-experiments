@@ -82,8 +82,6 @@ impl Footprint {
 ///
 /// Keep in mind that it is possible to have multiple tiles with the same index,
 /// namely if we have multiple lines crossing the same 4x4 area!
-///
-/// We are storing the points in a packed fashion in order to (TODO: find out).
 #[derive(Debug)]
 pub struct Tile {
     /// The index of the tile in the x direction.
@@ -135,15 +133,14 @@ impl Tile {
     }
 
     // TODO: Verify that this is efficient.
-    pub fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
+    pub(crate) fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
         (self.y, self.x).cmp(&(b.y, b.x))
     }
 }
 
-/// This is just Line but f32
+/// Same as a line, but uses f32 instead.
 #[derive(Clone, Copy, Debug)]
 pub struct FlatLine {
-    // should these be vec2?
     pub p0: Point,
     pub p1: Point,
 }
@@ -154,6 +151,8 @@ impl FlatLine {
     }
 }
 
+/// Stores a point within a tile (which can range from 0 to TILE_WIDTH/TILE_HEIGHT) as a
+/// u16, to reduce the memory footprint when sorting tiles.
 #[derive(Clone, Copy)]
 pub struct PackedPoint {
     x: u16,
