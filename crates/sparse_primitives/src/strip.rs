@@ -15,8 +15,6 @@ use crate::tiling::{PackedPoint, Tile, TILE_WIDTH};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
 
-pub(crate) struct Footprint(pub(crate) u32);
-
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
     pub x: i32,

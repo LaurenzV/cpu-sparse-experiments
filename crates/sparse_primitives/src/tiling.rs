@@ -1,7 +1,7 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::strip::Footprint;
+use std::fmt::{Debug, Formatter};
 
 pub const TILE_WIDTH: u32 = 4;
 pub const TILE_HEIGHT: u32 = 4;
@@ -11,36 +11,56 @@ const TILE_SCALE_Y: f32 = 1.0 / TILE_HEIGHT as f32;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct Loc {
+    // TODO: Benchmark i16 vs i32.
     x: i32,
+    // In practice will always be positive since we can (and also do) just ignore tiles where y < 0,
+    // but the same does not apply for x, where we do need to preserve tiles where x < 0 (so that
+    // filling works correctly).
     y: i32,
 }
 
 impl Loc {
-    /// Two locations are on the same strip if they are on the same
-    /// row and next to each other.
+    pub(crate) fn zero() -> Self {
+        Loc { x: 0, y: 0 }
+    }
+    /// Check whether two locations are on the same strip. This is the case if they are in the same
+    /// row and right next to each other.
     pub(crate) fn same_strip(&self, other: &Self) -> bool {
-        self.same_row(other) && (other.x - self.x) / 2 == 0
+        self.same_row(other) && (other.x - self.x).abs() <= 1
     }
 
     pub(crate) fn same_row(&self, other: &Self) -> bool {
         self.y == other.y
     }
+
+    pub fn cmp(&self, b: &Loc) -> std::cmp::Ordering {
+        (self.y, self.x).cmp(&(b.y, b.x))
+    }
 }
 
+pub(crate) struct Footprint(pub(crate) u32);
+
+/// A tile represents an aligned area on the pixmap, used to subdivide the viewport into sub-areas
+/// (currently 4x4) and analyze line intersections inside each such area.
+///
+/// Keep in mind that it is possible to have multiple tiles with the same index,
+/// namely if we have multiple lines crossing the same 4x4 area!
+///
+/// We are storing the points in a packed fashion in order to (TODO: find out).
+#[derive(Debug)]
 pub struct Tile {
-    x: i32,
-    // In practice will always be positive since we can just ignore tiles where y < 0,
-    // but the same does not apply for x, where we do need to preserve tiles where x < 0.
-    y: i32,
+    /// The index of the tile in the x- and y-direction.
+    loc: Loc,
+    /// The start point of the line in that tile.
     p0: PackedPoint,
+    /// The end point of the line in that tile.
     p1: PackedPoint,
 }
 
 impl Tile {
-    pub fn new(x: f32, y: f32, p0: PackedPoint, p1: PackedPoint) -> Self {
+    pub fn new(x: i32, y: i32, p0: PackedPoint, p1: PackedPoint) -> Self {
         Self {
-            x: x as i32,
-            y: y as i32,
+            loc: Loc { x, y },
             p0,
             p1,
         }
@@ -48,8 +68,10 @@ impl Tile {
 
     pub fn new_u16(x: u16, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
         Self {
-            x: x as i32,
-            y: y as i32,
+            loc: Loc {
+                x: x as i32,
+                y: y as i32,
+            },
             p0,
             p1,
         }
@@ -64,18 +86,15 @@ impl Tile {
     }
 
     pub fn x(&self) -> i32 {
-        self.x
+        self.loc.x
     }
 
     pub fn y(&self) -> i32 {
-        self.y
+        self.loc.y
     }
 
     pub(crate) fn loc(&self) -> Loc {
-        Loc {
-            x: self.x,
-            y: self.y,
-        }
+        self.loc
     }
 
     pub(crate) fn footprint(&self) -> Footprint {
@@ -91,20 +110,9 @@ impl Tile {
         (self.p1.packed_y() == 0) as i32 - (self.p0.packed_y() == 0) as i32
     }
 
+    // TODO: Verify that this is efficient.
     pub fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
-        (self.y, self.x).cmp(&(b.y, b.x))
-    }
-}
-
-impl std::fmt::Debug for Tile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let p0 = self.p0.unpack();
-        let p1 = self.p1.unpack();
-        write!(
-            f,
-            "Tile {{ xy: ({}, {}), p0: ({:.4}, {:.4}), p1: ({:.4}, {:.4}) }}",
-            self.x, self.y, p0.x, p0.y, p1.x, p1.y
-        )
+        self.loc.cmp(&b.loc)
     }
 }
 
@@ -122,7 +130,7 @@ impl FlatLine {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct PackedPoint {
     x: u16,
     y: u16,
@@ -154,6 +162,12 @@ impl PackedPoint {
 
     pub fn unpacked_y(&self) -> f32 {
         self.y as f32 * (1.0 / TILE_SCALE)
+    }
+}
+
+impl Debug for PackedPoint {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}, {}", self.unpacked_x(), self.unpacked_y())
     }
 }
 
@@ -290,8 +304,8 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
                 // 1x1 tile
                 push_tile(Tile::new(
-                    x,
-                    y,
+                    x as i32,
+                    y as i32,
                     PackedPoint::new(xfrac0, yfrac0),
                     PackedPoint::new(xfrac1, yfrac1),
                 ));
@@ -311,7 +325,12 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let xclip = xclip0 + i as f32 * sign * slope;
                     let xfrac = scale_up(xclip).max(1);
                     let packed = PackedPoint::new(xfrac, yclip);
-                    push_tile(Tile::new(x, y + i as f32 * sign, last_packed, packed));
+                    push_tile(Tile::new(
+                        x as i32,
+                        (y + i as f32 * sign) as i32,
+                        last_packed,
+                        packed,
+                    ));
                     // flip y between top and bottom of tile
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
                 }
@@ -319,8 +338,8 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
                 push_tile(Tile::new(
-                    x,
-                    y + (count_y - 1) as f32 * sign,
+                    x as i32,
+                    (y + (count_y - 1) as f32 * sign) as i32,
                     last_packed,
                     packed1,
                 ));
@@ -341,7 +360,12 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 let yclip = yclip0 + i as f32 * sign * slope;
                 let yfrac = scale_up(yclip).max(1);
                 let packed = PackedPoint::new(xclip, yfrac);
-                push_tile(Tile::new(x + i as f32 * sign, y, last_packed, packed));
+                push_tile(Tile::new(
+                    (x + i as f32 * sign) as i32,
+                    y as i32,
+                    last_packed,
+                    packed,
+                ));
                 // flip x between left and right of tile
                 last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
             }
@@ -350,8 +374,8 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
             push_tile(Tile::new(
-                x + (count_x - 1) as f32 * sign,
-                y,
+                (x + (count_x - 1) as f32 * sign) as i32,
+                y as i32,
                 last_packed,
                 packed1,
             ));
@@ -391,7 +415,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let x_intersect = s0.x + (s1.x - s0.x) * t_clipy - xi;
                     let xfrac = scale_up(x_intersect).max(1); // maybe should clamp?
                     let packed = PackedPoint::new(xfrac, yclip);
-                    push_tile(Tile::new(xi, yi, last_packed, packed));
+                    push_tile(Tile::new(xi as i32, yi as i32, last_packed, packed));
                     t_clipy += recip_dy.abs();
                     yi += signy;
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
@@ -400,7 +424,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let y_intersect = s0.y + (s1.y - s0.y) * t_clipx - yi;
                     let yfrac = scale_up(y_intersect).max(1); // maybe should clamp?
                     let packed = PackedPoint::new(xclip, yfrac);
-                    push_tile(Tile::new(xi, yi, last_packed, packed));
+                    push_tile(Tile::new(xi as i32, yi as i32, last_packed, packed));
                     t_clipx += recip_dx.abs();
                     xi += signx;
                     last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
@@ -410,7 +434,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let yfrac1 = scale_up(s1.y - yi);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-            push_tile(Tile::new(xi, yi, last_packed, packed1));
+            push_tile(Tile::new(xi as i32, yi as i32, last_packed, packed1));
         }
     }
     // This particular choice of sentinel tiles generates a sentinel strip.
@@ -426,18 +450,19 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
         PackedPoint::new(0, 0),
         PackedPoint::new(0, 0),
     ));
+
+    println!("{:#?}", tile_buf);
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::tiling::{make_tiles, scale_up, FlatLine, PackedPoint, Point, Tile};
+    use crate::tiling::{make_tiles, scale_up, FlatLine, Loc, PackedPoint, Point, Tile};
 
     // TODO: Is this the correct behavior?
     #[test]
     fn footprint_at_edge() {
         let tile = Tile {
-            x: 0,
-            y: 0,
+            loc: Loc::zero(),
             p0: PackedPoint::new(scale_up(1.0), scale_up(0.0)),
             p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
         };
@@ -449,7 +474,10 @@ mod tests {
     #[ignore]
     // TODO: Fix this
     fn infinite_loop() {
-        let mut line = FlatLine { p0: Point { x: 22.0, y: 552.0 }, p1: Point { x: 224.0, y: 388.0 } };
+        let mut line = FlatLine {
+            p0: Point { x: 22.0, y: 552.0 },
+            p1: Point { x: 224.0, y: 388.0 },
+        };
         let mut buf = vec![];
         make_tiles(&[line], &mut buf);
     }
