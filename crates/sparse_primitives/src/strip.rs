@@ -68,7 +68,7 @@ fn render_strips_scalar(
             let same_strip = prev_tile.loc().same_strip(&tile.loc());
 
             if same_strip {
-                fp.add(3);
+                fp.extend(3);
             }
 
             let x0 = fp.x0();

@@ -68,8 +68,8 @@ impl Footprint {
         32 - self.0.leading_zeros()
     }
 
-    /// Add a new index to the range.
-    pub(crate) fn add(&mut self, index: u8) {
+    /// Extend the range with a single index.
+    pub(crate) fn extend(&mut self, index: u8) {
         self.0 |= (1 << index) as u32;
     }
 
@@ -536,6 +536,47 @@ mod tests {
         let fp3 = Footprint::with_range(3, 7);
         assert_eq!(fp3.x0(), 3);
         assert_eq!(fp3.x1(), 7);
+    }
+
+    #[test]
+    fn footprint_extend() {
+        let mut fp = Footprint::empty();
+        fp.extend(5);
+        assert_eq!(fp.x0(), 5);
+        assert_eq!(fp.x1(), 6);
+
+        fp.extend(3);
+        assert_eq!(fp.x0(), 3);
+        assert_eq!(fp.x1(), 6);
+
+        fp.extend(8);
+        assert_eq!(fp.x0(), 3);
+        assert_eq!(fp.x1(), 9);
+
+        fp.extend(0);
+        assert_eq!(fp.x0(), 0);
+        assert_eq!(fp.x1(), 9);
+
+        fp.extend(9);
+        assert_eq!(fp.x0(), 0);
+        assert_eq!(fp.x1(), 10);
+    }
+
+    #[test]
+    fn footprint_merge() {
+        let mut fp1 = Footprint::with_range(2, 4);
+        let fp2 = Footprint::with_range(5, 6);
+        fp1.merge(&fp2);
+
+        assert_eq!(fp1.x0(), 2);
+        assert_eq!(fp1.x1(), 6);
+
+        let mut fp3 = Footprint::with_range(5, 9);
+        let fp4 = Footprint::with_range(7, 10);
+        fp3.merge(&fp4);
+
+        assert_eq!(fp3.x0(), 5);
+        assert_eq!(fp3.x1(), 10);
     }
 
     // TODO: Is this the correct behavior?
