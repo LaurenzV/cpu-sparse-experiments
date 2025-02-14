@@ -139,12 +139,13 @@ impl Tile {
     pub(crate) fn footprint(&self) -> Footprint {
         let x0 = self.p0.unpacked_x();
         let x1 = self.p1.unpacked_x();
-        let x_min = x0.min(x1);
-        let x_max = x0.max(x1);
+        let x_min = x0.min(x1).floor();
+        let x_max = x0.max(x1).ceil();
         // On CPU, might be better to do this as fixed point
-        let start_i = x_min.floor() as u32;
-        let end_i = (start_i + 1).max(x_max.ceil() as u32).min(TILE_WIDTH);
-        Footprint((1 << end_i) - (1 << start_i))
+        let start_i = x_min as u32;
+        let end_i = (start_i + 1).max(x_max as u32).min(TILE_WIDTH);
+
+        Footprint::with_range(start_i as u8, end_i as u8)
     }
 
     pub(crate) fn delta(&self) -> i32 {
