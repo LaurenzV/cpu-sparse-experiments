@@ -10,17 +10,17 @@ const TILE_SCALE_X: f32 = 1.0 / TILE_WIDTH as f32;
 const TILE_SCALE_Y: f32 = 1.0 / TILE_HEIGHT as f32;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) struct Loc {
+pub struct Loc {
     // TODO: Benchmark i16 vs i32.
-    x: i32,
+    pub x: i32,
     // In practice will always be positive since we can (and also do) just ignore tiles where y < 0,
     // but the same does not apply for x, where we do need to preserve tiles where x < 0 (so that
     // filling works correctly).
-    y: i32,
+    pub y: i32,
 }
 
 impl Loc {
-    pub(crate) fn zero() -> Self {
+    pub fn zero() -> Self {
         Loc { x: 0, y: 0 }
     }
     /// Check whether two locations are on the same strip. This is the case if they are in the same
@@ -33,12 +33,51 @@ impl Loc {
         self.y == other.y
     }
 
-    pub fn cmp(&self, b: &Loc) -> std::cmp::Ordering {
+    pub(crate) fn cmp(&self, b: &Loc) -> std::cmp::Ordering {
         (self.y, self.x).cmp(&(b.y, b.x))
     }
 }
 
+/// A footprint represents in a compact fashion the range of pixels covered by a tile.
+/// We represent this as a u32 so that we can work with bit-shifting for better performance.
 pub(crate) struct Footprint(pub(crate) u32);
+
+impl Footprint {
+    /// Create a new, empty footprint.
+    pub(crate) fn empty() -> Footprint {
+        Footprint(0)
+    }
+
+    /// Create a new footprint from a single index.
+    pub(crate) fn from_index(index: u8) -> Footprint {
+        Footprint(1 << index)
+    }
+
+    // /// Create a new footprint from a range [start, end).
+    // pub(crate) fn from_range(start: u8, end: u8) -> Footprint {
+    //     Footprint(1 << index)
+    // }
+
+    /// The start point of the covered range (inclusive).
+    pub(crate) fn x0(&self) -> u32 {
+        self.0.trailing_zeros()
+    }
+
+    /// The end point of the covered range (exclusive).
+    pub(crate) fn x1(&self) -> u32 {
+        32 - self.0.leading_zeros()
+    }
+
+    /// Add a new index to the range.
+    pub(crate) fn add(&mut self, index: u8) {
+        self.0 |= (1 << index) as u32;
+    }
+
+    /// Merge another footprint with the current one.
+    pub(crate) fn merge(&mut self, fp: &Footprint) {
+        self.0 |= fp.0;
+    }
+}
 
 /// A tile represents an aligned area on the pixmap, used to subdivide the viewport into sub-areas
 /// (currently 4x4) and analyze line intersections inside each such area.

@@ -11,7 +11,7 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::tiling::{PackedPoint, Tile, TILE_WIDTH};
+use crate::tiling::{Footprint, PackedPoint, Tile, TILE_WIDTH};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
 
@@ -54,7 +54,7 @@ fn render_strips_scalar(
     let mut strip_start = true;
     let mut cols = alpha_buf.len() as u32;
     let mut prev_tile = &tiles[0];
-    let mut fp = prev_tile.footprint().0;
+    let mut fp = prev_tile.footprint();
     let mut seg_start = 0;
     let mut delta = 0;
 
@@ -68,11 +68,11 @@ fn render_strips_scalar(
             let same_strip = prev_tile.loc().same_strip(&tile.loc());
 
             if same_strip {
-                fp |= 8;
+                fp.add(3);
             }
 
-            let x0 = fp.trailing_zeros();
-            let x1 = 32 - fp.leading_zeros();
+            let x0 = fp.x0();
+            let x1 = fp.x1();
             let mut areas = [[start_delta as f32; 4]; 4];
 
             for tile in &tiles[seg_start..i] {
@@ -177,7 +177,11 @@ fn render_strips_scalar(
             }
 
             cols += x1 - x0;
-            fp = if same_strip { 1 } else { 0 };
+            fp = if same_strip {
+                Footprint::from_index(0)
+            } else {
+                Footprint::empty()
+            };
 
             strip_start = !same_strip;
             seg_start = i;
@@ -187,7 +191,7 @@ fn render_strips_scalar(
             }
         }
 
-        fp |= tile.footprint().0;
+        fp.merge(&tile.footprint());
 
         prev_tile = tile;
     }
