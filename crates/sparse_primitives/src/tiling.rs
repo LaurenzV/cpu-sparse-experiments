@@ -48,15 +48,15 @@ impl Footprint {
         Footprint(0)
     }
 
-    /// Create a new footprint from a single index.
-    pub(crate) fn from_index(index: u8) -> Footprint {
+    /// Create a new footprint from a single index, i.e. [i, i + 1).
+    pub(crate) fn with_index(index: u8) -> Footprint {
         Footprint(1 << index)
     }
 
-    // /// Create a new footprint from a range [start, end).
-    // pub(crate) fn from_range(start: u8, end: u8) -> Footprint {
-    //     Footprint(1 << index)
-    // }
+    /// Create a new footprint from a single index, i.e. [start, end).
+    pub(crate) fn from_range(start: u8, end: u8) -> Footprint {
+        Footprint((1 << end) - (1 << start))
+    }
 
     /// The start point of the covered range (inclusive).
     pub(crate) fn x0(&self) -> u32 {
@@ -139,10 +139,12 @@ impl Tile {
     pub(crate) fn footprint(&self) -> Footprint {
         let x0 = self.p0.unpacked_x();
         let x1 = self.p1.unpacked_x();
+        let x_min = x0.min(x1);
+        let x_max = x0.max(x1);
         // On CPU, might be better to do this as fixed point
-        let xmin = x0.min(x1).floor() as u32;
-        let xmax = (xmin + 1).max(x0.max(x1).ceil() as u32).min(TILE_WIDTH);
-        Footprint((1 << xmax) - (1 << xmin))
+        let start_i = x_min.floor() as u32;
+        let end_i = (start_i + 1).max(x_max.ceil() as u32).min(TILE_WIDTH);
+        Footprint((1 << end_i) - (1 << start_i))
     }
 
     pub(crate) fn delta(&self) -> i32 {
@@ -495,7 +497,46 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
 #[cfg(test)]
 mod tests {
-    use crate::tiling::{make_tiles, scale_up, FlatLine, Loc, PackedPoint, Point, Tile};
+    use crate::tiling::{make_tiles, scale_up, FlatLine, Footprint, Loc, PackedPoint, Point, Tile};
+
+    #[test]
+    fn footprint_empty() {
+        let fp1 = Footprint::empty();
+        // Not optimal behavior, but currently how it is.
+        assert_eq!(fp1.x0(), 32);
+        assert_eq!(fp1.x1(), 0);
+    }
+
+    #[test]
+    fn footprint_with_index() {
+        let fp1 = Footprint::with_index(0);
+        assert_eq!(fp1.x0(), 0);
+        assert_eq!(fp1.x1(), 1);
+
+        let fp2 = Footprint::with_index(3);
+        assert_eq!(fp2.x0(), 3);
+        assert_eq!(fp2.x1(), 4);
+
+        let fp3 = Footprint::with_index(6);
+        assert_eq!(fp3.x0(), 6);
+        assert_eq!(fp3.x1(), 7);
+    }
+
+    #[test]
+    fn footprint_from_range() {
+        let fp1 = Footprint::from_range(1, 3);
+        assert_eq!(fp1.x0(), 1);
+        assert_eq!(fp1.x1(), 3);
+
+        // Same comment as for empty.
+        let fp2 = Footprint::from_range(2, 2);
+        assert_eq!(fp2.x0(), 32);
+        assert_eq!(fp2.x1(), 0);
+
+        let fp3 = Footprint::from_range(3, 7);
+        assert_eq!(fp3.x0(), 3);
+        assert_eq!(fp3.x1(), 7);
+    }
 
     // TODO: Is this the correct behavior?
     #[test]
