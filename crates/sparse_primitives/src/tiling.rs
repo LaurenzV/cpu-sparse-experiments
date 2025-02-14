@@ -86,49 +86,36 @@ impl Footprint {
 /// We are storing the points in a packed fashion in order to (TODO: find out).
 #[derive(Debug)]
 pub struct Tile {
-    /// The index of the tile in the x- and y-direction.
-    loc: Loc,
+    /// The index of the tile in the x direction.
+    pub x: i32,
+    /// The index of the tile in the y direction. See the comment in `Loc` for why
+    /// we can use u16 here.
+    pub y: u16,
     /// The start point of the line in that tile.
-    p0: PackedPoint,
+    pub p0: PackedPoint,
     /// The end point of the line in that tile.
-    p1: PackedPoint,
+    pub p1: PackedPoint,
 }
 
 impl Tile {
     pub fn new(x: i32, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
-        Self {
-            loc: Loc { x, y },
-            p0,
-            p1,
-        }
+        Self { x, y, p0, p1 }
     }
 
     pub fn new_u16(x: u16, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
         Self {
-            loc: Loc { x: x as i32, y },
+            x: x as i32,
+            y,
             p0,
             p1,
         }
     }
 
-    pub fn p0(&self) -> PackedPoint {
-        self.p0
-    }
-
-    pub fn p1(&self) -> PackedPoint {
-        self.p1
-    }
-
-    pub fn x(&self) -> i32 {
-        self.loc.x
-    }
-
-    pub fn y(&self) -> u16 {
-        self.loc.y
-    }
-
     pub(crate) fn loc(&self) -> Loc {
-        self.loc
+        Loc {
+            x: self.x,
+            y: self.y,
+        }
     }
 
     pub(crate) fn footprint(&self) -> Footprint {
@@ -149,7 +136,7 @@ impl Tile {
 
     // TODO: Verify that this is efficient.
     pub fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
-        self.loc.cmp(&b.loc)
+        (self.y, self.x).cmp(&(b.y, b.x))
     }
 }
 
@@ -310,10 +297,8 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
     let mut push_tile = |x: f32, y: f32, p0: PackedPoint, p1: PackedPoint| {
         if y >= 0.0 {
             tile_buf.push(Tile {
-                loc: Loc {
-                    x: x as i32,
-                    y: y as u16,
-                },
+                x: x as i32,
+                y: y as u16,
                 p0,
                 p1,
             });
@@ -566,7 +551,8 @@ mod tests {
     #[test]
     fn footprint_at_edge() {
         let tile = Tile {
-            loc: Loc::zero(),
+            x: 0,
+            y: 0,
             p0: PackedPoint::new(scale_up(1.0), scale_up(0.0)),
             p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
         };
