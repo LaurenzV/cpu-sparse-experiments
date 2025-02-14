@@ -12,7 +12,8 @@ const TILE_SCALE_Y: f32 = 1.0 / TILE_HEIGHT as f32;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Loc {
     // TODO: Unlike y, will not always be positive since we cannot ignore tiles where x < 0 because
-    // they still impact the winding number.
+    // they still impact the winding number. We should be able to change this once we have viewport
+    // culling.
     pub x: i32,
     pub y: u16,
 }
