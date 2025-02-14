@@ -11,12 +11,10 @@ const TILE_SCALE_Y: f32 = 1.0 / TILE_HEIGHT as f32;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Loc {
-    // TODO: Benchmark i16 vs i32.
+    // TODO: Unlike y, will not always be positive since we cannot ignore tiles where x < 0 because
+    // they still impact the winding number.
     pub x: i32,
-    // In practice will always be positive since we can (and also do) just ignore tiles where y < 0,
-    // but the same does not apply for x, where we do need to preserve tiles where x < 0 (so that
-    // filling works correctly).
-    pub y: i32,
+    pub y: u16,
 }
 
 impl Loc {
@@ -97,7 +95,7 @@ pub struct Tile {
 }
 
 impl Tile {
-    pub fn new(x: i32, y: i32, p0: PackedPoint, p1: PackedPoint) -> Self {
+    pub fn new(x: i32, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
         Self {
             loc: Loc { x, y },
             p0,
@@ -107,10 +105,7 @@ impl Tile {
 
     pub fn new_u16(x: u16, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
         Self {
-            loc: Loc {
-                x: x as i32,
-                y: y as i32,
-            },
+            loc: Loc { x: x as i32, y },
             p0,
             p1,
         }
@@ -128,7 +123,7 @@ impl Tile {
         self.loc.x
     }
 
-    pub fn y(&self) -> i32 {
+    pub fn y(&self) -> u16 {
         self.loc.y
     }
 
@@ -312,9 +307,16 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
         }
     };
 
-    let mut push_tile = |tile: Tile| {
-        if tile.y() >= 0 {
-            tile_buf.push(tile);
+    let mut push_tile = |x: f32, y: f32, p0: PackedPoint, p1: PackedPoint| {
+        if y >= 0.0 {
+            tile_buf.push(Tile {
+                loc: Loc {
+                    x: x as i32,
+                    y: y as u16,
+                },
+                p0,
+                p1,
+            });
         }
     };
 
@@ -345,12 +347,12 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 let yfrac1 = scale_up(s1.y - y);
 
                 // 1x1 tile
-                push_tile(Tile::new(
-                    x as i32,
-                    y as i32,
+                push_tile(
+                    x,
+                    y,
                     PackedPoint::new(xfrac0, yfrac0),
                     PackedPoint::new(xfrac1, yfrac1),
-                ));
+                );
             } else {
                 // vertical column
                 let slope = (s1.x - s0.x) / (s1.y - s0.y);
@@ -367,24 +369,14 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let xclip = xclip0 + i as f32 * sign * slope;
                     let xfrac = scale_up(xclip).max(1);
                     let packed = PackedPoint::new(xfrac, yclip);
-                    push_tile(Tile::new(
-                        x as i32,
-                        (y + i as f32 * sign) as i32,
-                        last_packed,
-                        packed,
-                    ));
+                    push_tile(x, y + i as f32 * sign, last_packed, packed);
                     // flip y between top and bottom of tile
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
                 }
                 let yfrac1 = scale_up(s1.y - (y + (count_y - 1) as f32 * sign));
                 let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-                push_tile(Tile::new(
-                    x as i32,
-                    (y + (count_y - 1) as f32 * sign) as i32,
-                    last_packed,
-                    packed1,
-                ));
+                push_tile(x, y + (count_y - 1) as f32 * sign, last_packed, packed1);
             }
         } else if count_y == 1 {
             // horizontal row
@@ -402,12 +394,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 let yclip = yclip0 + i as f32 * sign * slope;
                 let yfrac = scale_up(yclip).max(1);
                 let packed = PackedPoint::new(xclip, yfrac);
-                push_tile(Tile::new(
-                    (x + i as f32 * sign) as i32,
-                    y as i32,
-                    last_packed,
-                    packed,
-                ));
+                push_tile(x + i as f32 * sign, y, last_packed, packed);
                 // flip x between left and right of tile
                 last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
             }
@@ -415,12 +402,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let yfrac1 = scale_up(s1.y - y);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-            push_tile(Tile::new(
-                (x + (count_x - 1) as f32 * sign) as i32,
-                y as i32,
-                last_packed,
-                packed1,
-            ));
+            push_tile(x + (count_x - 1) as f32 * sign, y, last_packed, packed1);
         } else {
             // general case
             let recip_dx = 1.0 / (s1.x - s0.x);
@@ -457,7 +439,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let x_intersect = s0.x + (s1.x - s0.x) * t_clipy - xi;
                     let xfrac = scale_up(x_intersect).max(1); // maybe should clamp?
                     let packed = PackedPoint::new(xfrac, yclip);
-                    push_tile(Tile::new(xi as i32, yi as i32, last_packed, packed));
+                    push_tile(xi, yi, last_packed, packed);
                     t_clipy += recip_dy.abs();
                     yi += signy;
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
@@ -466,7 +448,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let y_intersect = s0.y + (s1.y - s0.y) * t_clipx - yi;
                     let yfrac = scale_up(y_intersect).max(1); // maybe should clamp?
                     let packed = PackedPoint::new(xclip, yfrac);
-                    push_tile(Tile::new(xi as i32, yi as i32, last_packed, packed));
+                    push_tile(xi, yi, last_packed, packed);
                     t_clipx += recip_dx.abs();
                     xi += signx;
                     last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
@@ -476,22 +458,22 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let yfrac1 = scale_up(s1.y - yi);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-            push_tile(Tile::new(xi as i32, yi as i32, last_packed, packed1));
+            push_tile(xi, yi, last_packed, packed1);
         }
     }
     // This particular choice of sentinel tiles generates a sentinel strip.
-    push_tile(Tile::new_u16(
-        0x3ffd,
-        0x3fff,
+    push_tile(
+        0x3ffd as f32,
+        0x3fff as f32,
         PackedPoint::new(0, 0),
         PackedPoint::new(0, 0),
-    ));
-    push_tile(Tile::new_u16(
-        0x3fff,
-        0x3fff,
+    );
+    push_tile(
+        0x3fff as f32,
+        0x3fff as f32,
         PackedPoint::new(0, 0),
         PackedPoint::new(0, 0),
-    ));
+    );
 
     println!("{:#?}", tile_buf);
 }

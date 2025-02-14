@@ -18,7 +18,7 @@ use crate::FillRule;
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
     pub x: i32,
-    pub y: i32,
+    pub y: u32,
     pub col: u32,
     pub winding: i32,
 }
@@ -168,7 +168,7 @@ fn render_strips_scalar(
             if strip_start {
                 let strip = Strip {
                     x: 4 * prev_tile.x() + x0 as i32,
-                    y: 4 * prev_tile.y(),
+                    y: 4 * prev_tile.y() as u32,
                     col: cols,
                     winding: start_delta,
                 };
@@ -202,7 +202,7 @@ impl Strip {
         self.x
     }
 
-    pub fn y(&self) -> i32 {
+    pub fn y(&self) -> u32 {
         self.y
     }
 
