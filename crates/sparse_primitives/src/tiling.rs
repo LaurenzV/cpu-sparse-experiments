@@ -205,17 +205,6 @@ impl Point {
     pub fn new(x: f32, y: f32) -> Self {
         Point { x, y }
     }
-
-    fn from_array(xy: [f32; 2]) -> Self {
-        Point::new(xy[0], xy[1])
-    }
-
-    pub fn pack(&self) -> PackedPoint {
-        let x = ((self.x * TILE_SCALE) + 0.5) as u16;
-        let y = ((self.y * TILE_SCALE) + 0.5) as u16;
-
-        PackedPoint { x, y }
-    }
 }
 
 impl std::ops::Add for Point {
@@ -246,16 +235,21 @@ const TILE_SCALE: f32 = 8192.0;
 // scale factor relative to unit square in tile
 const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
 
-pub(crate) fn scale_up(z: f32) -> u16 {
+fn scale_up(z: f32) -> u16 {
     ((z * FRAC_TILE_SCALE) + 0.5) as u16
 }
 
-fn span(a: f32, b: f32) -> u32 {
-    (a.max(b).ceil() - a.min(b).floor()).max(1.0) as u32
+fn scale_down(z: u16) -> f32 {
+    z as f32 / FRAC_TILE_SCALE
 }
 
 pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
     tile_buf.clear();
+
+    // Calculate how many tiles are covered between two positions. p0 and p1 are scaled
+    // to the tile unit square.
+    let spanned_tiles =
+        |p0: f32, p1: f32| -> u32 { (p0.max(p1).ceil() - p0.min(p1).floor()).max(1.0) as u32 };
 
     let round = |f: f32| -> f32 {
         // Round to the same resolution as used by our u16 representation
@@ -268,19 +262,24 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
         let frac = f.fract();
         i + (frac * FRAC_TILE_SCALE).round() / FRAC_TILE_SCALE
     };
+
     let round_point = |p: Point| -> Point {
         Point {
             x: round(p.x),
             y: round(p.y),
         }
     };
+
     let nudge_point = |p: Point| -> Point {
         // Lines that cross vertical tile boundaries need special treatment during
-        // anti aliasing. This case is detected via tile-relative x == 0. However,
+        // anti-aliasing. This case is detected via tile-relative x == 0. However,
         // lines can naturally start or end at a multiple of the 4x4 grid, too, but
         // these don't constitute crossings. We nudge these points ever so slightly,
         // by ensuring that xfrac0 and xfrac1 are always at least 1, which
-        // corresponds to 1/8192 of a pixel.
+        // corresponds to 1/8192 of a pixel. By doing so, whenever we encounter a point
+        // at a tile relative 0, we can treat it as an edge crossing. This is somewhat
+        // of a hack and in theory we should rather solve the underlying issue in the
+        // strip generation code, but it works for now.
 
         if p.x.fract() == 0.0 {
             Point {
@@ -304,29 +303,36 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
     };
 
     for line in lines {
-        let p0 = line.p0;
-        let p1 = line.p1;
-        let s0 = nudge_point(round_point(p0 * TILE_SCALE_X));
-        let s1 = nudge_point(round_point(p1 * TILE_SCALE_Y));
-        let count_x = span(s0.x, s1.x);
-        let count_y = span(s0.y, s1.y);
+        // Points scaled to the tile unit square.
+        let s0 = nudge_point(round_point(line.p0 * TILE_SCALE_X));
+        let s1 = nudge_point(round_point(line.p1 * TILE_SCALE_Y));
+
+        // Count how many tiles are covered on each axis.
+        let tile_count_x = spanned_tiles(s0.x, s1.x);
+        let tile_count_y = spanned_tiles(s0.y, s1.y);
+
+        // Note: This code is technically unreachable now, because we always nudge x points at tile-relative 0
+        // position. But we might need it again in the future if we change the logic.
         let mut x = s0.x.floor();
         if s0.x == x && s1.x < x {
             // s0.x is on right side of first tile
             x -= 1.0;
         }
+
         let mut y = s0.y.floor();
         if s0.y == y && s1.y < y {
-            // s0.y is on bottom of first tile
+            // s0.y is conceptually on bottom of the previous tile instead of at the top
+            // of the current tile, so we need to adjust the y location.
             y -= 1.0;
         }
+
         let xfrac0 = scale_up(s0.x - x);
         let yfrac0 = scale_up(s0.y - y);
         let packed0 = PackedPoint::new(xfrac0, yfrac0);
         // These could be replaced with <2 and the max(1.0) in span removed
-        if count_x == 1 {
+        if tile_count_x == 1 {
             let xfrac1 = scale_up(s1.x - x);
-            if count_y == 1 {
+            if tile_count_y == 1 {
                 let yfrac1 = scale_up(s1.y - y);
 
                 // 1x1 tile
@@ -348,7 +354,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     0
                 };
                 let mut last_packed = packed0;
-                for i in 0..count_y - 1 {
+                for i in 0..tile_count_y - 1 {
                     let xclip = xclip0 + i as f32 * sign * slope;
                     let xfrac = scale_up(xclip).max(1);
                     let packed = PackedPoint::new(xfrac, yclip);
@@ -356,12 +362,17 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     // flip y between top and bottom of tile
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
                 }
-                let yfrac1 = scale_up(s1.y - (y + (count_y - 1) as f32 * sign));
+                let yfrac1 = scale_up(s1.y - (y + (tile_count_y - 1) as f32 * sign));
                 let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-                push_tile(x, y + (count_y - 1) as f32 * sign, last_packed, packed1);
+                push_tile(
+                    x,
+                    y + (tile_count_y - 1) as f32 * sign,
+                    last_packed,
+                    packed1,
+                );
             }
-        } else if count_y == 1 {
+        } else if tile_count_y == 1 {
             // horizontal row
             let slope = (s1.y - s0.y) / (s1.x - s0.x);
             let sign = (s1.x - s0.x).signum();
@@ -373,7 +384,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 0
             };
             let mut last_packed = packed0;
-            for i in 0..count_x - 1 {
+            for i in 0..tile_count_x - 1 {
                 let yclip = yclip0 + i as f32 * sign * slope;
                 let yfrac = scale_up(yclip).max(1);
                 let packed = PackedPoint::new(xclip, yfrac);
@@ -381,11 +392,16 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 // flip x between left and right of tile
                 last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
             }
-            let xfrac1 = scale_up(s1.x - (x + (count_x - 1) as f32 * sign));
+            let xfrac1 = scale_up(s1.x - (x + (tile_count_x - 1) as f32 * sign));
             let yfrac1 = scale_up(s1.y - y);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-            push_tile(x + (count_x - 1) as f32 * sign, y, last_packed, packed1);
+            push_tile(
+                x + (tile_count_x - 1) as f32 * sign,
+                y,
+                last_packed,
+                packed1,
+            );
         } else {
             // general case
             let recip_dx = 1.0 / (s1.x - s0.x);
@@ -408,8 +424,8 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             } else {
                 0
             };
-            let x1 = x + (count_x - 1) as f32 * signx;
-            let y1 = y + (count_y - 1) as f32 * signy;
+            let x1 = x + (tile_count_x - 1) as f32 * signx;
+            let y1 = y + (tile_count_y - 1) as f32 * signy;
             let mut xi = x;
             let mut yi = y;
             let mut last_packed = packed0;
@@ -444,6 +460,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             push_tile(xi, yi, last_packed, packed1);
         }
     }
+
     // This particular choice of sentinel tiles generates a sentinel strip.
     push_tile(
         0x3ffd as f32,
@@ -457,8 +474,6 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
         PackedPoint::new(0, 0),
         PackedPoint::new(0, 0),
     );
-
-    println!("{:#?}", tile_buf);
 }
 
 #[cfg(test)]
