@@ -54,7 +54,7 @@ impl Footprint {
     }
 
     /// Create a new footprint from a single index, i.e. [start, end).
-    pub(crate) fn from_range(start: u8, end: u8) -> Footprint {
+    pub(crate) fn with_range(start: u8, end: u8) -> Footprint {
         Footprint((1 << end) - (1 << start))
     }
 
@@ -524,16 +524,16 @@ mod tests {
 
     #[test]
     fn footprint_from_range() {
-        let fp1 = Footprint::from_range(1, 3);
+        let fp1 = Footprint::with_range(1, 3);
         assert_eq!(fp1.x0(), 1);
         assert_eq!(fp1.x1(), 3);
 
         // Same comment as for empty.
-        let fp2 = Footprint::from_range(2, 2);
+        let fp2 = Footprint::with_range(2, 2);
         assert_eq!(fp2.x0(), 32);
         assert_eq!(fp2.x1(), 0);
 
-        let fp3 = Footprint::from_range(3, 7);
+        let fp3 = Footprint::with_range(3, 7);
         assert_eq!(fp3.x0(), 3);
         assert_eq!(fp3.x1(), 7);
     }
