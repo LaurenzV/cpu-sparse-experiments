@@ -201,29 +201,19 @@ pub struct Point {
 }
 
 impl Point {
-    pub fn pack(&self) -> PackedPoint {
-        let x = (self.x * TILE_SCALE).round() as u16;
-        let y = (self.y * TILE_SCALE).round() as u16;
-
-        PackedPoint { x, y }
-    }
-}
-
-const TILE_SCALE: f32 = 8192.0;
-// scale factor relative to unit square in tile
-const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
-
-pub(crate) fn scale_up(z: f32) -> u16 {
-    (z * FRAC_TILE_SCALE).round() as u16
-}
-
-impl Point {
     pub fn new(x: f32, y: f32) -> Self {
         Point { x, y }
     }
 
     fn from_array(xy: [f32; 2]) -> Self {
         Point::new(xy[0], xy[1])
+    }
+
+    pub fn pack(&self) -> PackedPoint {
+        let x = ((self.x * TILE_SCALE) + 0.5) as u16;
+        let y = ((self.y * TILE_SCALE) + 0.5) as u16;
+
+        PackedPoint { x, y }
     }
 }
 
@@ -249,6 +239,14 @@ impl std::ops::Mul<f32> for Point {
     fn mul(self, rhs: f32) -> Self {
         Point::new(self.x * rhs, self.y * rhs)
     }
+}
+
+const TILE_SCALE: f32 = 8192.0;
+// scale factor relative to unit square in tile
+const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
+
+pub(crate) fn scale_up(z: f32) -> u16 {
+    ((z * FRAC_TILE_SCALE) + 0.5) as u16
 }
 
 fn span(a: f32, b: f32) -> u32 {
