@@ -342,6 +342,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             } else {
                 // A vertical column.
                 let inv_slope = (s1.x - s0.x) / (s1.y - s0.y);
+                // TODO: Get rid of the sign by changing direction of line?
                 let sign = (s1.y - s0.y).signum();
 
                 // For downward lines, xclip0 and yclip store the x and y intersection points
@@ -373,7 +374,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 for i in 0..tile_count_y - 1 {
                     // Calculate the next x intersection point.
                     let xclip = xclip0 + i as f32 * sign * inv_slope;
-                    // TODO: Is the `.max(1)` really needed?
+                    // TODO: Is the `.max(1)` really needed? (Same for all other cases)
                     let xfrac = scale_up(xclip).max(1);
                     let packed = PackedPoint::new(xfrac, yclip);
 
@@ -410,7 +411,6 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
             for i in 0..tile_count_x - 1 {
                 let yclip = yclip0 + i as f32 * sign * slope;
-                // TODO: Is the `.max(1)` really needed?
                 let yfrac = scale_up(yclip).max(1);
                 let packed = PackedPoint::new(xclip, yfrac);
                 push_tile(x, y, last_packed, packed);
@@ -425,7 +425,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
             push_tile(x, y, last_packed, packed1);
         } else {
-            // General case (i.e. more than one tile covered in both directions). We perform DDA
+            // General case (i.e. more than one tile covered in both directions). We perform a DDA
             // to "walk" along the path and find out which tiles are intersected by the line
             // and at which positions.
 
@@ -434,7 +434,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let recip_dy = 1.0 / (s1.y - s0.y);
             let sign_y = (s1.y - s0.y).signum();
 
-            // t parameter for next intersection with a vertical grid line
+            // How much we advance at each intersection with a vertical grid line.
             let mut t_clipx = (x - s0.x) * recip_dx;
 
             // Similarly to the case "horizontal column", if the line goes to the right,
@@ -448,7 +448,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 0
             };
 
-            // t parameter for next intersection with a horizontal grid line
+            // How much we advance at each intersection with a horizontal grid line.
             let mut t_clipy = (y - s0.y) * recip_dy;
 
             // Same as xclip, but for the vertical direction, analogously to the
@@ -466,30 +466,34 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let mut xi = x;
             let mut yi = y;
             let mut last_packed = packed0;
-            let mut count = 0;
-            while xi != x1 || yi != y1 {
-                count += 1;
 
+            while xi != x1 || yi != y1 {
                 if t_clipy < t_clipx {
-                    // intersected with horizontal grid line
+                    // Intersected with a horizontal grid line.
                     let x_intersect = s0.x + (s1.x - s0.x) * t_clipy - xi;
                     let xfrac = scale_up(x_intersect).max(1); // maybe should clamp?
                     let packed = PackedPoint::new(xfrac, yclip);
+
                     push_tile(xi, yi, last_packed, packed);
+                    // TODO: Why abs?
                     t_clipy += recip_dy.abs();
                     yi += sign_y;
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
                 } else {
-                    // intersected with vertical grid line
+                    // Intersected with vertical grid line.
                     let y_intersect = s0.y + (s1.y - s0.y) * t_clipx - yi;
                     let yfrac = scale_up(y_intersect).max(1); // maybe should clamp?
                     let packed = PackedPoint::new(xclip, yfrac);
+
                     push_tile(xi, yi, last_packed, packed);
+
                     t_clipx += recip_dx.abs();
                     xi += sign_x;
                     last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
                 }
             }
+
+            // The last tile, where the end point is possibly not at an integer coordinate.
             let xfrac1 = scale_up(s1.x - xi);
             let yfrac1 = scale_up(s1.y - yi);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
