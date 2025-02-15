@@ -1,6 +1,8 @@
 mod tiling;
+mod sorting;
 
 use criterion::{criterion_group, criterion_main};
 
 criterion_group!(tg, tiling::tiling);
-criterion_main!(tg);
+criterion_group!(s, sorting::sorting);
+criterion_main!(tg, s);
