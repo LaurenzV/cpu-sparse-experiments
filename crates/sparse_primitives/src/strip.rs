@@ -178,7 +178,7 @@ fn render_strips_scalar(
 
             cols += x1 - x0;
             fp = if same_strip {
-                Footprint::with_index(0)
+                Footprint::from_index(0)
             } else {
                 Footprint::empty()
             };

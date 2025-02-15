@@ -48,12 +48,12 @@ impl Footprint {
     }
 
     /// Create a new footprint from a single index, i.e. [i, i + 1).
-    pub(crate) fn with_index(index: u8) -> Footprint {
+    pub(crate) fn from_index(index: u8) -> Footprint {
         Footprint(1 << index)
     }
 
     /// Create a new footprint from a single index, i.e. [start, end).
-    pub(crate) fn with_range(start: u8, end: u8) -> Footprint {
+    pub(crate) fn from_range(start: u8, end: u8) -> Footprint {
         Footprint((1 << end) - (1 << start))
     }
 
@@ -117,7 +117,7 @@ impl Tile {
         let start_i = x_min as u32;
         let end_i = (start_i + 1).max(x_max as u32).min(TILE_WIDTH);
 
-        Footprint::with_range(start_i as u8, end_i as u8)
+        Footprint::from_range(start_i as u8, end_i as u8)
     }
 
     pub(crate) fn delta(&self) -> i32 {
@@ -500,32 +500,32 @@ mod tests {
     }
 
     #[test]
-    fn footprint_with_index() {
-        let fp1 = Footprint::with_index(0);
+    fn footprint_from_index() {
+        let fp1 = Footprint::from_index(0);
         assert_eq!(fp1.x0(), 0);
         assert_eq!(fp1.x1(), 1);
 
-        let fp2 = Footprint::with_index(3);
+        let fp2 = Footprint::from_index(3);
         assert_eq!(fp2.x0(), 3);
         assert_eq!(fp2.x1(), 4);
 
-        let fp3 = Footprint::with_index(6);
+        let fp3 = Footprint::from_index(6);
         assert_eq!(fp3.x0(), 6);
         assert_eq!(fp3.x1(), 7);
     }
 
     #[test]
     fn footprint_from_range() {
-        let fp1 = Footprint::with_range(1, 3);
+        let fp1 = Footprint::from_range(1, 3);
         assert_eq!(fp1.x0(), 1);
         assert_eq!(fp1.x1(), 3);
 
         // Same comment as for empty.
-        let fp2 = Footprint::with_range(2, 2);
+        let fp2 = Footprint::from_range(2, 2);
         assert_eq!(fp2.x0(), 32);
         assert_eq!(fp2.x1(), 0);
 
-        let fp3 = Footprint::with_range(3, 7);
+        let fp3 = Footprint::from_range(3, 7);
         assert_eq!(fp3.x0(), 3);
         assert_eq!(fp3.x1(), 7);
     }
@@ -556,15 +556,15 @@ mod tests {
 
     #[test]
     fn footprint_merge() {
-        let mut fp1 = Footprint::with_range(2, 4);
-        let fp2 = Footprint::with_range(5, 6);
+        let mut fp1 = Footprint::from_range(2, 4);
+        let fp2 = Footprint::from_range(5, 6);
         fp1.merge(&fp2);
 
         assert_eq!(fp1.x0(), 2);
         assert_eq!(fp1.x1(), 6);
 
-        let mut fp3 = Footprint::with_range(5, 9);
-        let fp4 = Footprint::with_range(7, 10);
+        let mut fp3 = Footprint::from_range(5, 9);
+        let fp4 = Footprint::from_range(7, 10);
         fp3.merge(&fp4);
 
         assert_eq!(fp3.x0(), 5);
