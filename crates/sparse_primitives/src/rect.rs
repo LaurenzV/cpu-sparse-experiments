@@ -219,7 +219,7 @@ impl RenderContext {
             // Push the actual strip.
             strip_buf.push(Strip {
                 x: x0_floored as i32,
-                y: strip_y as i32,
+                y: strip_y,
                 col,
                 winding: 0,
             });
@@ -245,7 +245,7 @@ impl RenderContext {
 
                 self.strip_buf.push(Strip {
                     x: x0_floored as i32,
-                    y: (i * STRIP_HEIGHT as u32) as i32,
+                    y: i * STRIP_HEIGHT as u32,
                     col,
                     winding: 0,
                 });
@@ -257,7 +257,7 @@ impl RenderContext {
 
                     self.strip_buf.push(Strip {
                         x: x1_floored as i32,
-                        y: (i * STRIP_HEIGHT as u32) as i32,
+                        y: i * STRIP_HEIGHT as u32,
                         col,
                         winding: 1,
                     });

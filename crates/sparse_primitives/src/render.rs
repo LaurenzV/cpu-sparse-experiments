@@ -147,7 +147,7 @@ impl RenderContext {
                 continue;
             }
 
-            if strip.y() >= self.height as i32 {
+            if strip.y() >= self.height as u32 {
                 // Since strips are sorted by location, any subsequent strips will also be
                 // outside the viewport, so we can abort entirely.
                 break;

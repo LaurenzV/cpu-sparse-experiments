@@ -11,16 +11,14 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::tiling::{PackedPoint, Tile, TILE_WIDTH};
+use crate::tiling::{Footprint, PackedPoint, Tile, TILE_WIDTH};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
-
-pub(crate) struct Footprint(pub(crate) u32);
 
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
     pub x: i32,
-    pub y: i32,
+    pub y: u32,
     pub col: u32,
     pub winding: i32,
 }
@@ -56,7 +54,7 @@ fn render_strips_scalar(
     let mut strip_start = true;
     let mut cols = alpha_buf.len() as u32;
     let mut prev_tile = &tiles[0];
-    let mut fp = prev_tile.footprint().0;
+    let mut fp = prev_tile.footprint();
     let mut seg_start = 0;
     let mut delta = 0;
 
@@ -70,18 +68,18 @@ fn render_strips_scalar(
             let same_strip = prev_tile.loc().same_strip(&tile.loc());
 
             if same_strip {
-                fp |= 8;
+                fp.extend(3);
             }
 
-            let x0 = fp.trailing_zeros();
-            let x1 = 32 - fp.leading_zeros();
+            let x0 = fp.x0();
+            let x1 = fp.x1();
             let mut areas = [[start_delta as f32; 4]; 4];
 
             for tile in &tiles[seg_start..i] {
                 delta += tile.delta();
 
-                let p0 = tile.p0().unpack();
-                let p1 = tile.p1().unpack();
+                let p0 = tile.p0.unpack();
+                let p1 = tile.p1.unpack();
                 let inv_slope = (p1.x - p0.x) / (p1.y - p0.y);
 
                 // Note: We are iterating in column-major order because the inner loop always
@@ -169,8 +167,8 @@ fn render_strips_scalar(
 
             if strip_start {
                 let strip = Strip {
-                    x: 4 * prev_tile.x() + x0 as i32,
-                    y: 4 * prev_tile.y(),
+                    x: 4 * prev_tile.x + x0 as i32,
+                    y: 4 * prev_tile.y as u32,
                     col: cols,
                     winding: start_delta,
                 };
@@ -179,7 +177,11 @@ fn render_strips_scalar(
             }
 
             cols += x1 - x0;
-            fp = if same_strip { 1 } else { 0 };
+            fp = if same_strip {
+                Footprint::from_index(0)
+            } else {
+                Footprint::empty()
+            };
 
             strip_start = !same_strip;
             seg_start = i;
@@ -189,7 +191,7 @@ fn render_strips_scalar(
             }
         }
 
-        fp |= tile.footprint().0;
+        fp.merge(&tile.footprint());
 
         prev_tile = tile;
     }
@@ -200,7 +202,7 @@ impl Strip {
         self.x
     }
 
-    pub fn y(&self) -> i32 {
+    pub fn y(&self) -> u32 {
         self.y
     }
 
