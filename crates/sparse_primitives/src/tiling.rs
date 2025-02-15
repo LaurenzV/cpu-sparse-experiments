@@ -87,7 +87,7 @@ impl Footprint {
 ///
 /// Keep in mind that it is possible to have multiple tiles with the same index,
 /// namely if we have multiple lines crossing the same 4x4 area!
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tile {
     /// The index of the tile in the x direction.
     pub x: i32,
@@ -527,6 +527,10 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
         PackedPoint::new(0, 0),
         PackedPoint::new(0, 0),
     );
+}
+
+pub fn sort_tiles(tile_buf: &mut [Tile]) {
+    tile_buf.sort_unstable_by(Tile::cmp);
 }
 
 #[cfg(test)]
