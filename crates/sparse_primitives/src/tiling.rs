@@ -425,7 +425,10 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
             push_tile(x, y, last_packed, packed1);
         } else {
-            // General case (i.e. more than one tile covered in both directions.
+            // General case (i.e. more than one tile covered in both directions. We perform DDA
+            // to "walk" along the path and find out which tiles are intersected by the line
+            // and at which positions.
+
             let recip_dx = 1.0 / (s1.x - s0.x);
             let sign_x = (s1.x - s0.x).signum();
             let recip_dy = 1.0 / (s1.y - s0.y);
@@ -433,6 +436,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
             // t parameter for next intersection with a vertical grid line
             let mut t_clipx = (x - s0.x) * recip_dx;
+
             let xclip = if sign_x > 0.0 {
                 t_clipx += recip_dx;
                 scale_up(1.0)
@@ -449,6 +453,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 0
             };
 
+            // x and y coordinates of the target tile.
             let x1 = x + (tile_count_x - 1) as f32 * sign_x;
             let y1 = y + (tile_count_y - 1) as f32 * sign_y;
             let mut xi = x;
