@@ -101,15 +101,6 @@ impl Tile {
         Self { x, y, p0, p1 }
     }
 
-    pub fn new_u16(x: u16, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
-        Self {
-            x: x as i32,
-            y,
-            p0,
-            p1,
-        }
-    }
-
     pub(crate) fn loc(&self) -> Loc {
         Loc {
             x: self.x,
