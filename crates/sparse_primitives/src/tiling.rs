@@ -90,10 +90,9 @@ impl Footprint {
 #[derive(Debug, Clone)]
 pub struct Tile {
     /// The index of the tile in the x direction.
-    pub x: i32,
-    /// The index of the tile in the y direction. See the comment in `Loc` for why
-    /// we can use u16 here.
-    pub y: u16,
+    x: u16,
+    /// The index of the tile in the y direction.
+    y: u16,
     /// The start point of the line in that tile.
     pub p0: PackedPoint,
     /// The end point of the line in that tile.
@@ -102,12 +101,25 @@ pub struct Tile {
 
 impl Tile {
     pub fn new(x: i32, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
+        // As mentioned in the comment in `Loc`, for the x position we need to be
+        // able to store negative numbers. Because of this, we basically offset all numbers by
+        // 1, assigning negative numbers to 0 x + 1 to all others. This way, we can still
+        // sort them efficiently by packing x and y into a u32.
+        let x = (x + 1).max(0) as u16;
         Self { x, y, p0, p1 }
+    }
+
+    pub fn x(&self) -> i32 {
+        self.x as i32 - 1
+    }
+
+    pub fn y(&self) -> u16 {
+        self.y
     }
 
     pub(crate) fn loc(&self) -> Loc {
         Loc {
-            x: self.x,
+            x: self.x(),
             y: self.y,
         }
     }
@@ -128,9 +140,11 @@ impl Tile {
         (self.p1.packed_y() == 0) as i32 - (self.p0.packed_y() == 0) as i32
     }
 
-    // TODO: Verify that this is efficient.
     pub(crate) fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
-        (self.y, self.x).cmp(&(b.y, b.x))
+        // Note(raph): Verified in godbolt that this is efficient.
+        let xya = ((self.y as u32) << 16) + (self.x as u32);
+        let xyb = ((b.y as u32) << 16) + (b.x as u32);
+        xya.cmp(&xyb)
     }
 }
 
@@ -288,12 +302,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
     let mut push_tile = |x: f32, y: f32, p0: PackedPoint, p1: PackedPoint| {
         if y >= 0.0 {
-            tile_buf.push(Tile {
-                x: x as i32,
-                y: y as u16,
-                p0,
-                p1,
-            });
+            tile_buf.push(Tile::new(x as i32, y as u16, p0, p1));
         }
     };
 

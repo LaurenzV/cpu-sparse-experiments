@@ -167,8 +167,8 @@ fn render_strips_scalar(
 
             if strip_start {
                 let strip = Strip {
-                    x: 4 * prev_tile.x + x0 as i32,
-                    y: 4 * prev_tile.y as u32,
+                    x: 4 * prev_tile.x() + x0 as i32,
+                    y: 4 * prev_tile.y() as u32,
                     col: cols,
                     winding: start_delta,
                 };
