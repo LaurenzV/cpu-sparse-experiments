@@ -35,6 +35,3 @@ criterion = { version = "0.4", features = ["html_reports"] }
 # so we keep this for now.
 [profile.release]
 debug = true
-
-[patch.crates-io]
-kurbo = { path = "../kurbo"}
