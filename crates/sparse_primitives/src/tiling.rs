@@ -374,7 +374,9 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 for i in 0..tile_count_y - 1 {
                     // Calculate the next x intersection point.
                     let xclip = xclip0 + i as f32 * sign * inv_slope;
-                    // TODO: Is the `.max(1)` really needed? (Same for all other cases)
+                    // The .max(1) is necessary to indicate that the point actually crosses the
+                    // edge instead of ending at it. Perhaps we can figure out a different way
+                    // to represent this.
                     let xfrac = scale_up(xclip).max(1);
                     let packed = PackedPoint::new(xfrac, yclip);
 
