@@ -133,8 +133,8 @@ impl Tile {
     }
 
     pub(crate) fn footprint(&self) -> Footprint {
-        let x0 = self.p0.unpacked_x();
-        let x1 = self.p1.unpacked_x();
+        let x0 = self.p0().unpacked_x();
+        let x1 = self.p1().unpacked_x();
         let x_min = x0.min(x1).floor();
         let x_max = x0.max(x1).ceil();
         // On CPU, might be better to do this as fixed point
@@ -145,7 +145,7 @@ impl Tile {
     }
 
     pub(crate) fn delta(&self) -> i32 {
-        (self.p1.packed_y() == 0) as i32 - (self.p0.packed_y() == 0) as i32
+        (self.p1().packed_y() == 0) as i32 - (self.p0().packed_y() == 0) as i32
     }
 
     pub(crate) fn cmp(&self, b: &Tile) -> std::cmp::Ordering {
