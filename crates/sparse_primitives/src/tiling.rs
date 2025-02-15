@@ -321,6 +321,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
 
         let mut y = s0.y.floor();
         if s0.y == y && s1.y < y {
+            // Since the end point of the line is above the start point,
             // s0.y is conceptually on bottom of the previous tile instead of at the top
             // of the current tile, so we need to adjust the y location.
             y -= 1.0;
@@ -329,13 +330,14 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
         let xfrac0 = scale_up(s0.x - x);
         let yfrac0 = scale_up(s0.y - y);
         let packed0 = PackedPoint::new(xfrac0, yfrac0);
-        // These could be replaced with <2 and the max(1.0) in span removed
+
         if tile_count_x == 1 {
             let xfrac1 = scale_up(s1.x - x);
+
             if tile_count_y == 1 {
                 let yfrac1 = scale_up(s1.y - y);
 
-                // 1x1 tile
+                // A 1x1 tile.
                 push_tile(
                     x,
                     y,
@@ -343,34 +345,52 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     PackedPoint::new(xfrac1, yfrac1),
                 );
             } else {
-                // vertical column
-                let slope = (s1.x - s0.x) / (s1.y - s0.y);
+                // A vertical column.
+                let inv_slope = (s1.x - s0.x) / (s1.y - s0.y);
                 let sign = (s1.y - s0.y).signum();
-                let mut xclip0 = (s0.x - x) + (y - s0.y) * slope;
+
+                // For downward lines, xclip0 and yclip store the x and y intersection points
+                // at the bottom side of the current tile. For upward lines, they store the in
+                // intersection points at the top side of the current tile.
+                let mut xclip0 = (s0.x - x) + (y - s0.y) * inv_slope;
+                // We handled the case of a 1x1 tile before, so in this case the line will
+                // definitely cross the tile either at the top or bottom, and thus yclip is
+                // either 0 or 1.
                 let yclip = if sign > 0.0 {
-                    xclip0 += slope;
+                    // If the line goes downward, instead store where the line would intersect
+                    // the first tile at the bottom
+                    xclip0 += inv_slope;
                     scale_up(1.0)
                 } else {
+                    // Otherwise, the line goes up, and thus will intersect the top side of the
+                    // tile.
                     0
                 };
+
                 let mut last_packed = packed0;
+                // For the first tile, as well as all subsequent tiles that are intersected
+                // at the top and bottom, calculate the x intersection points and push the
+                // corresponding tiles.
                 for i in 0..tile_count_y - 1 {
-                    let xclip = xclip0 + i as f32 * sign * slope;
+                    // Calculate the next x intersection point.
+                    let xclip = xclip0 + i as f32 * sign * inv_slope;
+                    // TODO: Is the `.max(1)` really needed?
                     let xfrac = scale_up(xclip).max(1);
                     let packed = PackedPoint::new(xfrac, yclip);
-                    push_tile(x, y + i as f32 * sign, last_packed, packed);
-                    // flip y between top and bottom of tile
+
+                    push_tile(x, y, last_packed, packed);
+
+                    // Flip y between top and bottom of tile (i.e. from TILE_HEIGHT
+                    // to 0 or 0 to TILE_HEIGHT).
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
+                    y += sign;
                 }
-                let yfrac1 = scale_up(s1.y - (y + (tile_count_y - 1) as f32 * sign));
+
+                // Push the last tile, which might be at a fractional y offset.
+                let yfrac1 = scale_up(s1.y - y);
                 let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-                push_tile(
-                    x,
-                    y + (tile_count_y - 1) as f32 * sign,
-                    last_packed,
-                    packed1,
-                );
+                push_tile(x, y, last_packed, packed1);
             }
         } else if tile_count_y == 1 {
             // horizontal row
