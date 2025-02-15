@@ -471,7 +471,15 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             let mut yi = y;
             let mut last_packed = packed0;
 
-            while xi != x1 || yi != y1 {
+            loop {
+                // See issue 46 for why we don't just use an inequality check.
+                let x_cond = if sign_x > 0.0 { xi >= x1 } else { xi <= x1 };
+                let y_cond = if sign_y > 0.0 { yi >= y1 } else { yi <= y1 };
+
+                if x_cond && y_cond {
+                    break;
+                }
+
                 if t_clipy < t_clipx {
                     // Intersected with a horizontal grid line.
                     let x_intersect = s0.x + (s1.x - s0.x) * t_clipy - xi;
@@ -661,8 +669,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    // TODO: Fix this
     fn issue_46_infinite_loop() {
         let mut line = FlatLine {
             p0: Point { x: 22.0, y: 552.0 },
