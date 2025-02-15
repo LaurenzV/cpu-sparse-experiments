@@ -1,10 +1,10 @@
+use criterion::measurement::WallTime;
+use criterion::{BenchmarkGroup, Criterion};
+use peniko::kurbo::{Affine, BezPath, Stroke};
+use sparse_primitives::tiling::{make_tiles, sort_tiles, FlatLine};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use criterion::{BenchmarkGroup, Criterion};
-use criterion::measurement::WallTime;
-use peniko::kurbo::{Affine, BezPath, Stroke};
-use sparse_primitives::tiling::{make_tiles, sort_tiles, FlatLine};
 
 pub(crate) fn flattened_from_file(name: &str) -> Vec<Vec<FlatLine>> {
     let fills_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -34,7 +34,12 @@ pub(crate) fn flattened_from_file(name: &str) -> Vec<Vec<FlatLine>> {
         let mut temp_buf = vec![];
         // Obviously not 100% accurate since the stroke width isn't always the same, but good
         // enough for benching purposes.
-        sparse_primitives::flatten::stroke(&path, &Stroke::new(3.0), Affine::IDENTITY, &mut temp_buf);
+        sparse_primitives::flatten::stroke(
+            &path,
+            &Stroke::new(3.0),
+            Affine::IDENTITY,
+            &mut temp_buf,
+        );
         buf.push(temp_buf);
     }
 
@@ -51,11 +56,13 @@ pub fn sorting(c: &mut Criterion) {
 
 fn ghostscript_tiger(g: &mut BenchmarkGroup<WallTime>) {
     let mut tiles = flattened_from_file("gs_tiger")
-        .iter().map(|i| {
-        let mut tiles = vec![];
-        make_tiles(i, &mut tiles);
-        tiles
-    }).collect::<Vec<_>>();
+        .iter()
+        .map(|i| {
+            let mut tiles = vec![];
+            make_tiles(i, &mut tiles);
+            tiles
+        })
+        .collect::<Vec<_>>();
 
     g.bench_with_input("ghostscript tiger", &mut tiles.clone(), |b, i| {
         b.iter(|| {
@@ -69,11 +76,13 @@ fn ghostscript_tiger(g: &mut BenchmarkGroup<WallTime>) {
 
 fn coat_of_arms(g: &mut BenchmarkGroup<WallTime>) {
     let mut tiles = flattened_from_file("coat_of_arms")
-        .iter().map(|i| {
-        let mut tiles = vec![];
-        make_tiles(i, &mut tiles);
-        tiles
-    }).collect::<Vec<_>>();
+        .iter()
+        .map(|i| {
+            let mut tiles = vec![];
+            make_tiles(i, &mut tiles);
+            tiles
+        })
+        .collect::<Vec<_>>();
 
     g.bench_with_input("coat of arms", &mut tiles.clone(), |b, i| {
         b.iter(|| {
