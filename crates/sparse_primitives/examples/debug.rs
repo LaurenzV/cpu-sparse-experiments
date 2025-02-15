@@ -119,14 +119,14 @@ fn draw_tile_areas(document: &mut Document, tiles: &[Tile]) {
 
     for tile in tiles {
         // Draw the points
-        let x = tile.x * TILE_WIDTH as i32;
-        let y = tile.y * TILE_HEIGHT as u16;
+        let x = tile.x() * TILE_WIDTH as i32;
+        let y = tile.y() * TILE_HEIGHT as u16;
 
         if seen.contains(&(x, y)) {
             continue;
         }
 
-        let color = if tile.x == 95 && tile.y == 86 {
+        let color = if tile.x() == 95 && tile.y() == 86 {
             "red"
         } else {
             "darkblue"
@@ -223,8 +223,8 @@ fn draw_strips(document: &mut Document, strips: &[Strip], alphas: &[u32]) {
 fn draw_tile_intersections(document: &mut Document, tiles: &[Tile]) {
     for tile in tiles {
         // Draw the points
-        let x = tile.x * TILE_WIDTH as i32;
-        let y = tile.y * TILE_HEIGHT as u16;
+        let x = tile.x() * TILE_WIDTH as i32;
+        let y = tile.y() * TILE_HEIGHT as u16;
 
         let p0 = tile.p0.unpack();
         let p1 = tile.p1.unpack();
