@@ -57,6 +57,10 @@ impl Footprint {
         Footprint((1 << end) - (1 << start))
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
     /// The start point of the covered range (inclusive).
     pub(crate) fn x0(&self) -> u32 {
         self.0.trailing_zeros()
@@ -306,7 +310,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
         // position. But we might need it again in the future if we change the logic.
         let mut x = s0.x.floor();
         if s0.x == x && s1.x < x {
-            // s0.x is on right side of first tile
+            // s0.x is on right side of first tile.
             x -= 1.0;
         }
 
@@ -423,27 +427,30 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
         } else {
             // General case (i.e. more than one tile covered in both directions.
             let recip_dx = 1.0 / (s1.x - s0.x);
-            let signx = (s1.x - s0.x).signum();
+            let sign_x = (s1.x - s0.x).signum();
             let recip_dy = 1.0 / (s1.y - s0.y);
-            let signy = (s1.y - s0.y).signum();
+            let sign_y = (s1.y - s0.y).signum();
+
             // t parameter for next intersection with a vertical grid line
             let mut t_clipx = (x - s0.x) * recip_dx;
-            let xclip = if signx > 0.0 {
+            let xclip = if sign_x > 0.0 {
                 t_clipx += recip_dx;
                 scale_up(1.0)
             } else {
                 0
             };
+
             // t parameter for next intersection with a horizontal grid line
             let mut t_clipy = (y - s0.y) * recip_dy;
-            let yclip = if signy > 0.0 {
+            let yclip = if sign_y > 0.0 {
                 t_clipy += recip_dy;
                 scale_up(1.0)
             } else {
                 0
             };
-            let x1 = x + (tile_count_x - 1) as f32 * signx;
-            let y1 = y + (tile_count_y - 1) as f32 * signy;
+
+            let x1 = x + (tile_count_x - 1) as f32 * sign_x;
+            let y1 = y + (tile_count_y - 1) as f32 * sign_y;
             let mut xi = x;
             let mut yi = y;
             let mut last_packed = packed0;
@@ -458,7 +465,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let packed = PackedPoint::new(xfrac, yclip);
                     push_tile(xi, yi, last_packed, packed);
                     t_clipy += recip_dy.abs();
-                    yi += signy;
+                    yi += sign_y;
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
                 } else {
                     // intersected with vertical grid line
@@ -467,7 +474,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let packed = PackedPoint::new(xclip, yfrac);
                     push_tile(xi, yi, last_packed, packed);
                     t_clipx += recip_dx.abs();
-                    xi += signx;
+                    xi += sign_x;
                     last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
                 }
             }
@@ -578,9 +585,8 @@ mod tests {
         assert_eq!(fp3.x1(), 10);
     }
 
-    // TODO: Is this the correct behavior?
     #[test]
-    fn footprint_at_edge() {
+    fn footprint_at_tile_edge() {
         let tile = Tile {
             x: 0,
             y: 0,
@@ -588,13 +594,13 @@ mod tests {
             p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
         };
 
-        assert_eq!(tile.footprint().0, 0);
+        assert!(tile.footprint().is_empty());
     }
 
     #[test]
     #[ignore]
     // TODO: Fix this
-    fn infinite_loop() {
+    fn issue_46_infinite_loop() {
         let mut line = FlatLine {
             p0: Point { x: 22.0, y: 552.0 },
             p1: Point { x: 224.0, y: 388.0 },
