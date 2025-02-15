@@ -9,6 +9,10 @@ zune-png = { workspace = true }
 usvg = { workspace = true }
 resvg = { workspace = true }
 
+[[bench]]
+name = "main"
+harness = false
+
 [dev-dependencies]
 oxipng = { workspace = true }
 png = { workspace = true }
@@ -19,6 +23,7 @@ tiny-skia = { workspace = true }
 bench_gen = { workspace = true }
 svg = { workspace = true }
 rand = { workspace = true }
+criterion = { workspace = true }
 
 [features]
 simd = []

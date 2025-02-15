@@ -28,9 +28,13 @@ once_cell = "1.20.2"
 roxmltree = "0.20.0"
 image = "0.25.5"
 tiny-skia = {version = "0.11.4", features = ["png", "simd"]}
+criterion = { version = "0.4", features = ["html_reports"] }
 
 # Cargo warns that this is unnecessary, but for some reason if I remove this
 # and run an example from sparse_primitives the names still seem to disappear, so
 # so we keep this for now.
 [profile.release]
 debug = true
+
+[patch.crates-io]
+kurbo = { path = "../kurbo"}
