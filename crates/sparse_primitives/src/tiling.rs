@@ -94,9 +94,9 @@ pub struct Tile {
     /// The index of the tile in the y direction.
     y: u16,
     /// The start point of the line in that tile.
-    pub p0: PackedPoint,
+    p0: PackedPoint,
     /// The end point of the line in that tile.
-    pub p1: PackedPoint,
+    p1: PackedPoint,
 }
 
 impl Tile {
@@ -115,6 +115,14 @@ impl Tile {
 
     pub fn y(&self) -> u16 {
         self.y
+    }
+
+    pub fn p0(&self) -> PackedPoint {
+        self.p0
+    }
+
+    pub fn p1(&self) -> PackedPoint {
+        self.p1
     }
 
     pub(crate) fn loc(&self) -> Loc {
@@ -628,54 +636,54 @@ mod tests {
 
     #[test]
     fn footprint_at_tile_edge() {
-        let tile = Tile {
-            x: 0,
-            y: 0,
-            p0: PackedPoint::new(scale_up(1.0), scale_up(0.0)),
-            p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
-        };
+        let tile = Tile::new(
+            0,
+            0,
+            PackedPoint::new(scale_up(1.0), scale_up(0.0)),
+            PackedPoint::new(scale_up(1.0), scale_up(1.0)),
+        );
 
         assert!(tile.footprint().is_empty());
     }
 
     #[test]
     fn footprints_in_tile() {
-        let tile = Tile {
-            x: 0,
-            y: 0,
-            p0: PackedPoint::new(scale_up(0.5), scale_up(0.0)),
-            p1: PackedPoint::new(scale_up(0.55), scale_up(1.0)),
-        };
+        let tile = Tile::new(
+            0,
+            0,
+            PackedPoint::new(scale_up(0.5), scale_up(0.0)),
+            PackedPoint::new(scale_up(0.55), scale_up(1.0)),
+        );
 
         assert_eq!(tile.footprint().x0(), 2);
         assert_eq!(tile.footprint().x1(), 3);
 
-        let tile = Tile {
-            x: 0,
-            y: 0,
-            p0: PackedPoint::new(scale_up(0.1), scale_up(0.0)),
-            p1: PackedPoint::new(scale_up(0.6), scale_up(1.0)),
-        };
+        let tile = Tile::new(
+            0,
+            0,
+            PackedPoint::new(scale_up(0.1), scale_up(0.0)),
+            PackedPoint::new(scale_up(0.6), scale_up(1.0)),
+        );
 
         assert_eq!(tile.footprint().x0(), 0);
         assert_eq!(tile.footprint().x1(), 3);
 
-        let tile = Tile {
-            x: 0,
-            y: 0,
-            p0: PackedPoint::new(scale_up(0.0), scale_up(0.0)),
-            p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
-        };
+        let tile = Tile::new(
+            0,
+            0,
+            PackedPoint::new(scale_up(0.0), scale_up(0.0)),
+            PackedPoint::new(scale_up(1.0), scale_up(1.0)),
+        );
 
         assert_eq!(tile.footprint().x0(), 0);
         assert_eq!(tile.footprint().x1(), 4);
 
-        let tile = Tile {
-            x: 0,
-            y: 0,
-            p0: PackedPoint::new(scale_up(0.74), scale_up(0.0)),
-            p1: PackedPoint::new(scale_up(1.76), scale_up(1.0)),
-        };
+        let tile = Tile::new(
+            0,
+            0,
+            PackedPoint::new(scale_up(0.74), scale_up(0.0)),
+            PackedPoint::new(scale_up(1.76), scale_up(1.0)),
+        );
 
         assert_eq!(tile.footprint().x0(), 2);
         assert_eq!(tile.footprint().x1(), 4);
