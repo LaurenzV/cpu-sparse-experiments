@@ -362,6 +362,10 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 // For the first tile, as well as all subsequent tiles that are intersected
                 // at the top and bottom, calculate the x intersection points and push the
                 // corresponding tiles.
+
+                // Note: This could perhaps be SIMD-optimized, but initial experiments suggest
+                // that in the vast majority of cases the number of tiles is between 0-5, so
+                // it's probably not really worth it.
                 for i in 0..tile_count_y - 1 {
                     // Calculate the next x intersection point.
                     let xclip = xclip0 + i as f32 * sign * inv_slope;
@@ -384,9 +388,12 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 push_tile(x, y, last_packed, packed1);
             }
         } else if tile_count_y == 1 {
-            // horizontal row
+            // A horizontal row.
+            // Same explanations apply as above, but instead in the horizontal direction.
+
             let slope = (s1.y - s0.y) / (s1.x - s0.x);
             let sign = (s1.x - s0.x).signum();
+
             let mut yclip0 = (s0.y - y) + (x - s0.x) * slope;
             let xclip = if sign > 0.0 {
                 yclip0 += slope;
@@ -394,27 +401,27 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
             } else {
                 0
             };
+
             let mut last_packed = packed0;
+
             for i in 0..tile_count_x - 1 {
                 let yclip = yclip0 + i as f32 * sign * slope;
+                // TODO: Is the `.max(1)` really needed?
                 let yfrac = scale_up(yclip).max(1);
                 let packed = PackedPoint::new(xclip, yfrac);
-                push_tile(x + i as f32 * sign, y, last_packed, packed);
-                // flip x between left and right of tile
+                push_tile(x, y, last_packed, packed);
                 last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
+
+                x += sign
             }
-            let xfrac1 = scale_up(s1.x - (x + (tile_count_x - 1) as f32 * sign));
+
+            let xfrac1 = scale_up(s1.x - x);
             let yfrac1 = scale_up(s1.y - y);
             let packed1 = PackedPoint::new(xfrac1, yfrac1);
 
-            push_tile(
-                x + (tile_count_x - 1) as f32 * sign,
-                y,
-                last_packed,
-                packed1,
-            );
+            push_tile(x, y, last_packed, packed1);
         } else {
-            // general case
+            // General case (i.e. more than one tile covered in both directions.
             let recip_dx = 1.0 / (s1.x - s0.x);
             let signx = (s1.x - s0.x).signum();
             let recip_dy = 1.0 / (s1.y - s0.y);
