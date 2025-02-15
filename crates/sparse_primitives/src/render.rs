@@ -7,7 +7,7 @@
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
 use crate::strip::render_strips;
-use crate::tiling::{Point, Tile};
+use crate::tiling::{Point, Tile, Tiler};
 use crate::{
     fine::Fine,
     strip::{self, Strip},
@@ -35,7 +35,7 @@ pub struct RenderContext {
     /// These are all scratch buffers, to be used for path rendering. They're here solely
     /// so the allocations can be reused.
     pub line_buf: Vec<FlatLine>,
-    pub tile_buf: Vec<Tile>,
+    pub tiler: Tiler,
     pub strip_buf: Vec<Strip>,
     #[cfg(feature = "simd")]
     use_simd: bool,
@@ -58,7 +58,7 @@ impl RenderContext {
 
         let alphas = vec![];
         let line_buf = vec![];
-        let tile_buf = vec![];
+        let tiler = Tiler::new();
         let strip_buf = vec![];
         Self {
             width,
@@ -66,7 +66,7 @@ impl RenderContext {
             tiles,
             alphas,
             line_buf,
-            tile_buf,
+            tiler,
             strip_buf,
             #[cfg(feature = "simd")]
             use_simd: option_env!("SIMD").is_some(),
@@ -111,11 +111,11 @@ impl RenderContext {
             // Path is actually a rectangle, so used fast path for rectangles.
             self.render_filled_rect(&rect, paint);
         } else {
-            tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
-            self.tile_buf.sort_unstable_by(Tile::cmp);
+            self.tiler.make_tiles(&self.line_buf);
+            self.tiler.sort_tiles();
 
             render_strips(
-                &self.tile_buf,
+                &self.tiler,
                 &mut self.strip_buf,
                 &mut self.alphas,
                 fill_rule,

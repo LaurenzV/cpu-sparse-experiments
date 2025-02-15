@@ -11,7 +11,7 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::tiling::{Footprint, PackedPoint, Tile, TILE_WIDTH};
+use crate::tiling::{Footprint, PackedPoint, Tile, Tiler, TILE_WIDTH};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
 
@@ -25,7 +25,7 @@ pub struct Strip {
 
 #[inline(never)]
 pub fn render_strips(
-    tiles: &[Tile],
+    tiler: &Tiler,
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
     fill_rule: FillRule,
@@ -33,18 +33,18 @@ pub fn render_strips(
 ) {
     #[cfg(feature = "simd")]
     if use_simd {
-        #[cfg(target_arch = "aarch64")]
-        if std::arch::is_aarch64_feature_detected!("neon") {
-            // SAFETY: We checked that the target feature `neon` is available.
-            return unsafe { neon::render_strips(tiles, strip_buf, alpha_buf) };
-        }
+        // #[cfg(target_arch = "aarch64")]
+        // if std::arch::is_aarch64_feature_detected!("neon") {
+        //     // SAFETY: We checked that the target feature `neon` is available.
+        //     return unsafe { neon::render_strips(tiles, strip_buf, alpha_buf) };
+        // }
     }
 
-    render_strips_scalar(tiles, strip_buf, alpha_buf, fill_rule);
+    render_strips_scalar(tiler, strip_buf, alpha_buf, fill_rule);
 }
 
 fn render_strips_scalar(
-    tiles: &[Tile],
+    tiler: &Tiler,
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
     fill_rule: FillRule,
@@ -53,15 +53,15 @@ fn render_strips_scalar(
 
     let mut strip_start = true;
     let mut cols = alpha_buf.len() as u32;
-    let mut prev_tile = &tiles[0];
+    let mut prev_tile = tiler.get_tile(0);
     let mut fp = prev_tile.footprint();
     let mut seg_start = 0;
     let mut delta = 0;
 
     // Note: the input should contain a sentinel tile, to avoid having
     // logic here to process the final strip.
-    for i in 1..tiles.len() {
-        let tile = &tiles[i];
+    for i in 1..tiler.len() {
+        let tile = tiler.get_tile(i);
 
         if prev_tile.loc() != tile.loc() {
             let start_delta = delta;
@@ -75,7 +75,9 @@ fn render_strips_scalar(
             let x1 = fp.x1();
             let mut areas = [[start_delta as f32; 4]; 4];
 
-            for tile in &tiles[seg_start..i] {
+            for j in seg_start..i {
+                let tile = tiler.get_tile(j);
+
                 delta += tile.delta();
 
                 let p0 = tile.p0().unpack();
