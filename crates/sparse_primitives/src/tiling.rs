@@ -9,6 +9,7 @@ pub const TILE_HEIGHT: u32 = 4;
 const TILE_SCALE_X: f32 = 1.0 / TILE_WIDTH as f32;
 const TILE_SCALE_Y: f32 = 1.0 / TILE_HEIGHT as f32;
 
+#[derive(Clone)]
 pub struct Tiler {
     tile_buf: Vec<Tile>,
     tile_index_buf: Vec<TileIndex>
@@ -402,6 +403,7 @@ impl Footprint {
     }
 }
 
+#[derive(Clone)]
 struct TileIndex {
     yx: u32,
     index: u32
