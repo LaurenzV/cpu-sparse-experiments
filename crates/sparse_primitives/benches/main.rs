@@ -1,5 +1,5 @@
-mod tiling;
 mod sorting;
+mod tiling;
 
 use criterion::{criterion_group, criterion_main};
 
