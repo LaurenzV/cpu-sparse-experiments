@@ -415,7 +415,9 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                 let yclip = yclip0 + i as f32 * sign * slope;
                 let yfrac = scale_up(yclip).max(1);
                 let packed = PackedPoint::new(xclip, yfrac);
+
                 push_tile(x, y, last_packed, packed);
+
                 last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
 
                 x += sign
@@ -477,7 +479,7 @@ pub fn make_tiles(lines: &[FlatLine], tile_buf: &mut Vec<Tile>) {
                     let packed = PackedPoint::new(xfrac, yclip);
 
                     push_tile(xi, yi, last_packed, packed);
-                    // TODO: Why abs?
+
                     t_clipy += recip_dy.abs();
                     yi += sign_y;
                     last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
@@ -613,6 +615,49 @@ mod tests {
         };
 
         assert!(tile.footprint().is_empty());
+    }
+
+    #[test]
+    fn footprints_in_tile() {
+        let tile = Tile {
+            x: 0,
+            y: 0,
+            p0: PackedPoint::new(scale_up(0.5), scale_up(0.0)),
+            p1: PackedPoint::new(scale_up(0.55), scale_up(1.0)),
+        };
+
+        assert_eq!(tile.footprint().x0(), 2);
+        assert_eq!(tile.footprint().x1(), 3);
+
+        let tile = Tile {
+            x: 0,
+            y: 0,
+            p0: PackedPoint::new(scale_up(0.1), scale_up(0.0)),
+            p1: PackedPoint::new(scale_up(0.6), scale_up(1.0)),
+        };
+
+        assert_eq!(tile.footprint().x0(), 0);
+        assert_eq!(tile.footprint().x1(), 3);
+
+        let tile = Tile {
+            x: 0,
+            y: 0,
+            p0: PackedPoint::new(scale_up(0.0), scale_up(0.0)),
+            p1: PackedPoint::new(scale_up(1.0), scale_up(1.0)),
+        };
+
+        assert_eq!(tile.footprint().x0(), 0);
+        assert_eq!(tile.footprint().x1(), 4);
+
+        let tile = Tile {
+            x: 0,
+            y: 0,
+            p0: PackedPoint::new(scale_up(0.74), scale_up(0.0)),
+            p1: PackedPoint::new(scale_up(1.76), scale_up(1.0)),
+        };
+
+        assert_eq!(tile.footprint().x0(), 2);
+        assert_eq!(tile.footprint().x1(), 4);
     }
 
     #[test]
