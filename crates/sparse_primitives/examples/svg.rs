@@ -2,17 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use std::io::BufWriter;
-use std::str::FromStr;
 
-use peniko::color::{palette, AlphaColor, Srgb};
-use peniko::kurbo::{Affine, BezPath, Point, Shape, Size, Stroke, Vec2};
-use peniko::{BrushRef, Color};
-use roxmltree::Document;
-use sparse_primitives::render::Path;
 use sparse_primitives::svg::{render_tree, SVGContext};
 use sparse_primitives::{Pixmap, RenderContext};
-use usvg::tiny_skia_path::PathSegment;
-use usvg::{Node, Paint};
 
 pub fn main() {
     let scale = 1.0;

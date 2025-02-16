@@ -1,9 +1,8 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use oxipng::{InFile, OutFile};
-use peniko::color::palette::css::{BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED};
-use peniko::color::{palette, AlphaColor};
-use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke, DEFAULT_ACCURACY};
-use sparse_primitives::{FillRule, Pixmap, RenderContext};
+use peniko::color::palette;
+use peniko::color::palette::css::{BLUE, GREEN, MAROON, REBECCA_PURPLE, RED};
+use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
+use sparse_primitives::FillRule;
 use std::f64::consts::PI;
 
 mod util;

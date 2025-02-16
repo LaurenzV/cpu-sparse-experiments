@@ -1,5 +1,5 @@
-use tiny_skia::{Color, FillRule, Pixmap};
-use usvg::{Node, Paint, PaintOrder, Transform};
+use tiny_skia::Pixmap;
+use usvg::Transform;
 
 fn main() {
     let scale = 1.0;

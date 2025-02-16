@@ -1,6 +1,5 @@
-use peniko::color::{AlphaColor, Rgba8, Srgb};
+use peniko::color::{AlphaColor, Srgb};
 use peniko::kurbo::{Affine, BezPath, Point, Rect, RoundedRectRadii, Shape};
-use rand::prelude::ThreadRng;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::f64::consts::PI;
@@ -43,7 +42,7 @@ pub struct Params {
 pub enum Command {
     FillRect(Rect, AlphaColor<Srgb>),
     StrokeRect(Rect, AlphaColor<Srgb>),
-    FillPath(BezPath, AlphaColor<Srgb>),
+    FillPath(BezPath, AlphaColor<Srgb>, bool),
     StrokePath(BezPath, AlphaColor<Srgb>),
 }
 
@@ -104,13 +103,14 @@ impl Iterator for RectIterator {
                     Some(Command::FillPath(
                         affine * rect.to_rounded_rect(radius).to_path(0.1),
                         color,
+                        true,
                     ))
                 }
             } else {
                 if self.params.stroke {
                     Some(Command::StrokePath(affine * rect.to_path(0.1), color))
                 } else {
-                    Some(Command::FillPath(affine * rect.to_path(0.1), color))
+                    Some(Command::FillPath(affine * rect.to_path(0.1), color, true))
                 }
             }
         } else {
@@ -124,6 +124,7 @@ impl Iterator for RectIterator {
                     Some(Command::FillPath(
                         rect.to_rounded_rect(radius).to_path(0.1),
                         color,
+                        true,
                     ))
                 }
             } else {
@@ -161,8 +162,8 @@ impl Iterator for PolyIterator {
     fn next(&mut self) -> Option<Self::Item> {
         let size = self.params.size;
 
-        let mut x = self.rng.random_range(0..=(self.params.width - size)) as f64;
-        let mut y = self.rng.random_range(0..=(self.params.height - size)) as f64;
+        let x = self.rng.random_range(0..=(self.params.width - size)) as f64;
+        let y = self.rng.random_range(0..=(self.params.height - size)) as f64;
 
         let mut path = BezPath::new();
         let mut move_to = false;
@@ -186,7 +187,7 @@ impl Iterator for PolyIterator {
         if self.params.stroke {
             Some(Command::StrokePath(path.into(), color))
         } else {
-            Some(Command::FillPath(path.into(), color))
+            Some(Command::FillPath(path.into(), color, self.nz))
         }
     }
 }

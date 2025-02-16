@@ -29,9 +29,9 @@ impl Pixmap {
         let mut decoded = decoder.decode().ok()?.u8()?;
 
         for pixel in decoded.chunks_exact_mut(4) {
-            pixel[0] = pixel[0] * pixel[3];
-            pixel[1] = pixel[1] * pixel[3];
-            pixel[2] = pixel[2] * pixel[3];
+            pixel[0] *= pixel[3];
+            pixel[1] *= pixel[3];
+            pixel[2] *= pixel[3];
         }
 
         Some(Self {

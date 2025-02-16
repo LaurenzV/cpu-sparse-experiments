@@ -1,4 +1,4 @@
-use bench_gen::{Command, Params, PolyIterator, RectIterator, RectType};
+use bench_gen::{Command, Params, PolyIterator};
 use peniko::kurbo::{Cap, Join, Stroke};
 use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
@@ -12,7 +12,7 @@ const STROKE_WIDTH: f64 = 2.0;
 fn main() {
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
 
-    for size in [8, 16, 32, 64, 128, 256].repeat(1) {
+    for size in [8, 16, 32, 64, 128, 256] {
         ctx.reset();
 
         let params = Params {
@@ -56,14 +56,19 @@ fn write_pixmap(pixmap: &mut Pixmap, size: usize) {
 fn run_cmd(ctx: &mut RenderContext, cmd: &Command) {
     match cmd {
         Command::FillRect(r, c) => {
-            ctx.fill_rect(&r, (*c).into());
+            ctx.fill_rect(r, (*c).into());
         }
         Command::StrokeRect(r, c) => {
             let stroke = stroke();
-            ctx.stroke_rect(&r, &stroke, (*c).into());
+            ctx.stroke_rect(r, &stroke, (*c).into());
         }
-        Command::FillPath(p, c) => {
-            ctx.fill_path(&p.clone().into(), FillRule::NonZero, (*c).into());
+        Command::FillPath(p, c, nz) => {
+            let fill_rule = if *nz {
+                FillRule::NonZero
+            } else {
+                FillRule::EvenOdd
+            };
+            ctx.fill_path(&p.clone().into(), fill_rule, (*c).into());
         }
         Command::StrokePath(p, c) => {
             let stroke = stroke();

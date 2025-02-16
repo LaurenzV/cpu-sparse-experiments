@@ -1,9 +1,8 @@
 use peniko::color::palette;
-use peniko::kurbo::{Affine, BezPath, Stroke};
-use rand::Rng;
+use peniko::kurbo::{Affine, BezPath};
 use sparse_primitives::paint::Paint;
 use sparse_primitives::strip::Strip;
-use sparse_primitives::tiling::{FlatLine, Point, Tile, Tiles, TILE_SIZE};
+use sparse_primitives::tiling::{FlatLine, Tiles, TILE_SIZE};
 use sparse_primitives::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
 use sparse_primitives::{FillRule, RenderContext};
 use std::collections::HashSet;
@@ -171,7 +170,7 @@ fn draw_strips(document: &mut Document, strips: &[Strip], alphas: &[u32]) {
             .set("x", x)
             .set("y", y * STRIP_HEIGHT as u32)
             .set("width", width)
-            .set("height", 1 * STRIP_HEIGHT)
+            .set("height", STRIP_HEIGHT)
             .set("stroke", color)
             .set("fill", color)
             .set("fill-opacity", 0.4)
