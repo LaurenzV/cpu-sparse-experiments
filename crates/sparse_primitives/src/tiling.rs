@@ -136,11 +136,11 @@ impl Tiler {
                         // If the line goes downward, instead store where the line would intersect
                         // the first tile at the bottom
                         xclip0 += inv_slope;
-                        (scale_up(1.0), -1.0)
+                        (scale_up(1.0), scale_up(-1.0))
                     } else {
                         // Otherwise, the line goes up, and thus will intersect the top side of the
                         // tile.
-                        (0.0, 1.0)
+                        (0.0, scale_up(1.0))
                     };
 
                     let mut last_packed = packed0;
@@ -157,7 +157,7 @@ impl Tiler {
                         // The .max(1) is necessary to indicate that the point actually crosses the
                         // edge instead of ending at it. Perhaps we can figure out a different way
                         // to represent this.
-                        let xfrac = scale_up(xclip).max(1.0);
+                        let xfrac = scale_up(xclip).max(0.0000001);
                         let packed = Point::new(xfrac, yclip);
 
                         push_tile(x, y, last_packed, packed);
@@ -184,9 +184,9 @@ impl Tiler {
                 let mut yclip0 = (s0.y - y) + (x - s0.x) * slope;
                 let (xclip, flip) = if sign > 0.0 {
                     yclip0 += slope;
-                    (scale_up(1.0), -1.0)
+                    (scale_up(1.0), scale_up(-1.0))
                 } else {
-                    (0.0, 1.0)
+                    (0.0, scale_up(1.0))
                 };
 
                 let mut last_packed = packed0;
@@ -227,9 +227,9 @@ impl Tiler {
                 // on the left side.
                 let (xclip, flip_x) = if sign_x > 0.0 {
                     t_clipx += recip_dx;
-                    (scale_up(1.0), -1.0)
+                    (scale_up(1.0), scale_up(-1.0))
                 } else {
-                    (0.0, 1.0)
+                    (0.0, scale_up(1.0))
                 };
 
                 // How much we advance at each intersection with a horizontal grid line.
@@ -239,9 +239,9 @@ impl Tiler {
                 // "vertical column" case.
                 let (yclip, flip_y) = if sign_y > 0.0 {
                     t_clipy += recip_dy;
-                    (scale_up(1.0), -1.0)
+                    (scale_up(1.0), scale_up(-1.0))
                 } else {
-                    (0.0, 1.0)
+                    (0.0, scale_up(1.0))
                 };
 
                 // x and y coordinates of the target tile.
@@ -281,7 +281,7 @@ impl Tiler {
 
                         t_clipx += recip_dx.abs();
                         xi += sign_x;
-                        last_packed = Point::new(packed.x, packed.y + flip_x);
+                        last_packed = Point::new(packed.x + flip_x, packed.y);
                     }
                 }
 
@@ -572,7 +572,7 @@ const TILE_SCALE: f32 = 8192.0;
 // scale factor relative to unit square in tile
 const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
 
-fn scale_up(z: f32) -> f32 {
+const fn scale_up(z: f32) -> f32 {
     z * 4.0
     // ((z * FRAC_TILE_SCALE) + 0.5) as u16
 }
