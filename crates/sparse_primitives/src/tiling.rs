@@ -40,7 +40,6 @@ impl Tiler {
 
     pub fn sort_tiles(&mut self) {
         self.sorted = true;
-        eprintln!("{:#?}", self.tile_buf);
         self.tile_index_buf.sort_unstable_by(TileIndex::cmp);
     }
 
