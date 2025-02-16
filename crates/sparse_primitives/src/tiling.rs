@@ -6,8 +6,10 @@
 use std::fmt::{Debug, Formatter};
 
 pub const TILE_SIZE: u32 = 4;
+
 const TILE_SCALE: f32 = TILE_SIZE as f32;
 const INV_TILE_SCALE: f32 = 1.0 / TILE_SIZE as f32;
+const NUDGE_FACTOR: f32 = 0.0000001;
 
 /// Handles the tiling of paths.
 #[derive(Clone, Debug)]
@@ -38,6 +40,7 @@ impl Tiler {
 
     pub fn sort_tiles(&mut self) {
         self.sorted = true;
+        eprintln!("{:#?}", self.tile_buf);
         self.tile_index_buf.sort_unstable_by(TileIndex::cmp);
     }
 
@@ -147,7 +150,7 @@ impl Tiler {
                     } else {
                         // Otherwise, the line goes up, and thus will intersect the top side of the
                         // tile.
-                        (0.0, scale_up(1.0))
+                        (scale_up(0.0), scale_up(1.0))
                     };
 
                     let mut last_packed = packed0;
@@ -164,7 +167,7 @@ impl Tiler {
                         // The .max(1) is necessary to indicate that the point actually crosses the
                         // edge instead of ending at it. Perhaps we can figure out a different way
                         // to represent this.
-                        let xfrac = scale_up(xclip).max(0.0000001);
+                        let xfrac = scale_up(xclip).max(NUDGE_FACTOR);
                         let packed = Point::new(xfrac, yclip);
 
                         push_tile(x, y, last_packed, packed);
@@ -193,7 +196,7 @@ impl Tiler {
                     yclip0 += slope;
                     (scale_up(1.0), scale_up(-1.0))
                 } else {
-                    (0.0, scale_up(1.0))
+                    (scale_up(0.0), scale_up(1.0))
                 };
 
                 let mut last_packed = packed0;
@@ -236,7 +239,7 @@ impl Tiler {
                     t_clipx += recip_dx;
                     (scale_up(1.0), scale_up(-1.0))
                 } else {
-                    (0.0, scale_up(1.0))
+                    (scale_up(0.0), scale_up(1.0))
                 };
 
                 // How much we advance at each intersection with a horizontal grid line.
@@ -248,7 +251,7 @@ impl Tiler {
                     t_clipy += recip_dy;
                     (scale_up(1.0), scale_up(-1.0))
                 } else {
-                    (0.0, scale_up(1.0))
+                    (scale_up(0.0), scale_up(1.0))
                 };
 
                 // x and y coordinates of the target tile.
@@ -270,7 +273,7 @@ impl Tiler {
                     if t_clipy < t_clipx {
                         // Intersected with a horizontal grid line.
                         let x_intersect = s0.x + (s1.x - s0.x) * t_clipy - xi;
-                        let xfrac = scale_up(x_intersect).max(0.0000001); // maybe should clamp?
+                        let xfrac = scale_up(x_intersect).max(NUDGE_FACTOR);
                         let packed = Point::new(xfrac, yclip);
 
                         push_tile(xi, yi, last_packed, packed);
@@ -281,7 +284,7 @@ impl Tiler {
                     } else {
                         // Intersected with vertical grid line.
                         let y_intersect = s0.y + (s1.y - s0.y) * t_clipx - yi;
-                        let yfrac = scale_up(y_intersect).max(0.0000001); // maybe should clamp?
+                        let yfrac = scale_up(y_intersect).max(NUDGE_FACTOR);
                         let packed = Point::new(xclip, yfrac);
 
                         push_tile(xi, yi, last_packed, packed);
