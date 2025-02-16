@@ -94,8 +94,8 @@ impl Tiler {
 
         for line in lines {
             // Points scaled to the tile unit square.
-            let s0 = nudge_point(line.p0 * INV_TILE_SCALE);
-            let s1 = nudge_point(line.p1 * INV_TILE_SCALE);
+            let s0 = nudge_point(scale_down(line.p0));
+            let s1 = nudge_point(scale_down(line.p1));
 
             // Count how many tiles are covered on each axis.
             let tile_count_x = spanned_tiles(s0.x, s1.x);
@@ -132,7 +132,6 @@ impl Tiler {
                 } else {
                     // A vertical column.
                     let inv_slope = (s1.x - s0.x) / (s1.y - s0.y);
-                    // TODO: Get rid of the sign by changing direction of line?
                     let sign = (s1.y - s0.y).signum();
 
                     // For downward lines, xclip0 and yclip store the x and y intersection points
@@ -543,8 +542,8 @@ const fn scale_up(z: f32) -> f32 {
     z * 4.0
 }
 
-const fn scale_down(z: u16) -> f32 {
-    z as f32 * INV_TILE_SCALE
+fn scale_down(z: Point) -> Point {
+    z * INV_TILE_SCALE
 }
 
 #[cfg(test)]
