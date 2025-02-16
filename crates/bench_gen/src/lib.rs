@@ -103,7 +103,7 @@ impl Iterator for RectIterator {
                     Some(Command::FillPath(
                         affine * rect.to_rounded_rect(radius).to_path(0.1),
                         color,
-                        true
+                        true,
                     ))
                 }
             } else {
@@ -124,7 +124,7 @@ impl Iterator for RectIterator {
                     Some(Command::FillPath(
                         rect.to_rounded_rect(radius).to_path(0.1),
                         color,
-                        true
+                        true,
                     ))
                 }
             } else {
