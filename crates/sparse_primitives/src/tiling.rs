@@ -46,7 +46,7 @@ impl Tiler {
         // Calculate how many tiles are covered between two positions. p0 and p1 are scaled
         // to the tile unit square.
         let spanned_tiles =
-            |p0: f32, p1: f32| -> u32 { (p0.max(p1).ceil() - p0.min(p1).floor()).max(0.0000001) as u32 };
+            |p0: f32, p1: f32| -> u32 { (p0.max(p1).ceil() - p0.min(p1).floor()).max(1.0) as u32 };
 
         let nudge_point = |p: Point| -> Point {
             // Lines that cross vertical tile boundaries need special treatment during
