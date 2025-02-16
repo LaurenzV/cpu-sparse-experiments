@@ -9,7 +9,7 @@ pub const TILE_HEIGHT: u32 = 4;
 const TILE_SCALE_X: f32 = 1.0 / TILE_WIDTH as f32;
 const TILE_SCALE_Y: f32 = 1.0 / TILE_HEIGHT as f32;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Tiler {
     tile_buf: Vec<Tile>,
     tile_index_buf: Vec<TileIndex>
@@ -384,25 +384,29 @@ impl Footprint {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct TileIndex {
-    yx: u32,
+    x: u16,
+    y: u16,
     index: u32
 }
 
 impl TileIndex {
     pub fn from_tile(index: u32, tile: &Tile) -> Self {
-        let x = (tile.x + 1).max(0) as u32;
-        let y = tile.y as u32;
+        let x = (tile.x + 1).max(0) as u16;
+        let y = tile.y;
 
         Self {
-            yx: (y << 16) | x,
+            x,
+            y,
             index,
         }
     }
 
     pub(crate) fn cmp(&self, b: &TileIndex) -> std::cmp::Ordering {
-        self.yx.cmp(&b.yx)
+        let xya = ((self.y as u32) << 16) + (self.x as u32);
+        let xyb = ((b.y as u32) << 16) + (b.x as u32);
+        xya.cmp(&xyb)
     }
 
     pub fn index(&self) -> usize {
@@ -429,11 +433,10 @@ pub struct Tile {
 
 impl Tile {
     pub fn new(x: i32, y: u16, p0: Point, p1: Point) -> Self {
-        // As mentioned in the comment in `Loc`, for the x position we need to be
-        // able to store negative numbers. Because of this, we basically offset all numbers by
-        // 1, assigning negative numbers to 0 x + 1 to all others. This way, we can still
-        // sort them efficiently by packing x and y into a u32.
-        Self { x, y, p0, p1 }
+        Self {
+            // We don't need to store the exact negative location, just that it is negative,
+            // so that the winding number calculation is correct.
+            x: x.max(-1), y, p0, p1 }
     }
 
     pub fn x(&self) -> i32 {
