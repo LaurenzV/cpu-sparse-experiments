@@ -7,7 +7,7 @@
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
 use crate::strip::render_strips;
-use crate::tiling::{Point, Tile};
+use crate::tiling::{Point, Tile, Tiles};
 use crate::{
     fine::Fine,
     strip::{self, Strip},
@@ -29,13 +29,13 @@ pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
 pub struct RenderContext {
     pub width: usize,
     pub height: usize,
-    pub tiles: Vec<WideTile>,
+    pub wide_tiles: Vec<WideTile>,
     pub alphas: Vec<u32>,
 
     /// These are all scratch buffers, to be used for path rendering. They're here solely
     /// so the allocations can be reused.
     pub line_buf: Vec<FlatLine>,
-    pub tile_buf: Vec<Tile>,
+    pub tiles: Tiles,
     pub strip_buf: Vec<Strip>,
     #[cfg(feature = "simd")]
     use_simd: bool,
@@ -48,25 +48,25 @@ impl RenderContext {
     pub fn new(width: usize, height: usize) -> Self {
         let width_tiles = (width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
         let height_tiles = (height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
-        let mut tiles = Vec::with_capacity(width_tiles * height_tiles);
+        let mut wide_tiles = Vec::with_capacity(width_tiles * height_tiles);
 
         for w in 0..width_tiles {
             for h in 0..height_tiles {
-                tiles.push(WideTile::new(w * WIDE_TILE_WIDTH, h * STRIP_HEIGHT));
+                wide_tiles.push(WideTile::new(w * WIDE_TILE_WIDTH, h * STRIP_HEIGHT));
             }
         }
 
         let alphas = vec![];
         let line_buf = vec![];
-        let tile_buf = vec![];
+        let tiles = Tiles::new();
         let strip_buf = vec![];
         Self {
             width,
             height,
-            tiles,
+            wide_tiles,
             alphas,
             line_buf,
-            tile_buf,
+            tiles,
             strip_buf,
             #[cfg(feature = "simd")]
             use_simd: option_env!("SIMD").is_some(),
@@ -76,7 +76,7 @@ impl RenderContext {
 
     /// Reset the current render context.
     pub fn reset(&mut self) {
-        for tile in &mut self.tiles {
+        for tile in &mut self.wide_tiles {
             tile.bg = AlphaColor::TRANSPARENT;
             tile.cmds.clear();
         }
@@ -96,7 +96,7 @@ impl RenderContext {
         let height_tiles = (self.height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
         for y in 0..height_tiles {
             for x in 0..width_tiles {
-                let tile = &self.tiles[y * width_tiles + x];
+                let tile = &self.wide_tiles[y * width_tiles + x];
                 fine.clear(tile.bg.premultiply().to_rgba8().to_u8_array());
                 for cmd in &tile.cmds {
                     fine.run_cmd(cmd, &self.alphas);
@@ -111,11 +111,11 @@ impl RenderContext {
             // Path is actually a rectangle, so used fast path for rectangles.
             self.render_filled_rect(&rect, paint);
         } else {
-            tiling::make_tiles(&self.line_buf, &mut self.tile_buf);
-            self.tile_buf.sort_unstable_by(Tile::cmp);
+            self.tiles.make_tiles(&self.line_buf);
+            self.tiles.sort_tiles();
 
             render_strips(
-                &self.tile_buf,
+                &self.tiles,
                 &mut self.strip_buf,
                 &mut self.alphas,
                 fill_rule,
@@ -184,7 +184,7 @@ impl RenderContext {
                 };
                 x += width;
                 col += width;
-                self.tiles[row_start + xtile].push(Cmd::Strip(cmd));
+                self.wide_tiles[row_start + xtile].push(Cmd::Strip(cmd));
             }
 
             if fill_rule.active_fill(next_strip.winding)
@@ -200,7 +200,7 @@ impl RenderContext {
                     let x_tile_rel = x % WIDE_TILE_WIDTH as u32;
                     let width = x2.min(((xtile + 1) * WIDE_TILE_WIDTH) as u32) - x;
                     x += width;
-                    self.tiles[row_start + xtile].fill(x_tile_rel, width, paint.clone());
+                    self.wide_tiles[row_start + xtile].fill(x_tile_rel, width, paint.clone());
                 }
             }
         }

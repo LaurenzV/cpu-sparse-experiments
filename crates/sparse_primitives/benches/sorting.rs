@@ -1,7 +1,7 @@
 use criterion::measurement::WallTime;
-use criterion::{BenchmarkGroup, Criterion};
+use criterion::{BatchSize, BenchmarkGroup, Criterion};
 use peniko::kurbo::{Affine, BezPath, Stroke};
-use sparse_primitives::tiling::{make_tiles, sort_tiles, FlatLine};
+use sparse_primitives::tiling::{FlatLine, Tiles};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -58,38 +58,46 @@ fn ghostscript_tiger(g: &mut BenchmarkGroup<WallTime>) {
     let mut tiles = flattened_from_file("gs_tiger")
         .iter()
         .map(|i| {
-            let mut tiles = vec![];
-            make_tiles(i, &mut tiles);
+            let mut tiles = Tiles::new();
+            tiles.make_tiles(i);
+
             tiles
         })
         .collect::<Vec<_>>();
 
     g.bench_with_input("ghostscript tiger", &mut tiles.clone(), |b, i| {
-        b.iter(|| {
-            let mut input = i.clone();
-            for buf in &mut input {
-                sort_tiles(buf);
-            }
-        })
+        b.iter_batched_ref(
+            || i.clone(),
+            |input| {
+                for buf in input {
+                    buf.sort_tiles();
+                }
+            },
+            BatchSize::SmallInput,
+        )
     });
 }
 
 fn coat_of_arms(g: &mut BenchmarkGroup<WallTime>) {
-    let mut tiles = flattened_from_file("coat_of_arms")
+    let tiles = flattened_from_file("coat_of_arms")
         .iter()
         .map(|i| {
-            let mut tiles = vec![];
-            make_tiles(i, &mut tiles);
+            let mut tiles = Tiles::new();
+            tiles.make_tiles(i);
+
             tiles
         })
         .collect::<Vec<_>>();
 
-    g.bench_with_input("coat of arms", &mut tiles.clone(), |b, i| {
-        b.iter(|| {
-            let mut input = i.clone();
-            for buf in &mut input {
-                sort_tiles(buf);
-            }
-        })
+    g.bench_with_input("coat of arms", &tiles, |b, i| {
+        b.iter_batched_ref(
+            || i.clone(),
+            |input| {
+                for buf in input {
+                    buf.sort_tiles();
+                }
+            },
+            BatchSize::SmallInput,
+        )
     });
 }

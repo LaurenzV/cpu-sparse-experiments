@@ -11,7 +11,7 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::tiling::{Footprint, PackedPoint, Tile, TILE_WIDTH};
+use crate::tiling::{Footprint, Tiles};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
 
@@ -25,7 +25,7 @@ pub struct Strip {
 
 #[inline(never)]
 pub fn render_strips(
-    tiles: &[Tile],
+    tiles: &Tiles,
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
     fill_rule: FillRule,
@@ -44,7 +44,7 @@ pub fn render_strips(
 }
 
 fn render_strips_scalar(
-    tiles: &[Tile],
+    tiles: &Tiles,
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
     fill_rule: FillRule,
@@ -53,7 +53,7 @@ fn render_strips_scalar(
 
     let mut strip_start = true;
     let mut cols = alpha_buf.len() as u32;
-    let mut prev_tile = &tiles[0];
+    let mut prev_tile = tiles.get_tile(0);
     let mut fp = prev_tile.footprint();
     let mut seg_start = 0;
     let mut delta = 0;
@@ -61,7 +61,7 @@ fn render_strips_scalar(
     // Note: the input should contain a sentinel tile, to avoid having
     // logic here to process the final strip.
     for i in 1..tiles.len() {
-        let tile = &tiles[i];
+        let tile = tiles.get_tile(i);
 
         if prev_tile.loc() != tile.loc() {
             let start_delta = delta;
@@ -75,11 +75,13 @@ fn render_strips_scalar(
             let x1 = fp.x1();
             let mut areas = [[start_delta as f32; 4]; 4];
 
-            for tile in &tiles[seg_start..i] {
+            for j in seg_start..i {
+                let tile = tiles.get_tile(j);
+
                 delta += tile.delta();
 
-                let p0 = tile.p0.unpack();
-                let p1 = tile.p1.unpack();
+                let p0 = tile.p0();
+                let p1 = tile.p1();
                 let inv_slope = (p1.x - p0.x) / (p1.y - p0.y);
 
                 // Note: We are iterating in column-major order because the inner loop always
@@ -208,7 +210,7 @@ impl Strip {
 
     pub fn strip_y(&self) -> u32 {
         // TODO: Don't convert?
-        self.y as u32 / STRIP_HEIGHT as u32
+        self.y / STRIP_HEIGHT as u32
     }
 }
 
@@ -217,11 +219,11 @@ mod neon {
     use std::arch::aarch64::*;
 
     use crate::strip::Strip;
-    use crate::tiling::Tile;
+    use crate::tiling::{Tile, Tiles};
 
     /// SAFETY: Caller must ensure that target feature `neon` is available.
     pub unsafe fn render_strips(
-        tiles: &[Tile],
+        tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
     ) {
@@ -232,16 +234,16 @@ mod neon {
 
             let mut strip_start = true;
             let mut cols = alpha_buf.len() as u32;
-            let mut prev_tile = &tiles[0];
+            let mut prev_tile = tiles.get_tile(0);
             let mut fp = prev_tile.footprint().0;
             let mut seg_start = 0;
             let mut delta = 0;
             // Note: the input should contain a sentinel tile, to avoid having
             // logic here to process the final strip.
             const IOTA: [f32; 4] = [0.0, 1.0, 2.0, 3.0];
-            let iota = vld1q_f32(IOTA.as_ptr() as *const f32);
+            let iota = vld1q_f32(IOTA.as_ptr());
             for i in 1..tiles.len() {
-                let tile = &tiles[i];
+                let tile = tiles.get_tile(i);
                 if prev_tile.loc() != tile.loc() {
                     let start_delta = delta;
                     let same_strip = prev_tile.loc().same_strip(&tile.loc());
@@ -251,11 +253,12 @@ mod neon {
                     let x0 = fp.trailing_zeros();
                     let x1 = 32 - fp.leading_zeros();
                     let mut areas = [[start_delta as f32; 4]; 4];
-                    for tile in &tiles[seg_start..i] {
+                    for j in seg_start..i {
+                        let tile = tiles.get_tile(j);
                         // small gain possible here to unpack in simd, but llvm goes halfway
                         delta += tile.delta();
-                        let p0 = tile.p0().unpack();
-                        let p1 = tile.p1().unpack();
+                        let p0 = tile.p0();
+                        let p1 = tile.p1();
                         let slope = (p1.x - p0.x) / (p1.y - p0.y);
                         let vstarty = vsubq_f32(vdupq_n_f32(p0.y), iota);
                         let vy0 = vminq_f32(vmaxq_f32(vstarty, vdupq_n_f32(0.0)), vdupq_n_f32(1.0));
@@ -310,7 +313,7 @@ mod neon {
                     if strip_start {
                         let strip = Strip {
                             x: 4 * prev_tile.x() + x0 as i32,
-                            y: 4 * prev_tile.y(),
+                            y: (4 * prev_tile.y()) as u32,
                             col: cols,
                             winding: start_delta,
                         };

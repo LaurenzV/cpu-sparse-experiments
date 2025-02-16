@@ -3,8 +3,7 @@ use peniko::kurbo::{Affine, BezPath, Stroke};
 use rand::Rng;
 use sparse_primitives::paint::Paint;
 use sparse_primitives::strip::Strip;
-use sparse_primitives::svg::{render_tree, SVGContext};
-use sparse_primitives::tiling::{FlatLine, Point, Tile, TILE_HEIGHT, TILE_WIDTH};
+use sparse_primitives::tiling::{FlatLine, Point, Tile, Tiles, TILE_SIZE};
 use sparse_primitives::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
 use sparse_primitives::{FillRule, RenderContext};
 use std::collections::HashSet;
@@ -12,8 +11,8 @@ use svg::node::element::path::Data;
 use svg::node::element::{Circle, Path, Rectangle};
 use svg::{Document, Node};
 
-const WIDTH: usize = 50;
-const HEIGHT: usize = 50;
+const WIDTH: usize = 15;
+const HEIGHT: usize = 8;
 
 fn main() {
     let mut document = Document::new().set("viewBox", (-10, -10, WIDTH + 20, HEIGHT + 20));
@@ -28,12 +27,12 @@ fn main() {
 
     draw_grid(&mut document);
     draw_line_segments(&mut document, &ctx.line_buf);
-    draw_tile_areas(&mut document, &ctx.tile_buf);
-    draw_tile_intersections(&mut document, &ctx.tile_buf);
+    draw_tile_areas(&mut document, &ctx.tiles);
+    draw_tile_intersections(&mut document, &ctx.tiles);
     draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
-    draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
+    draw_wide_tiles(&mut document, &ctx.wide_tiles, &ctx.alphas);
 
-    svg::save("target/out.svg", &document).unwrap();
+    svg::save("../../target/out.svg", &document).unwrap();
 }
 
 fn ctx() -> RenderContext {
@@ -41,10 +40,9 @@ fn ctx() -> RenderContext {
 
     let path = {
         let mut path = BezPath::new();
-        path.move_to((5.0, 0.0));
-        path.line_to((15.5, 12.5));
-        path.line_to((3.5, 23.0));
-        path.line_to((-7.5, 11.5));
+        path.move_to((4.0, 0.0));
+        path.line_to((11.0, 7.99));
+        path.line_to((-5.0, 7.99));
         path.close_path();
 
         path
@@ -114,13 +112,14 @@ fn draw_wide_tiles(document: &mut Document, wide_tiles: &[WideTile], alphas: &[u
     }
 }
 
-fn draw_tile_areas(document: &mut Document, tiles: &[Tile]) {
+fn draw_tile_areas(document: &mut Document, tiles: &Tiles) {
     let mut seen = HashSet::new();
 
-    for tile in tiles {
+    for i in 0..tiles.len() {
+        let tile = tiles.get_tile(i);
         // Draw the points
-        let x = tile.x() * TILE_WIDTH as i32;
-        let y = tile.y() * TILE_HEIGHT as u16;
+        let x = tile.x() * TILE_SIZE as i32;
+        let y = tile.y() * TILE_SIZE as u16;
 
         if seen.contains(&(x, y)) {
             continue;
@@ -135,8 +134,8 @@ fn draw_tile_areas(document: &mut Document, tiles: &[Tile]) {
         let rect = Rectangle::new()
             .set("x", x)
             .set("y", y)
-            .set("width", TILE_WIDTH)
-            .set("height", TILE_HEIGHT)
+            .set("width", TILE_SIZE)
+            .set("height", TILE_SIZE)
             .set("fill", color)
             .set("stroke", color)
             .set("stroke-opacity", 0.6)
@@ -220,14 +219,15 @@ fn draw_strips(document: &mut Document, strips: &[Strip], alphas: &[u32]) {
     }
 }
 
-fn draw_tile_intersections(document: &mut Document, tiles: &[Tile]) {
-    for tile in tiles {
+fn draw_tile_intersections(document: &mut Document, tiles: &Tiles) {
+    for i in 0..tiles.len() {
+        let tile = tiles.get_tile(i);
         // Draw the points
-        let x = tile.x() * TILE_WIDTH as i32;
-        let y = tile.y() * TILE_HEIGHT as u16;
+        let x = tile.x() * TILE_SIZE as i32;
+        let y = tile.y() * TILE_SIZE as u16;
 
-        let p0 = tile.p0.unpack();
-        let p1 = tile.p1.unpack();
+        let p0 = tile.p0();
+        let p1 = tile.p1();
         for p in [(p0, -0.05, "darkgreen"), (p1, 0.05, "purple")] {
             let circle = Circle::new()
                 .set("cx", x as f32 + p.0.x + p.1)
