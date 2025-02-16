@@ -57,7 +57,7 @@ impl<'a> Fine<'a> {
     #[inline(never)]
     pub(crate) fn pack(&mut self, x: usize, y: usize) {
         pack(
-            &mut self.out_buf,
+            self.out_buf,
             &self.scratch,
             self.width,
             self.height,

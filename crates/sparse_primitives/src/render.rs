@@ -46,8 +46,8 @@ pub struct RenderContext {
 impl RenderContext {
     /// Create a new render context.
     pub fn new(width: usize, height: usize) -> Self {
-        let width_tiles = (width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
-        let height_tiles = (height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
+        let width_tiles = width.div_ceil(WIDE_TILE_WIDTH);
+        let height_tiles = height.div_ceil(STRIP_HEIGHT);
         let mut wide_tiles = Vec::with_capacity(width_tiles * height_tiles);
 
         for w in 0..width_tiles {
@@ -92,8 +92,8 @@ impl RenderContext {
             self.use_simd,
         );
 
-        let width_tiles = (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
-        let height_tiles = (self.height + STRIP_HEIGHT - 1) / STRIP_HEIGHT;
+        let width_tiles = self.width.div_ceil(WIDE_TILE_WIDTH);
+        let height_tiles = self.height.div_ceil(STRIP_HEIGHT);
         for y in 0..height_tiles {
             for x in 0..width_tiles {
                 let tile = &self.wide_tiles[y * width_tiles + x];
@@ -128,7 +128,7 @@ impl RenderContext {
     }
 
     fn wide_tiles_per_row(&self) -> usize {
-        (self.width + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH
+        self.width.div_ceil(WIDE_TILE_WIDTH)
     }
 
     /// Generate the strip and fill commands for each wide tile using the current `strip_buf`.
@@ -158,7 +158,7 @@ impl RenderContext {
             // support viewport culling yet. However, when generating the commands
             // we only want to emit strips >= 0, so we calculate the adjustment
             // and then only include the alpha indices for columns where x >= 0.
-            let x0_adjustment = (strip.x()).min(0).abs() as u32;
+            let x0_adjustment = (strip.x()).min(0).unsigned_abs();
             let x0 = (strip.x() + x0_adjustment as i32) as u32;
             let y = strip.strip_y();
             let row_start = y as usize * width_tiles;
@@ -170,7 +170,7 @@ impl RenderContext {
             // It's possible that a strip extends into a new wide tile, but we don't actually
             // have as many wide tiles (e.g. because the pixmap width is only 512, but
             // strip ends at 513), so take the minimum between the rounded values and `width_tiles`.
-            let xtile1 = ((x1 as usize + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH).min(width_tiles);
+            let xtile1 = (x1 as usize).div_ceil(WIDE_TILE_WIDTH).min(width_tiles);
             let mut x = x0;
 
             for xtile in xtile0..xtile1 {
@@ -195,7 +195,7 @@ impl RenderContext {
                 x = x1;
                 let x2 = next_strip.x() as u32;
                 let fxt0 = x1 as usize / WIDE_TILE_WIDTH;
-                let fxt1 = (x2 as usize + WIDE_TILE_WIDTH - 1) / WIDE_TILE_WIDTH;
+                let fxt1 = (x2 as usize).div_ceil(WIDE_TILE_WIDTH);
                 for xtile in fxt0..fxt1 {
                     let x_tile_rel = x % WIDE_TILE_WIDTH as u32;
                     let width = x2.min(((xtile + 1) * WIDE_TILE_WIDTH) as u32) - x;
@@ -222,7 +222,7 @@ impl RenderContext {
 
     /// Pre-concatenate a new transform to the current transformation matrix.
     pub fn transform(&mut self, transform: Affine) {
-        self.transform = self.transform * transform;
+        self.transform *= transform;
     }
 
     /// Set the current transformation matrix.

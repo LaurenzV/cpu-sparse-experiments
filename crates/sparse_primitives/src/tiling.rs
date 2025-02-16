@@ -19,6 +19,12 @@ pub struct Tiles {
     sorted: bool,
 }
 
+impl Default for Tiles {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Tiles {
     pub fn new() -> Self {
         Self {

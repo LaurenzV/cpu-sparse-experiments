@@ -18,8 +18,6 @@ static DIFFS_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
     path
 });
 
-const RECT_TOLERANCE: f32 = 0.1;
-
 pub fn get_ctx(width: usize, height: usize, transparent: bool) -> RenderContext {
     let mut ctx = RenderContext::new(width, height);
     if !transparent {

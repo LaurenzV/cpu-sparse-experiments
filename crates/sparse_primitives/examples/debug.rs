@@ -170,7 +170,7 @@ fn draw_strips(document: &mut Document, strips: &[Strip], alphas: &[u32]) {
             .set("x", x)
             .set("y", y * STRIP_HEIGHT as u32)
             .set("width", width)
-            .set("height", 1 * STRIP_HEIGHT)
+            .set("height", STRIP_HEIGHT)
             .set("stroke", color)
             .set("fill", color)
             .set("fill-opacity", 0.4)

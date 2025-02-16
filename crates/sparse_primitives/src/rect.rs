@@ -108,7 +108,7 @@ impl RenderContext {
                 tile.fill(0, WIDE_TILE_WIDTH as u32, paint.clone());
             }
         } else {
-            self.strip_filled_rect(&rect);
+            self.strip_filled_rect(rect);
             self.generate_commands(FillRule::NonZero, paint);
         }
     }
@@ -200,7 +200,7 @@ impl RenderContext {
             // Strip the first column, which might have an additional alpha mask due to non-integer
             // alignment of x0.
             let col = alpha_buf.len() as u32;
-            alpha_buf.push(alpha(&alphas, left_alpha));
+            alpha_buf.push(alpha(alphas, left_alpha));
 
             // If the rect covers more than one pixel horizontally, fill all the remaining ones
             // except for the last one with the same opacity as in `alphas`.
@@ -208,12 +208,12 @@ impl RenderContext {
             // the alpha we pushed above is enough.
             if x_end - x_start >= 1 {
                 for _ in (x_start + 1)..x_end {
-                    alpha_buf.push(alpha(&alphas, 1.0));
+                    alpha_buf.push(alpha(alphas, 1.0));
                 }
 
                 // Fill the last, right column, which might also need an additional alpha mask
                 // due to non-integer alignment of x1.
-                alpha_buf.push(alpha(&alphas, right_alpha));
+                alpha_buf.push(alpha(alphas, right_alpha));
             }
 
             // Push the actual strip.

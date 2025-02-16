@@ -9,6 +9,12 @@ pub struct SVGContext {
     transforms: Vec<Affine>,
 }
 
+impl Default for SVGContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SVGContext {
     pub fn new() -> Self {
         Self {
