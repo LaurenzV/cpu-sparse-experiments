@@ -46,7 +46,7 @@ impl Tiler {
         // Calculate how many tiles are covered between two positions. p0 and p1 are scaled
         // to the tile unit square.
         let spanned_tiles =
-            |p0: f32, p1: f32| -> u32 { (p0.max(p1).ceil() - p0.min(p1).floor()).max(1.0) as u32 };
+            |p0: f32, p1: f32| -> u32 { (p0.max(p1).ceil() - p0.min(p1).floor()).max(0.0000001) as u32 };
 
         let nudge_point = |p: Point| -> Point {
             // Lines that cross vertical tile boundaries need special treatment during
@@ -132,15 +132,15 @@ impl Tiler {
                     // We handled the case of a 1x1 tile before, so in this case the line will
                     // definitely cross the tile either at the top or bottom, and thus yclip is
                     // either 0 or 1.
-                    let yclip = if sign > 0.0 {
+                    let (yclip, flip) = if sign > 0.0 {
                         // If the line goes downward, instead store where the line would intersect
                         // the first tile at the bottom
                         xclip0 += inv_slope;
-                        scale_up(1.0)
+                        (scale_up(1.0), -1.0)
                     } else {
                         // Otherwise, the line goes up, and thus will intersect the top side of the
                         // tile.
-                        0.0
+                        (0.0, 1.0)
                     };
 
                     let mut last_packed = packed0;
@@ -164,7 +164,7 @@ impl Tiler {
 
                         // Flip y between top and bottom of tile (i.e. from TILE_HEIGHT
                         // to 0 or 0 to TILE_HEIGHT).
-                        last_packed = Point::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
+                        last_packed = Point::new(packed.x, packed.y + flip);
                         y += sign;
                     }
 
@@ -182,25 +182,25 @@ impl Tiler {
                 let sign = (s1.x - s0.x).signum();
 
                 let mut yclip0 = (s0.y - y) + (x - s0.x) * slope;
-                let xclip = if sign > 0.0 {
+                let (xclip, flip) = if sign > 0.0 {
                     yclip0 += slope;
-                    scale_up(1.0)
+                    (scale_up(1.0), -1.0)
                 } else {
-                    0.0
+                    (0.0, 1.0)
                 };
 
                 let mut last_packed = packed0;
 
                 for i in 0..tile_count_x - 1 {
                     let yclip = yclip0 + i as f32 * sign * slope;
-                    let yfrac = scale_up(yclip).max(1.0);
+                    let yfrac = scale_up(yclip).max(0.0000001);
                     let packed = Point::new(xclip, yfrac);
 
                     push_tile(x, y, last_packed, packed);
 
-                    last_packed = Point::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
+                    last_packed = Point::new(packed.x + flip, packed.y);
 
-                    x += sign
+                    x += sign;
                 }
 
                 let xfrac1 = scale_up(s1.x - x);
@@ -225,11 +225,11 @@ impl Tiler {
                 // we will always intersect the tiles on the right side (except for perhaps the last
                 // tile, but this case is handled separately in the end). Otherwise, we always intersect
                 // on the left side.
-                let xclip = if sign_x > 0.0 {
+                let (xclip, flip_x) = if sign_x > 0.0 {
                     t_clipx += recip_dx;
-                    scale_up(1.0)
+                    (scale_up(1.0), -1.0)
                 } else {
-                    0.0
+                    (0.0, 1.0)
                 };
 
                 // How much we advance at each intersection with a horizontal grid line.
@@ -237,11 +237,11 @@ impl Tiler {
 
                 // Same as xclip, but for the vertical direction, analogously to the
                 // "vertical column" case.
-                let yclip = if sign_y > 0.0 {
+                let (yclip, flip_y) = if sign_y > 0.0 {
                     t_clipy += recip_dy;
-                    scale_up(1.0)
+                    (scale_up(1.0), -1.0)
                 } else {
-                    0.0
+                    (0.0, 1.0)
                 };
 
                 // x and y coordinates of the target tile.
@@ -263,25 +263,25 @@ impl Tiler {
                     if t_clipy < t_clipx {
                         // Intersected with a horizontal grid line.
                         let x_intersect = s0.x + (s1.x - s0.x) * t_clipy - xi;
-                        let xfrac = scale_up(x_intersect).max(1.0); // maybe should clamp?
+                        let xfrac = scale_up(x_intersect).max(0.0000001); // maybe should clamp?
                         let packed = Point::new(xfrac, yclip);
 
                         push_tile(xi, yi, last_packed, packed);
 
                         t_clipy += recip_dy.abs();
                         yi += sign_y;
-                        last_packed = Point::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
+                        last_packed = Point::new(packed.x, packed.y + flip_y);
                     } else {
                         // Intersected with vertical grid line.
                         let y_intersect = s0.y + (s1.y - s0.y) * t_clipx - yi;
-                        let yfrac = scale_up(y_intersect).max(1.0); // maybe should clamp?
+                        let yfrac = scale_up(y_intersect).max(0.0000001); // maybe should clamp?
                         let packed = Point::new(xclip, yfrac);
 
                         push_tile(xi, yi, last_packed, packed);
 
                         t_clipx += recip_dx.abs();
                         xi += sign_x;
-                        last_packed = Point::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
+                        last_packed = Point::new(packed.x, packed.y + flip_x);
                     }
                 }
 
@@ -573,7 +573,7 @@ const TILE_SCALE: f32 = 8192.0;
 const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
 
 fn scale_up(z: f32) -> f32 {
-    z
+    z * 4.0
     // ((z * FRAC_TILE_SCALE) + 0.5) as u16
 }
 
