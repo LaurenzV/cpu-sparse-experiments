@@ -1,9 +1,8 @@
 use peniko::color::palette;
-use peniko::kurbo::{Affine, BezPath, Stroke};
-use rand::Rng;
+use peniko::kurbo::{Affine, BezPath};
 use sparse_primitives::paint::Paint;
 use sparse_primitives::strip::Strip;
-use sparse_primitives::tiling::{FlatLine, Point, Tile, Tiles, TILE_SIZE};
+use sparse_primitives::tiling::{FlatLine, Tiles, TILE_SIZE};
 use sparse_primitives::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
 use sparse_primitives::{FillRule, RenderContext};
 use std::collections::HashSet;

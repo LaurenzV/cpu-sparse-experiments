@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use peniko::color::palette;
-use peniko::kurbo::{BezPath, Stroke};
+use peniko::kurbo::BezPath;
 use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
-use std::time::Instant;
 
 const WIDTH: usize = 64;
 const HEIGHT: usize = 64;

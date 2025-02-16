@@ -1,7 +1,7 @@
 //! Tile generation
 
 use criterion::measurement::WallTime;
-use criterion::{BenchmarkGroup, Criterion, SamplingMode};
+use criterion::{BenchmarkGroup, Criterion};
 use peniko::kurbo::{Affine, BezPath, Stroke};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
@@ -9,7 +9,7 @@ use sparse_primitives::flatten;
 use sparse_primitives::tiling::{FlatLine, Point, Tiles};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 const SEED: [u8; 32] = [0; 32];
 
@@ -108,10 +108,10 @@ fn read_from_file(name: &str) -> Vec<Vec<FlatLine>> {
 
 pub fn tiling(c: &mut Criterion) {
     let mut unit_group = c.benchmark_group("tiling_unit");
-    // single_tile(&mut unit_group);
-    // horizontal_column(&mut unit_group);
-    // vertical_column(&mut unit_group);
-    // general_case(&mut unit_group);
+    single_tile(&mut unit_group);
+    horizontal_column(&mut unit_group);
+    vertical_column(&mut unit_group);
+    general_case(&mut unit_group);
     unit_group.finish();
 
     let mut integration_group = c.benchmark_group("tiling_integration");

@@ -55,7 +55,7 @@ pub fn sorting(c: &mut Criterion) {
 }
 
 fn ghostscript_tiger(g: &mut BenchmarkGroup<WallTime>) {
-    let mut tiles = flattened_from_file("gs_tiger")
+    let tiles = flattened_from_file("gs_tiger")
         .iter()
         .map(|i| {
             let mut tiles = Tiles::new();

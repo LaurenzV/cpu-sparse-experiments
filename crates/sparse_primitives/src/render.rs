@@ -142,7 +142,7 @@ impl RenderContext {
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
 
-            if strip.x() >= self.width as i32 || strip.y() < 0 {
+            if strip.x() >= self.width as i32 {
                 // Don't render strips that are outside the viewport.
                 continue;
             }

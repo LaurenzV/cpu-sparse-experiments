@@ -3,12 +3,12 @@
 
 //! Tiling of paths.
 
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 
 pub const TILE_SIZE: u32 = 4;
 
 const TILE_SCALE: f32 = TILE_SIZE as f32;
-const INV_TILE_SCALE: f32 = 1.0 / TILE_SIZE as f32;
+const INV_TILE_SCALE: f32 = 1.0 / TILE_SCALE;
 const NUDGE_FACTOR: f32 = 0.0000001;
 
 /// Handles the tiling of paths.
@@ -339,10 +339,6 @@ impl Loc {
     pub(crate) fn same_row(&self, other: &Self) -> bool {
         self.y == other.y
     }
-
-    pub(crate) fn cmp(&self, b: &Loc) -> std::cmp::Ordering {
-        (self.y, self.x).cmp(&(b.y, b.x))
-    }
 }
 
 /// A footprint represents in a compact fashion the range of pixels covered by a tile.
@@ -363,10 +359,6 @@ impl Footprint {
     /// Create a new footprint from a single index, i.e. [start, end).
     pub(crate) fn from_range(start: u8, end: u8) -> Footprint {
         Footprint((1 << end) - (1 << start))
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.0 == 0
     }
 
     /// The start point of the covered range (inclusive).
@@ -546,6 +538,12 @@ fn scale_down(z: Point) -> Point {
 mod tests {
     use crate::tiling::{scale_up, FlatLine, Footprint, Point, Tile, Tiles};
 
+    impl Footprint {
+        pub(crate) fn is_empty(&self) -> bool {
+            self.0 == 0
+        }
+    }
+
     #[test]
     fn footprint_empty() {
         let fp1 = Footprint::empty();
@@ -683,7 +681,7 @@ mod tests {
 
     #[test]
     fn issue_46_infinite_loop() {
-        let mut line = FlatLine {
+        let line = FlatLine {
             p0: Point { x: 22.0, y: 552.0 },
             p1: Point { x: 224.0, y: 388.0 },
         };

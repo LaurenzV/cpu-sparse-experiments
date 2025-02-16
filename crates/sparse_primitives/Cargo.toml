@@ -27,6 +27,3 @@ criterion = { workspace = true }
 
 [features]
 simd = []
-
-[profile.release]
-debug = true

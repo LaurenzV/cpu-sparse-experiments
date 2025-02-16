@@ -133,7 +133,7 @@ fn fill_scalar(
                 (buf, buf[3])
             };
 
-            let mut colors = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+            let colors = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
                 .chunks_exact_mut(STRIP_HEIGHT_F32);
 
             if alpha == 255 {

@@ -199,7 +199,7 @@ impl RenderContext {
                                 strip_y: u32| {
             // Strip the first column, which might have an additional alpha mask due to non-integer
             // alignment of x0.
-            let mut col = alpha_buf.len() as u32;
+            let col = alpha_buf.len() as u32;
             alpha_buf.push(alpha(&alphas, left_alpha));
 
             // If the rect covers more than one pixel horizontally, fill all the remaining ones
