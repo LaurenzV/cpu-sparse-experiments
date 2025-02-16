@@ -121,61 +121,57 @@ pub fn tiling(c: &mut Criterion) {
     integration_group.finish();
 }
 
-// fn single_tile(g: &mut BenchmarkGroup<WallTime>) {
-//     let lines = LineIterator::new(IteratorType::SingleTile)
-//         .take(6000)
-//         .collect::<Vec<_>>();
-//
-//     g.bench_function("single tile", |b| {
-//         b.iter(|| {
-//             let mut v = vec![];
-//
-//             make_tiles(&lines, &mut v);
-//         })
-//     });
-// }
-//
-// fn horizontal_column(g: &mut BenchmarkGroup<WallTime>) {
-//     let lines = LineIterator::new(IteratorType::HorizontalColumn)
-//         .take(6000)
-//         .collect::<Vec<_>>();
-//
-//     g.bench_function("horizontal column", |b| {
-//         b.iter(|| {
-//             let mut v = vec![];
-//
-//             make_tiles(&lines, &mut v);
-//         })
-//     });
-// }
-//
-// fn vertical_column(g: &mut BenchmarkGroup<WallTime>) {
-//     let lines = LineIterator::new(IteratorType::VerticalColumn)
-//         .take(6000)
-//         .collect::<Vec<_>>();
-//
-//     g.bench_function("vertical column", |b| {
-//         b.iter(|| {
-//             let mut v = vec![];
-//
-//             make_tiles(&lines, &mut v);
-//         })
-//     });
-// }
-//
-// fn general_case(g: &mut BenchmarkGroup<WallTime>) {
-//     let lines = LineIterator::new(IteratorType::GeneralCase)
-//         .take(6000)
-//         .collect::<Vec<_>>();
-//
-//     g.bench_function("general case", |b| {
-//         b.iter(|| {
-//             let mut v = vec![];
-//
-//             make_tiles(&lines, &mut v);
-//         })
-//     });
-// }
+fn single_tile(g: &mut BenchmarkGroup<WallTime>) {
+    let lines = LineIterator::new(IteratorType::SingleTile)
+        .take(6000)
+        .collect::<Vec<_>>();
+
+    g.bench_function("single tile", |b| {
+        b.iter(|| {
+            let mut tiler = Tiler::new();
+            tiler.make_tiles(&lines);
+        })
+    });
+}
+
+fn horizontal_column(g: &mut BenchmarkGroup<WallTime>) {
+    let lines = LineIterator::new(IteratorType::HorizontalColumn)
+        .take(6000)
+        .collect::<Vec<_>>();
+
+    g.bench_function("horizontal column", |b| {
+        b.iter(|| {
+            let mut tiler = Tiler::new();
+            tiler.make_tiles(&lines);
+        })
+    });
+}
+
+fn vertical_column(g: &mut BenchmarkGroup<WallTime>) {
+    let lines = LineIterator::new(IteratorType::VerticalColumn)
+        .take(6000)
+        .collect::<Vec<_>>();
+
+    g.bench_function("vertical column", |b| {
+        b.iter(|| {
+            let mut tiler = Tiler::new();
+            tiler.make_tiles(&lines);
+        })
+    });
+}
+
+fn general_case(g: &mut BenchmarkGroup<WallTime>) {
+    let lines = LineIterator::new(IteratorType::GeneralCase)
+        .take(6000)
+        .collect::<Vec<_>>();
+
+    g.bench_function("general case", |b| {
+        b.iter(|| {
+            let mut tiler = Tiler::new();
+            tiler.make_tiles(&lines);
+        })
+    });
+}
 
 fn ghostscript_tiger(g: &mut BenchmarkGroup<WallTime>) {
     let lines = read_from_file("gs_tiger");
