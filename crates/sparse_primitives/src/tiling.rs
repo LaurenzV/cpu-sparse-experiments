@@ -48,25 +48,6 @@ impl Tiler {
         let spanned_tiles =
             |p0: f32, p1: f32| -> u32 { (p0.max(p1).ceil() - p0.min(p1).floor()).max(1.0) as u32 };
 
-        let round = |f: f32| -> f32 {
-            // Round to the same resolution as used by our u16 representation
-            // (see scale_up). This avoids discrepancies between the f32 and
-            // u16 values when checking for alignment with the tile grid.
-            //
-            // We round just the fractional part to avoid precision issues for large
-            // coordinates.)
-            let i = f.trunc();
-            let frac = f.fract();
-            i + (frac * FRAC_TILE_SCALE).round() / FRAC_TILE_SCALE
-        };
-
-        let round_point = |p: Point| -> Point {
-            Point {
-                x: round(p.x),
-                y: round(p.y),
-            }
-        };
-
         let nudge_point = |p: Point| -> Point {
             // Lines that cross vertical tile boundaries need special treatment during
             // anti-aliasing. This case is detected via tile-relative x == 0. However,
@@ -88,7 +69,7 @@ impl Tiler {
             }
         };
 
-        let mut push_tile = |x: f32, y: f32, p0: PackedPoint, p1: PackedPoint| {
+        let mut push_tile = |x: f32, y: f32, p0: Point, p1: Point| {
             if y >= 0.0 {
                 let tile = Tile::new(x as i32, y as u16, p0, p1);
                 self.tile_index_buf.push(TileIndex::from_tile(self.tile_buf.len() as u32, &tile));
@@ -98,8 +79,8 @@ impl Tiler {
 
         for line in lines {
             // Points scaled to the tile unit square.
-            let s0 = nudge_point(round_point(line.p0 * TILE_SCALE_X));
-            let s1 = nudge_point(round_point(line.p1 * TILE_SCALE_Y));
+            let s0 = nudge_point(line.p0 * TILE_SCALE_X);
+            let s1 = nudge_point(line.p1 * TILE_SCALE_Y);
 
             // Count how many tiles are covered on each axis.
             let tile_count_x = spanned_tiles(s0.x, s1.x);
@@ -123,7 +104,7 @@ impl Tiler {
 
             let xfrac0 = scale_up(s0.x - x);
             let yfrac0 = scale_up(s0.y - y);
-            let packed0 = PackedPoint::new(xfrac0, yfrac0);
+            let packed0 = Point::new(xfrac0, yfrac0);
 
             if tile_count_x == 1 {
                 let xfrac1 = scale_up(s1.x - x);
@@ -135,8 +116,8 @@ impl Tiler {
                     push_tile(
                         x,
                         y,
-                        PackedPoint::new(xfrac0, yfrac0),
-                        PackedPoint::new(xfrac1, yfrac1),
+                        Point::new(xfrac0, yfrac0),
+                        Point::new(xfrac1, yfrac1),
                     );
                 } else {
                     // A vertical column.
@@ -159,7 +140,7 @@ impl Tiler {
                     } else {
                         // Otherwise, the line goes up, and thus will intersect the top side of the
                         // tile.
-                        0
+                        0.0
                     };
 
                     let mut last_packed = packed0;
@@ -176,20 +157,20 @@ impl Tiler {
                         // The .max(1) is necessary to indicate that the point actually crosses the
                         // edge instead of ending at it. Perhaps we can figure out a different way
                         // to represent this.
-                        let xfrac = scale_up(xclip).max(1);
-                        let packed = PackedPoint::new(xfrac, yclip);
+                        let xfrac = scale_up(xclip).max(1.0);
+                        let packed = Point::new(xfrac, yclip);
 
                         push_tile(x, y, last_packed, packed);
 
                         // Flip y between top and bottom of tile (i.e. from TILE_HEIGHT
                         // to 0 or 0 to TILE_HEIGHT).
-                        last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
+                        last_packed = Point::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
                         y += sign;
                     }
 
                     // Push the last tile, which might be at a fractional y offset.
                     let yfrac1 = scale_up(s1.y - y);
-                    let packed1 = PackedPoint::new(xfrac1, yfrac1);
+                    let packed1 = Point::new(xfrac1, yfrac1);
 
                     push_tile(x, y, last_packed, packed1);
                 }
@@ -205,26 +186,26 @@ impl Tiler {
                     yclip0 += slope;
                     scale_up(1.0)
                 } else {
-                    0
+                    0.0
                 };
 
                 let mut last_packed = packed0;
 
                 for i in 0..tile_count_x - 1 {
                     let yclip = yclip0 + i as f32 * sign * slope;
-                    let yfrac = scale_up(yclip).max(1);
-                    let packed = PackedPoint::new(xclip, yfrac);
+                    let yfrac = scale_up(yclip).max(1.0);
+                    let packed = Point::new(xclip, yfrac);
 
                     push_tile(x, y, last_packed, packed);
 
-                    last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
+                    last_packed = Point::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
 
                     x += sign
                 }
 
                 let xfrac1 = scale_up(s1.x - x);
                 let yfrac1 = scale_up(s1.y - y);
-                let packed1 = PackedPoint::new(xfrac1, yfrac1);
+                let packed1 = Point::new(xfrac1, yfrac1);
 
                 push_tile(x, y, last_packed, packed1);
             } else {
@@ -248,7 +229,7 @@ impl Tiler {
                     t_clipx += recip_dx;
                     scale_up(1.0)
                 } else {
-                    0
+                    0.0
                 };
 
                 // How much we advance at each intersection with a horizontal grid line.
@@ -260,7 +241,7 @@ impl Tiler {
                     t_clipy += recip_dy;
                     scale_up(1.0)
                 } else {
-                    0
+                    0.0
                 };
 
                 // x and y coordinates of the target tile.
@@ -282,32 +263,32 @@ impl Tiler {
                     if t_clipy < t_clipx {
                         // Intersected with a horizontal grid line.
                         let x_intersect = s0.x + (s1.x - s0.x) * t_clipy - xi;
-                        let xfrac = scale_up(x_intersect).max(1); // maybe should clamp?
-                        let packed = PackedPoint::new(xfrac, yclip);
+                        let xfrac = scale_up(x_intersect).max(1.0); // maybe should clamp?
+                        let packed = Point::new(xfrac, yclip);
 
                         push_tile(xi, yi, last_packed, packed);
 
                         t_clipy += recip_dy.abs();
                         yi += sign_y;
-                        last_packed = PackedPoint::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
+                        last_packed = Point::new(packed.x, packed.y ^ FRAC_TILE_SCALE as u16);
                     } else {
                         // Intersected with vertical grid line.
                         let y_intersect = s0.y + (s1.y - s0.y) * t_clipx - yi;
-                        let yfrac = scale_up(y_intersect).max(1); // maybe should clamp?
-                        let packed = PackedPoint::new(xclip, yfrac);
+                        let yfrac = scale_up(y_intersect).max(1.0); // maybe should clamp?
+                        let packed = Point::new(xclip, yfrac);
 
                         push_tile(xi, yi, last_packed, packed);
 
                         t_clipx += recip_dx.abs();
                         xi += sign_x;
-                        last_packed = PackedPoint::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
+                        last_packed = Point::new(packed.x ^ FRAC_TILE_SCALE as u16, packed.y);
                     }
                 }
 
                 // The last tile, where the end point is possibly not at an integer coordinate.
                 let xfrac1 = scale_up(s1.x - xi);
                 let yfrac1 = scale_up(s1.y - yi);
-                let packed1 = PackedPoint::new(xfrac1, yfrac1);
+                let packed1 = Point::new(xfrac1, yfrac1);
 
                 push_tile(xi, yi, last_packed, packed1);
             }
@@ -317,14 +298,14 @@ impl Tiler {
         push_tile(
             0x3ffd as f32,
             0x3fff as f32,
-            PackedPoint::new(0, 0),
-            PackedPoint::new(0, 0),
+            Point::new(0.0, 0.0),
+            Point::new(0.0, 0.0),
         );
         push_tile(
             0x3fff as f32,
             0x3fff as f32,
-            PackedPoint::new(0, 0),
-            PackedPoint::new(0, 0),
+            Point::new(0.0, 0.0),
+            Point::new(0.0, 0.0),
         );
     }
 }
@@ -441,13 +422,13 @@ pub struct Tile {
     /// The index of the tile in the y direction.
     y: u16,
     /// The start point of the line in that tile.
-    p0: PackedPoint,
+    p0: Point,
     /// The end point of the line in that tile.
-    p1: PackedPoint,
+    p1: Point,
 }
 
 impl Tile {
-    pub fn new(x: i32, y: u16, p0: PackedPoint, p1: PackedPoint) -> Self {
+    pub fn new(x: i32, y: u16, p0: Point, p1: Point) -> Self {
         // As mentioned in the comment in `Loc`, for the x position we need to be
         // able to store negative numbers. Because of this, we basically offset all numbers by
         // 1, assigning negative numbers to 0 x + 1 to all others. This way, we can still
@@ -463,11 +444,11 @@ impl Tile {
         self.y
     }
 
-    pub fn p0(&self) -> PackedPoint {
+    pub fn p0(&self) -> Point {
         self.p0
     }
 
-    pub fn p1(&self) -> PackedPoint {
+    pub fn p1(&self) -> Point {
         self.p1
     }
 
@@ -479,8 +460,8 @@ impl Tile {
     }
 
     pub(crate) fn footprint(&self) -> Footprint {
-        let x0 = self.p0().unpacked_x();
-        let x1 = self.p1().unpacked_x();
+        let x0 = self.p0().x;
+        let x1 = self.p1().x;
         let x_min = x0.min(x1).floor();
         let x_max = x0.max(x1).ceil();
         // On CPU, might be better to do this as fixed point
@@ -491,7 +472,7 @@ impl Tile {
     }
 
     pub(crate) fn delta(&self) -> i32 {
-        (self.p1().packed_y() == 0) as i32 - (self.p0().packed_y() == 0) as i32
+        (self.p1().y == 0.0) as i32 - (self.p0().y == 0.0) as i32
     }
 }
 
@@ -591,8 +572,9 @@ const TILE_SCALE: f32 = 8192.0;
 // scale factor relative to unit square in tile
 const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
 
-fn scale_up(z: f32) -> u16 {
-    ((z * FRAC_TILE_SCALE) + 0.5) as u16
+fn scale_up(z: f32) -> f32 {
+    z
+    // ((z * FRAC_TILE_SCALE) + 0.5) as u16
 }
 
 fn scale_down(z: u16) -> f32 {

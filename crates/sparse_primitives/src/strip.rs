@@ -80,8 +80,8 @@ fn render_strips_scalar(
 
                 delta += tile.delta();
 
-                let p0 = tile.p0().unpack();
-                let p1 = tile.p1().unpack();
+                let p0 = tile.p0();
+                let p1 = tile.p1();
                 let inv_slope = (p1.x - p0.x) / (p1.y - p0.y);
 
                 // Note: We are iterating in column-major order because the inner loop always
