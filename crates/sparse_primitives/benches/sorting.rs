@@ -72,7 +72,9 @@ fn ghostscript_tiger(g: &mut BenchmarkGroup<WallTime>) {
                 for buf in input {
                     buf.sort_tiles();
                 }
-            }, BatchSize::SmallInput)
+            },
+            BatchSize::SmallInput,
+        )
     });
 }
 
@@ -94,6 +96,8 @@ fn coat_of_arms(g: &mut BenchmarkGroup<WallTime>) {
                 for buf in input {
                     buf.sort_tiles();
                 }
-            }, BatchSize::SmallInput)
+            },
+            BatchSize::SmallInput,
+        )
     });
 }

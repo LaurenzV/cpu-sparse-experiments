@@ -3,8 +3,7 @@ use peniko::kurbo::{Affine, BezPath, Stroke};
 use rand::Rng;
 use sparse_primitives::paint::Paint;
 use sparse_primitives::strip::Strip;
-use sparse_primitives::svg::{render_tree, SVGContext};
-use sparse_primitives::tiling::{FlatLine, Point, Tile, Tiler, TILE_HEIGHT, TILE_WIDTH};
+use sparse_primitives::tiling::{FlatLine, Point, Tile, Tiler, TILE_SIZE};
 use sparse_primitives::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
 use sparse_primitives::{FillRule, RenderContext};
 use std::collections::HashSet;
@@ -119,8 +118,8 @@ fn draw_tile_areas(document: &mut Document, tiler: &Tiler) {
     for i in 0..tiler.len() {
         let tile = tiler.get_tile(i);
         // Draw the points
-        let x = tile.x() * TILE_WIDTH as i32;
-        let y = tile.y() * TILE_HEIGHT as u16;
+        let x = tile.x() * TILE_SIZE as i32;
+        let y = tile.y() * TILE_SIZE as u16;
 
         if seen.contains(&(x, y)) {
             continue;
@@ -135,8 +134,8 @@ fn draw_tile_areas(document: &mut Document, tiler: &Tiler) {
         let rect = Rectangle::new()
             .set("x", x)
             .set("y", y)
-            .set("width", TILE_WIDTH)
-            .set("height", TILE_HEIGHT)
+            .set("width", TILE_SIZE)
+            .set("height", TILE_SIZE)
             .set("fill", color)
             .set("stroke", color)
             .set("stroke-opacity", 0.6)
@@ -224,8 +223,8 @@ fn draw_tile_intersections(document: &mut Document, tiler: &Tiler) {
     for i in 0..tiler.len() {
         let tile = tiler.get_tile(i);
         // Draw the points
-        let x = tile.x() * TILE_WIDTH as i32;
-        let y = tile.y() * TILE_HEIGHT as u16;
+        let x = tile.x() * TILE_SIZE as i32;
+        let y = tile.y() * TILE_SIZE as u16;
 
         let p0 = tile.p0();
         let p1 = tile.p1();

@@ -5,11 +5,9 @@
 
 use std::fmt::{Debug, Formatter};
 
-pub const TILE_WIDTH: u32 = 4;
-pub const TILE_HEIGHT: u32 = 4;
-
-const TILE_SCALE_X: f32 = 1.0 / TILE_WIDTH as f32;
-const TILE_SCALE_Y: f32 = 1.0 / TILE_HEIGHT as f32;
+pub const TILE_SIZE: u32 = 4;
+const TILE_SCALE: f32 = TILE_SIZE as f32;
+const INV_TILE_SCALE: f32 = 1.0 / TILE_SIZE as f32;
 
 /// Handles the tiling of paths.
 #[derive(Clone, Debug)]
@@ -24,7 +22,7 @@ impl Tiler {
         Self {
             tile_buf: vec![],
             sorted: false,
-            tile_index_buf: vec![]
+            tile_index_buf: vec![],
         }
     }
 
@@ -85,15 +83,16 @@ impl Tiler {
         let mut push_tile = |x: f32, y: f32, p0: Point, p1: Point| {
             if y >= 0.0 {
                 let tile = Tile::new(x as i32, y as u16, p0, p1);
-                self.tile_index_buf.push(TileIndex::from_tile(self.tile_buf.len() as u32, &tile));
+                self.tile_index_buf
+                    .push(TileIndex::from_tile(self.tile_buf.len() as u32, &tile));
                 self.tile_buf.push(tile);
             }
         };
 
         for line in lines {
             // Points scaled to the tile unit square.
-            let s0 = nudge_point(line.p0 * TILE_SCALE_X);
-            let s1 = nudge_point(line.p1 * TILE_SCALE_Y);
+            let s0 = nudge_point(line.p0 * INV_TILE_SCALE);
+            let s1 = nudge_point(line.p1 * INV_TILE_SCALE);
 
             // Count how many tiles are covered on each axis.
             let tile_count_x = spanned_tiles(s0.x, s1.x);
@@ -126,12 +125,7 @@ impl Tiler {
                     let yfrac1 = scale_up(s1.y - y);
 
                     // A 1x1 tile.
-                    push_tile(
-                        x,
-                        y,
-                        Point::new(xfrac0, yfrac0),
-                        Point::new(xfrac1, yfrac1),
-                    );
+                    push_tile(x, y, Point::new(xfrac0, yfrac0), Point::new(xfrac1, yfrac1));
                 } else {
                     // A vertical column.
                     let inv_slope = (s1.x - s0.x) / (s1.y - s0.y);
@@ -323,7 +317,6 @@ impl Tiler {
     }
 }
 
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Loc {
     // TODO: Unlike y, will not always be positive since we cannot ignore tiles where x < 0 because
@@ -401,7 +394,7 @@ impl Footprint {
 struct TileIndex {
     x: u16,
     y: u16,
-    index: u32
+    index: u32,
 }
 
 impl TileIndex {
@@ -409,11 +402,7 @@ impl TileIndex {
         let x = (tile.x + 1).max(0) as u16;
         let y = tile.y;
 
-        Self {
-            x,
-            y,
-            index,
-        }
+        Self { x, y, index }
     }
 
     pub(crate) fn cmp(&self, b: &TileIndex) -> std::cmp::Ordering {
@@ -449,7 +438,11 @@ impl Tile {
         Self {
             // We don't need to store the exact negative location, just that it is negative,
             // so that the winding number calculation is correct.
-            x: x.max(-1), y, p0, p1 }
+            x: x.max(-1),
+            y,
+            p0,
+            p1,
+        }
     }
 
     pub fn x(&self) -> i32 {
@@ -482,7 +475,7 @@ impl Tile {
         let x_max = x0.max(x1).ceil();
         // On CPU, might be better to do this as fixed point
         let start_i = x_min as u32;
-        let end_i = (start_i + 1).max(x_max as u32).min(TILE_WIDTH);
+        let end_i = (start_i + 1).max(x_max as u32).min(TILE_SIZE);
 
         Footprint::from_range(start_i as u8, end_i as u8)
     }
@@ -541,8 +534,6 @@ impl std::ops::Mul<f32> for Point {
     }
 }
 
-const TILE_SCALE: f32 = 8192.0;
-// scale factor relative to unit square in tile
 const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
 
 const fn scale_up(z: f32) -> f32 {
@@ -550,156 +541,156 @@ const fn scale_up(z: f32) -> f32 {
 }
 
 const fn scale_down(z: u16) -> f32 {
-    z as f32 / FRAC_TILE_SCALE
+    z as f32 * INV_TILE_SCALE
 }
 
-//
-// #[cfg(test)]
-// mod tests {
-//     use crate::tiling::{make_tiles, scale_up, FlatLine, Footprint, Loc, PackedPoint, Point, Tile};
-//
-//     #[test]
-//     fn footprint_empty() {
-//         let fp1 = Footprint::empty();
-//         // Not optimal behavior, but currently how it is.
-//         assert_eq!(fp1.x0(), 32);
-//         assert_eq!(fp1.x1(), 0);
-//     }
-//
-//     #[test]
-//     fn footprint_from_index() {
-//         let fp1 = Footprint::from_index(0);
-//         assert_eq!(fp1.x0(), 0);
-//         assert_eq!(fp1.x1(), 1);
-//
-//         let fp2 = Footprint::from_index(3);
-//         assert_eq!(fp2.x0(), 3);
-//         assert_eq!(fp2.x1(), 4);
-//
-//         let fp3 = Footprint::from_index(6);
-//         assert_eq!(fp3.x0(), 6);
-//         assert_eq!(fp3.x1(), 7);
-//     }
-//
-//     #[test]
-//     fn footprint_from_range() {
-//         let fp1 = Footprint::from_range(1, 3);
-//         assert_eq!(fp1.x0(), 1);
-//         assert_eq!(fp1.x1(), 3);
-//
-//         // Same comment as for empty.
-//         let fp2 = Footprint::from_range(2, 2);
-//         assert_eq!(fp2.x0(), 32);
-//         assert_eq!(fp2.x1(), 0);
-//
-//         let fp3 = Footprint::from_range(3, 7);
-//         assert_eq!(fp3.x0(), 3);
-//         assert_eq!(fp3.x1(), 7);
-//     }
-//
-//     #[test]
-//     fn footprint_extend() {
-//         let mut fp = Footprint::empty();
-//         fp.extend(5);
-//         assert_eq!(fp.x0(), 5);
-//         assert_eq!(fp.x1(), 6);
-//
-//         fp.extend(3);
-//         assert_eq!(fp.x0(), 3);
-//         assert_eq!(fp.x1(), 6);
-//
-//         fp.extend(8);
-//         assert_eq!(fp.x0(), 3);
-//         assert_eq!(fp.x1(), 9);
-//
-//         fp.extend(0);
-//         assert_eq!(fp.x0(), 0);
-//         assert_eq!(fp.x1(), 9);
-//
-//         fp.extend(9);
-//         assert_eq!(fp.x0(), 0);
-//         assert_eq!(fp.x1(), 10);
-//     }
-//
-//     #[test]
-//     fn footprint_merge() {
-//         let mut fp1 = Footprint::from_range(2, 4);
-//         let fp2 = Footprint::from_range(5, 6);
-//         fp1.merge(&fp2);
-//
-//         assert_eq!(fp1.x0(), 2);
-//         assert_eq!(fp1.x1(), 6);
-//
-//         let mut fp3 = Footprint::from_range(5, 9);
-//         let fp4 = Footprint::from_range(7, 10);
-//         fp3.merge(&fp4);
-//
-//         assert_eq!(fp3.x0(), 5);
-//         assert_eq!(fp3.x1(), 10);
-//     }
-//
-//     #[test]
-//     fn footprint_at_tile_edge() {
-//         let tile = Tile::new(
-//             0,
-//             0,
-//             PackedPoint::new(scale_up(1.0), scale_up(0.0)),
-//             PackedPoint::new(scale_up(1.0), scale_up(1.0)),
-//         );
-//
-//         assert!(tile.footprint().is_empty());
-//     }
-//
-//     #[test]
-//     fn footprints_in_tile() {
-//         let tile = Tile::new(
-//             0,
-//             0,
-//             PackedPoint::new(scale_up(0.5), scale_up(0.0)),
-//             PackedPoint::new(scale_up(0.55), scale_up(1.0)),
-//         );
-//
-//         assert_eq!(tile.footprint().x0(), 2);
-//         assert_eq!(tile.footprint().x1(), 3);
-//
-//         let tile = Tile::new(
-//             0,
-//             0,
-//             PackedPoint::new(scale_up(0.1), scale_up(0.0)),
-//             PackedPoint::new(scale_up(0.6), scale_up(1.0)),
-//         );
-//
-//         assert_eq!(tile.footprint().x0(), 0);
-//         assert_eq!(tile.footprint().x1(), 3);
-//
-//         let tile = Tile::new(
-//             0,
-//             0,
-//             PackedPoint::new(scale_up(0.0), scale_up(0.0)),
-//             PackedPoint::new(scale_up(1.0), scale_up(1.0)),
-//         );
-//
-//         assert_eq!(tile.footprint().x0(), 0);
-//         assert_eq!(tile.footprint().x1(), 4);
-//
-//         let tile = Tile::new(
-//             0,
-//             0,
-//             PackedPoint::new(scale_up(0.74), scale_up(0.0)),
-//             PackedPoint::new(scale_up(1.76), scale_up(1.0)),
-//         );
-//
-//         assert_eq!(tile.footprint().x0(), 2);
-//         assert_eq!(tile.footprint().x1(), 4);
-//     }
-//
-//     #[test]
-//     fn issue_46_infinite_loop() {
-//         let mut line = FlatLine {
-//             p0: Point { x: 22.0, y: 552.0 },
-//             p1: Point { x: 224.0, y: 388.0 },
-//         };
-//         let mut buf = vec![];
-//         make_tiles(&[line], &mut buf);
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use crate::tiling::{scale_up, FlatLine, Footprint, Point, Tile, Tiler};
+
+    #[test]
+    fn footprint_empty() {
+        let fp1 = Footprint::empty();
+        // Not optimal behavior, but currently how it is.
+        assert_eq!(fp1.x0(), 32);
+        assert_eq!(fp1.x1(), 0);
+    }
+
+    #[test]
+    fn footprint_from_index() {
+        let fp1 = Footprint::from_index(0);
+        assert_eq!(fp1.x0(), 0);
+        assert_eq!(fp1.x1(), 1);
+
+        let fp2 = Footprint::from_index(3);
+        assert_eq!(fp2.x0(), 3);
+        assert_eq!(fp2.x1(), 4);
+
+        let fp3 = Footprint::from_index(6);
+        assert_eq!(fp3.x0(), 6);
+        assert_eq!(fp3.x1(), 7);
+    }
+
+    #[test]
+    fn footprint_from_range() {
+        let fp1 = Footprint::from_range(1, 3);
+        assert_eq!(fp1.x0(), 1);
+        assert_eq!(fp1.x1(), 3);
+
+        // Same comment as for empty.
+        let fp2 = Footprint::from_range(2, 2);
+        assert_eq!(fp2.x0(), 32);
+        assert_eq!(fp2.x1(), 0);
+
+        let fp3 = Footprint::from_range(3, 7);
+        assert_eq!(fp3.x0(), 3);
+        assert_eq!(fp3.x1(), 7);
+    }
+
+    #[test]
+    fn footprint_extend() {
+        let mut fp = Footprint::empty();
+        fp.extend(5);
+        assert_eq!(fp.x0(), 5);
+        assert_eq!(fp.x1(), 6);
+
+        fp.extend(3);
+        assert_eq!(fp.x0(), 3);
+        assert_eq!(fp.x1(), 6);
+
+        fp.extend(8);
+        assert_eq!(fp.x0(), 3);
+        assert_eq!(fp.x1(), 9);
+
+        fp.extend(0);
+        assert_eq!(fp.x0(), 0);
+        assert_eq!(fp.x1(), 9);
+
+        fp.extend(9);
+        assert_eq!(fp.x0(), 0);
+        assert_eq!(fp.x1(), 10);
+    }
+
+    #[test]
+    fn footprint_merge() {
+        let mut fp1 = Footprint::from_range(2, 4);
+        let fp2 = Footprint::from_range(5, 6);
+        fp1.merge(&fp2);
+
+        assert_eq!(fp1.x0(), 2);
+        assert_eq!(fp1.x1(), 6);
+
+        let mut fp3 = Footprint::from_range(5, 9);
+        let fp4 = Footprint::from_range(7, 10);
+        fp3.merge(&fp4);
+
+        assert_eq!(fp3.x0(), 5);
+        assert_eq!(fp3.x1(), 10);
+    }
+
+    #[test]
+    fn footprint_at_tile_edge() {
+        let tile = Tile::new(
+            0,
+            0,
+            Point::new(scale_up(1.0), scale_up(0.0)),
+            Point::new(scale_up(1.0), scale_up(1.0)),
+        );
+
+        assert!(tile.footprint().is_empty());
+    }
+
+    #[test]
+    fn footprints_in_tile() {
+        let tile = Tile::new(
+            0,
+            0,
+            Point::new(scale_up(0.5), scale_up(0.0)),
+            Point::new(scale_up(0.55), scale_up(1.0)),
+        );
+
+        assert_eq!(tile.footprint().x0(), 2);
+        assert_eq!(tile.footprint().x1(), 3);
+
+        let tile = Tile::new(
+            0,
+            0,
+            Point::new(scale_up(0.1), scale_up(0.0)),
+            Point::new(scale_up(0.6), scale_up(1.0)),
+        );
+
+        assert_eq!(tile.footprint().x0(), 0);
+        assert_eq!(tile.footprint().x1(), 3);
+
+        let tile = Tile::new(
+            0,
+            0,
+            Point::new(scale_up(0.0), scale_up(0.0)),
+            Point::new(scale_up(1.0), scale_up(1.0)),
+        );
+
+        assert_eq!(tile.footprint().x0(), 0);
+        assert_eq!(tile.footprint().x1(), 4);
+
+        let tile = Tile::new(
+            0,
+            0,
+            Point::new(scale_up(0.74), scale_up(0.0)),
+            Point::new(scale_up(1.76), scale_up(1.0)),
+        );
+
+        assert_eq!(tile.footprint().x0(), 2);
+        assert_eq!(tile.footprint().x1(), 4);
+    }
+
+    #[test]
+    fn issue_46_infinite_loop() {
+        let mut line = FlatLine {
+            p0: Point { x: 22.0, y: 552.0 },
+            p1: Point { x: 224.0, y: 388.0 },
+        };
+
+        let mut tiler = Tiler::new();
+        tiler.make_tiles(&[line]);
+    }
+}
