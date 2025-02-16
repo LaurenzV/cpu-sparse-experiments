@@ -72,10 +72,9 @@ impl Tiler {
             // at a tile relative 0, we can treat it as an edge crossing. This is somewhat
             // of a hack and in theory we should rather solve the underlying issue in the
             // strip generation code, but it works for now.
-
             if p.x.fract() == 0.0 {
                 Point {
-                    x: p.x + 1.0 / FRAC_TILE_SCALE,
+                    x: p.x + NUDGE_FACTOR,
                     y: p.y,
                 }
             } else {
@@ -535,8 +534,6 @@ impl std::ops::Mul<f32> for Point {
         Point::new(self.x * rhs, self.y * rhs)
     }
 }
-
-const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
 
 const fn scale_up(z: f32) -> f32 {
     z * 4.0
