@@ -1,6 +1,8 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+//! Tiling of paths.
+
 use std::fmt::{Debug, Formatter};
 
 pub const TILE_WIDTH: u32 = 4;
@@ -9,16 +11,19 @@ pub const TILE_HEIGHT: u32 = 4;
 const TILE_SCALE_X: f32 = 1.0 / TILE_WIDTH as f32;
 const TILE_SCALE_Y: f32 = 1.0 / TILE_HEIGHT as f32;
 
+/// Handles the tiling of paths.
 #[derive(Clone, Debug)]
 pub struct Tiler {
     tile_buf: Vec<Tile>,
-    tile_index_buf: Vec<TileIndex>
+    tile_index_buf: Vec<TileIndex>,
+    sorted: bool,
 }
 
 impl Tiler {
     pub fn new() -> Self {
         Self {
             tile_buf: vec![],
+            sorted: false,
             tile_index_buf: vec![]
         }
     }
@@ -30,16 +35,24 @@ impl Tiler {
     pub fn reset(&mut self) {
         self.tile_buf.clear();
         self.tile_index_buf.clear();
+        self.sorted = false;
     }
 
     pub fn sort_tiles(&mut self) {
+        self.sorted = true;
         self.tile_index_buf.sort_unstable_by(TileIndex::cmp);
     }
 
+    /// Get the tile at a certain index.
+    ///
+    /// Panics if the tiler hasn't been sorted before.
     pub fn get_tile(&self, index: u32) -> &Tile {
+        assert!(self.sorted);
+
         &self.tile_buf[self.tile_index_buf[index as usize].index()]
     }
 
+    /// Make the tiles.
     pub fn make_tiles(&mut self, lines: &[FlatLine]) {
         self.reset();
 
