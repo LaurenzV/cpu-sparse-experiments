@@ -6,7 +6,7 @@ use peniko::kurbo::{Affine, BezPath, Stroke};
 use rand::prelude::StdRng;
 use rand::{Rng, SeedableRng};
 use sparse_primitives::flatten;
-use sparse_primitives::tiling::{FlatLine, Point, Tiler};
+use sparse_primitives::tiling::{FlatLine, Point, Tiles};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -128,8 +128,8 @@ fn single_tile(g: &mut BenchmarkGroup<WallTime>) {
 
     g.bench_function("single tile", |b| {
         b.iter(|| {
-            let mut tiler = Tiler::new();
-            tiler.make_tiles(&lines);
+            let mut tiles = Tiles::new();
+            tiles.make_tiles(&lines);
         })
     });
 }
@@ -141,8 +141,8 @@ fn horizontal_column(g: &mut BenchmarkGroup<WallTime>) {
 
     g.bench_function("horizontal column", |b| {
         b.iter(|| {
-            let mut tiler = Tiler::new();
-            tiler.make_tiles(&lines);
+            let mut tiles = Tiles::new();
+            tiles.make_tiles(&lines);
         })
     });
 }
@@ -154,8 +154,8 @@ fn vertical_column(g: &mut BenchmarkGroup<WallTime>) {
 
     g.bench_function("vertical column", |b| {
         b.iter(|| {
-            let mut tiler = Tiler::new();
-            tiler.make_tiles(&lines);
+            let mut tiles = Tiles::new();
+            tiles.make_tiles(&lines);
         })
     });
 }
@@ -167,8 +167,8 @@ fn general_case(g: &mut BenchmarkGroup<WallTime>) {
 
     g.bench_function("general case", |b| {
         b.iter(|| {
-            let mut tiler = Tiler::new();
-            tiler.make_tiles(&lines);
+            let mut tiles = Tiles::new();
+            tiles.make_tiles(&lines);
         })
     });
 }
@@ -178,7 +178,7 @@ fn ghostscript_tiger(g: &mut BenchmarkGroup<WallTime>) {
 
     g.bench_function("ghostscript tiger", |b| {
         b.iter(|| {
-            let mut tiling = Tiler::new();
+            let mut tiling = Tiles::new();
 
             for buf in &lines {
                 tiling.make_tiles(buf);
@@ -192,7 +192,7 @@ fn coat_of_arms(g: &mut BenchmarkGroup<WallTime>) {
 
     g.bench_function("coat of arms", |b| {
         b.iter(|| {
-            let mut tiling = Tiler::new();
+            let mut tiling = Tiles::new();
 
             for buf in &lines {
                 tiling.make_tiles(buf);

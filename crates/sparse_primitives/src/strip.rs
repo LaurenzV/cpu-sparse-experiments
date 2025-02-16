@@ -11,7 +11,7 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::tiling::{Footprint, Tiler};
+use crate::tiling::{Footprint, Tiles};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
 
@@ -25,7 +25,7 @@ pub struct Strip {
 
 #[inline(never)]
 pub fn render_strips(
-    tiler: &Tiler,
+    tiles: &Tiles,
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
     fill_rule: FillRule,
@@ -36,15 +36,15 @@ pub fn render_strips(
         #[cfg(target_arch = "aarch64")]
         if std::arch::is_aarch64_feature_detected!("neon") {
             // SAFETY: We checked that the target feature `neon` is available.
-            return unsafe { neon::render_strips(tiler, strip_buf, alpha_buf) };
+            return unsafe { neon::render_strips(tiles, strip_buf, alpha_buf) };
         }
     }
 
-    render_strips_scalar(tiler, strip_buf, alpha_buf, fill_rule);
+    render_strips_scalar(tiles, strip_buf, alpha_buf, fill_rule);
 }
 
 fn render_strips_scalar(
-    tiler: &Tiler,
+    tiles: &Tiles,
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
     fill_rule: FillRule,
@@ -53,15 +53,15 @@ fn render_strips_scalar(
 
     let mut strip_start = true;
     let mut cols = alpha_buf.len() as u32;
-    let mut prev_tile = tiler.get_tile(0);
+    let mut prev_tile = tiles.get_tile(0);
     let mut fp = prev_tile.footprint();
     let mut seg_start = 0;
     let mut delta = 0;
 
     // Note: the input should contain a sentinel tile, to avoid having
     // logic here to process the final strip.
-    for i in 1..tiler.len() {
-        let tile = tiler.get_tile(i);
+    for i in 1..tiles.len() {
+        let tile = tiles.get_tile(i);
 
         if prev_tile.loc() != tile.loc() {
             let start_delta = delta;
@@ -76,7 +76,7 @@ fn render_strips_scalar(
             let mut areas = [[start_delta as f32; 4]; 4];
 
             for j in seg_start..i {
-                let tile = tiler.get_tile(j);
+                let tile = tiles.get_tile(j);
 
                 delta += tile.delta();
 
@@ -219,11 +219,11 @@ mod neon {
     use std::arch::aarch64::*;
 
     use crate::strip::Strip;
-    use crate::tiling::{Tile, Tiler};
+    use crate::tiling::{Tile, Tiles};
 
     /// SAFETY: Caller must ensure that target feature `neon` is available.
     pub unsafe fn render_strips(
-        tiler: &Tiler,
+        tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
     ) {
@@ -234,7 +234,7 @@ mod neon {
 
             let mut strip_start = true;
             let mut cols = alpha_buf.len() as u32;
-            let mut prev_tile = tiler.get_tile(0);
+            let mut prev_tile = tiles.get_tile(0);
             let mut fp = prev_tile.footprint().0;
             let mut seg_start = 0;
             let mut delta = 0;
@@ -242,8 +242,8 @@ mod neon {
             // logic here to process the final strip.
             const IOTA: [f32; 4] = [0.0, 1.0, 2.0, 3.0];
             let iota = vld1q_f32(IOTA.as_ptr());
-            for i in 1..tiler.len() {
-                let tile = tiler.get_tile(i);
+            for i in 1..tiles.len() {
+                let tile = tiles.get_tile(i);
                 if prev_tile.loc() != tile.loc() {
                     let start_delta = delta;
                     let same_strip = prev_tile.loc().same_strip(&tile.loc());
@@ -254,7 +254,7 @@ mod neon {
                     let x1 = 32 - fp.leading_zeros();
                     let mut areas = [[start_delta as f32; 4]; 4];
                     for j in seg_start..i {
-                        let tile = tiler.get_tile(j);
+                        let tile = tiles.get_tile(j);
                         // small gain possible here to unpack in simd, but llvm goes halfway
                         delta += tile.delta();
                         let p0 = tile.p0();

@@ -13,13 +13,13 @@ const NUDGE_FACTOR: f32 = 0.0000001;
 
 /// Handles the tiling of paths.
 #[derive(Clone, Debug)]
-pub struct Tiler {
+pub struct Tiles {
     tile_buf: Vec<Tile>,
     tile_index_buf: Vec<TileIndex>,
     sorted: bool,
 }
 
-impl Tiler {
+impl Tiles {
     pub fn new() -> Self {
         Self {
             tile_buf: vec![],
@@ -45,7 +45,7 @@ impl Tiler {
 
     /// Get the tile at a certain index.
     ///
-    /// Panics if the tiler hasn't been sorted before.
+    /// Panics if the tiles hasn't been sorted before.
     pub fn get_tile(&self, index: u32) -> &Tile {
         assert!(self.sorted);
 
@@ -544,7 +544,7 @@ fn scale_down(z: Point) -> Point {
 
 #[cfg(test)]
 mod tests {
-    use crate::tiling::{scale_up, FlatLine, Footprint, Point, Tile, Tiler};
+    use crate::tiling::{scale_up, FlatLine, Footprint, Point, Tile, Tiles};
 
     #[test]
     fn footprint_empty() {
@@ -688,7 +688,7 @@ mod tests {
             p1: Point { x: 224.0, y: 388.0 },
         };
 
-        let mut tiler = Tiler::new();
-        tiler.make_tiles(&[line]);
+        let mut tiles = Tiles::new();
+        tiles.make_tiles(&[line]);
     }
 }

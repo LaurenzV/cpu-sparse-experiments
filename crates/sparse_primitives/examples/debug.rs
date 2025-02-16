@@ -3,7 +3,7 @@ use peniko::kurbo::{Affine, BezPath, Stroke};
 use rand::Rng;
 use sparse_primitives::paint::Paint;
 use sparse_primitives::strip::Strip;
-use sparse_primitives::tiling::{FlatLine, Point, Tile, Tiler, TILE_SIZE};
+use sparse_primitives::tiling::{FlatLine, Point, Tile, Tiles, TILE_SIZE};
 use sparse_primitives::wide_tile::{Cmd, WideTile, STRIP_HEIGHT};
 use sparse_primitives::{FillRule, RenderContext};
 use std::collections::HashSet;
@@ -27,10 +27,10 @@ fn main() {
 
     draw_grid(&mut document);
     draw_line_segments(&mut document, &ctx.line_buf);
-    draw_tile_areas(&mut document, &ctx.tiler);
-    draw_tile_intersections(&mut document, &ctx.tiler);
+    draw_tile_areas(&mut document, &ctx.tiles);
+    draw_tile_intersections(&mut document, &ctx.tiles);
     draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
-    draw_wide_tiles(&mut document, &ctx.tiles, &ctx.alphas);
+    draw_wide_tiles(&mut document, &ctx.wide_tiles, &ctx.alphas);
 
     svg::save("../../target/out.svg", &document).unwrap();
 }
@@ -112,11 +112,11 @@ fn draw_wide_tiles(document: &mut Document, wide_tiles: &[WideTile], alphas: &[u
     }
 }
 
-fn draw_tile_areas(document: &mut Document, tiler: &Tiler) {
+fn draw_tile_areas(document: &mut Document, tiles: &Tiles) {
     let mut seen = HashSet::new();
 
-    for i in 0..tiler.len() {
-        let tile = tiler.get_tile(i);
+    for i in 0..tiles.len() {
+        let tile = tiles.get_tile(i);
         // Draw the points
         let x = tile.x() * TILE_SIZE as i32;
         let y = tile.y() * TILE_SIZE as u16;
@@ -219,9 +219,9 @@ fn draw_strips(document: &mut Document, strips: &[Strip], alphas: &[u32]) {
     }
 }
 
-fn draw_tile_intersections(document: &mut Document, tiler: &Tiler) {
-    for i in 0..tiler.len() {
-        let tile = tiler.get_tile(i);
+fn draw_tile_intersections(document: &mut Document, tiles: &Tiles) {
+    for i in 0..tiles.len() {
+        let tile = tiles.get_tile(i);
         // Draw the points
         let x = tile.x() * TILE_SIZE as i32;
         let y = tile.y() * TILE_SIZE as u16;

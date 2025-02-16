@@ -1,7 +1,7 @@
 use criterion::measurement::WallTime;
 use criterion::{BatchSize, BenchmarkGroup, Criterion};
 use peniko::kurbo::{Affine, BezPath, Stroke};
-use sparse_primitives::tiling::{FlatLine, Tiler};
+use sparse_primitives::tiling::{FlatLine, Tiles};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -58,10 +58,10 @@ fn ghostscript_tiger(g: &mut BenchmarkGroup<WallTime>) {
     let mut tiles = flattened_from_file("gs_tiger")
         .iter()
         .map(|i| {
-            let mut tiler = Tiler::new();
-            tiler.make_tiles(i);
+            let mut tiles = Tiles::new();
+            tiles.make_tiles(i);
 
-            tiler
+            tiles
         })
         .collect::<Vec<_>>();
 
@@ -82,10 +82,10 @@ fn coat_of_arms(g: &mut BenchmarkGroup<WallTime>) {
     let tiles = flattened_from_file("coat_of_arms")
         .iter()
         .map(|i| {
-            let mut tiler = Tiler::new();
-            tiler.make_tiles(i);
+            let mut tiles = Tiles::new();
+            tiles.make_tiles(i);
 
-            tiler
+            tiles
         })
         .collect::<Vec<_>>();
 
