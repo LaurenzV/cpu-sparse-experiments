@@ -505,49 +505,6 @@ impl FlatLine {
     }
 }
 
-/// Stores a point within a tile (which can range from 0 to TILE_WIDTH/TILE_HEIGHT) as a
-/// u16, to reduce the memory footprint when sorting tiles.
-#[derive(Clone, Copy)]
-pub struct PackedPoint {
-    x: u16,
-    y: u16,
-}
-
-impl PackedPoint {
-    pub fn new(x: u16, y: u16) -> Self {
-        PackedPoint { x, y }
-    }
-
-    pub fn unpack(&self) -> Point {
-        let x = self.unpacked_x();
-        let y = self.unpacked_y();
-
-        Point::new(x, y)
-    }
-
-    pub fn packed_x(&self) -> u16 {
-        self.x
-    }
-
-    pub fn packed_y(&self) -> u16 {
-        self.y
-    }
-
-    pub fn unpacked_x(&self) -> f32 {
-        self.x as f32 * (1.0 / TILE_SCALE)
-    }
-
-    pub fn unpacked_y(&self) -> f32 {
-        self.y as f32 * (1.0 / TILE_SCALE)
-    }
-}
-
-impl Debug for PackedPoint {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}, {}", self.unpacked_x(), self.unpacked_y())
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Point {
     pub x: f32,
@@ -590,10 +547,9 @@ const FRAC_TILE_SCALE: f32 = 8192.0 * 4.0;
 
 const fn scale_up(z: f32) -> f32 {
     z * 4.0
-    // ((z * FRAC_TILE_SCALE) + 0.5) as u16
 }
 
-fn scale_down(z: u16) -> f32 {
+const fn scale_down(z: u16) -> f32 {
     z as f32 / FRAC_TILE_SCALE
 }
 

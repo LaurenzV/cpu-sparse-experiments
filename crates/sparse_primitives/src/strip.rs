@@ -11,7 +11,7 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::tiling::{Footprint, PackedPoint, Tile, Tiler, TILE_WIDTH};
+use crate::tiling::{Footprint, Tiler};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
 
@@ -210,7 +210,7 @@ impl Strip {
 
     pub fn strip_y(&self) -> u32 {
         // TODO: Don't convert?
-        self.y as u32 / STRIP_HEIGHT as u32
+        self.y / STRIP_HEIGHT as u32
     }
 }
 
@@ -256,8 +256,8 @@ mod neon {
                     for tile in &tiles[seg_start..i] {
                         // small gain possible here to unpack in simd, but llvm goes halfway
                         delta += tile.delta();
-                        let p0 = tile.p0().unpack();
-                        let p1 = tile.p1().unpack();
+                        let p0 = tile.p0();
+                        let p1 = tile.p1();
                         let slope = (p1.x - p0.x) / (p1.y - p0.y);
                         let vstarty = vsubq_f32(vdupq_n_f32(p0.y), iota);
                         let vy0 = vminq_f32(vmaxq_f32(vstarty, vdupq_n_f32(0.0)), vdupq_n_f32(1.0));
