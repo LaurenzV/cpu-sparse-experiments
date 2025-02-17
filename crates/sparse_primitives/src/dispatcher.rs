@@ -1,3 +1,6 @@
+/// A macro for dispatching to kernels. Make sure that you pass the correct function
+/// to each argument, as this macro will call into it using unsafe code, assuming that for example
+/// the function in `neon` only uses `neon` instructions!
 #[macro_export]
 macro_rules! dispatch {
     (
