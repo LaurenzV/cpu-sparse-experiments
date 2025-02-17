@@ -37,6 +37,7 @@ pub struct RenderContext {
     pub line_buf: Vec<FlatLine>,
     pub tiles: Tiles,
     pub strip_buf: Vec<Strip>,
+    #[cfg(feature = "simd")]
     use_simd: bool,
 
     transform: Affine,
@@ -67,7 +68,9 @@ impl RenderContext {
             line_buf,
             tiles,
             strip_buf,
-            use_simd: option_env!("SIMD").is_some(),
+            #[cfg(feature = "simd")]
+            // TODO: Allow to configure
+            use_simd: true,
             transform: Affine::IDENTITY,
         }
     }
@@ -86,6 +89,7 @@ impl RenderContext {
             pixmap.width,
             pixmap.height,
             &mut pixmap.buf,
+            #[cfg(feature = "simd")]
             self.use_simd,
         );
 
@@ -116,6 +120,7 @@ impl RenderContext {
                 &mut self.strip_buf,
                 &mut self.alphas,
                 fill_rule,
+                #[cfg(feature = "simd")]
                 self.use_simd,
             );
 
