@@ -31,6 +31,10 @@ pub fn render_strips(
     fill_rule: FillRule,
     execution_mode: ExecutionMode,
 ) {
+    strip_buf.clear();
+
+    // There's unfortunately some hard-to-avoid code duplication between the different
+    // kernels, so when changing something we need to make sure to keep it in sync.
     dispatch!(
         scalar: scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule),
         neon: neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule),
@@ -64,8 +68,6 @@ mod scalar {
         alpha_buf: &mut Vec<u32>,
         fill_rule: FillRule,
     ) {
-        strip_buf.clear();
-
         let mut strip_start = true;
         let mut cols = alpha_buf.len() as u32;
         let mut prev_tile = tiles.get_tile(0);
@@ -231,8 +233,6 @@ mod neon {
         fill_rule: FillRule,
     ) {
         // TODO: Clean up and improve this impementation
-        strip_buf.clear();
-
         let mut strip_start = true;
         let mut cols = alpha_buf.len() as u32;
         let mut prev_tile = tiles.get_tile(0);
