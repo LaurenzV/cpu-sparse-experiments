@@ -85,6 +85,8 @@ impl<'a> Fine<'a> {
 
     #[inline(never)]
     pub(crate) fn strip(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
+        debug_assert!(alphas.len() >= width);
+
         let dispatcher = Dispatcher {
             scalar: Box::new(|scratch| scalar::strip(scratch, x, width, alphas, paint)),
             execution_mode: self.execution_mode,
@@ -94,13 +96,6 @@ impl<'a> Fine<'a> {
 
         dispatcher.dispatch(&mut self.scratch);
     }
-}
-
-#[inline(always)]
-fn div_255(val: u16) -> u16 {
-    // For some reason, doing this instead of / 255 makes strip_scalar 3x faster on ARM.
-    // TODO: Measure behavior on x86
-    (val + 1 + (val >> 8)) >> 8
 }
 
 fn pack(
@@ -134,9 +129,16 @@ fn pack(
 }
 
 mod scalar {
-    use crate::fine::{div_255, STRIP_HEIGHT_F32};
+    use crate::fine::STRIP_HEIGHT_F32;
     use crate::paint::Paint;
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
+
+    #[inline(always)]
+    fn div_255(val: u16) -> u16 {
+        // For some reason, doing this instead of / 255 makes strip_scalar 3x faster on ARM.
+        // TODO: Measure behavior on x86
+        (val + 1 + (val >> 8)) >> 8
+    }
 
     pub(super) fn fill(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
@@ -188,7 +190,6 @@ mod scalar {
             Paint::Solid(s) => {
                 let color = s.premultiply().to_rgba8().to_u8_array();
 
-                debug_assert!(alphas.len() >= width);
                 for (z, a) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
                     .chunks_exact_mut(16)
                     .zip(alphas)
