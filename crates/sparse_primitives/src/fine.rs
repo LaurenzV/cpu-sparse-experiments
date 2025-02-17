@@ -226,29 +226,36 @@ mod neon {
             (buf, buf[3])
         };
 
-        let color_buf_simd = vld1_u8(color_buf[0..].as_ptr());
+        let color_buf_simd = vld1q_u8(color_buf[0..].as_ptr());
 
         let mut strip_cols = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
             .chunks_exact_mut(STRIP_HEIGHT_F32);
 
-        if alpha == 255 {
-            for col in strip_cols {
-                col.copy_from_slice(&color_buf);
-            }
-        } else {
-            let inv_alpha = vdup_n_u8(255 - alpha);
+        let inv_alpha = vdupq_n_u8(255 - alpha);
 
-            for z in strip_cols {
-                for i in 0..2 {
-                    let index = i * 8;
-                    let z_vals = vld1_u8(z.as_mut_ptr().add(index));
-                    let im_1 = vmull_u8(z_vals, inv_alpha);
-                    let im_2 = div_255(im_1);
-                    let im_3 = vmovn_u16(im_2);
-                    let im_4 = vadd_u8(im_3, color_buf_simd);
-                    vst1_u8(z.as_mut_ptr().add(index), im_4);
-                }
-            }
+        for z in strip_cols {
+            let z_vals = vld1q_u8(z.as_mut_ptr());
+            let temp_low = vmull_u8(vget_low_u8(z_vals), vget_low_u8(inv_alpha));
+            let temp_high = vmull_high_u8(z_vals, inv_alpha);
+
+            // Implement the shift and accumulate operations:
+            // ushr v5.8h, v5.8h, #8
+            // usra v4.8h, v4.8h, #8
+            let temp_high = vshrq_n_u16::<8>(temp_high);
+            let temp_low = vsraq_n_u16::<8>(temp_low, temp_low);
+
+            // umlal2 v5.8h, v2.16b, v3.16b
+            let temp_high = vmlal_high_u8(temp_high, z_vals, inv_alpha);
+
+            // addhn and addhn2 operations
+            let result_low = vaddhn_u16(temp_low, vdupq_n_u16(1));
+            let result = vaddhn_high_u16(result_low, temp_high, vdupq_n_u16(1));
+
+            // Final addition
+            let final_result = vaddq_u8(result, color_buf_simd);
+
+            vst1q_u8(z.as_mut_ptr(), final_result);
+
         }
     }
 
