@@ -13,7 +13,7 @@ use crate::{
     strip::{self, Strip},
     tiling::{self, FlatLine},
     wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
-    FillRule, Pixmap,
+    ExecutionMode, FillRule, Pixmap,
 };
 use peniko::kurbo::{BezPath, Rect, Shape};
 use peniko::{
@@ -37,8 +37,7 @@ pub struct RenderContext {
     pub line_buf: Vec<FlatLine>,
     pub tiles: Tiles,
     pub strip_buf: Vec<Strip>,
-    #[cfg(feature = "simd")]
-    use_simd: bool,
+    execution_mode: ExecutionMode,
 
     transform: Affine,
 }
@@ -68,9 +67,11 @@ impl RenderContext {
             line_buf,
             tiles,
             strip_buf,
-            #[cfg(feature = "simd")]
             // TODO: Allow to configure
-            use_simd: true,
+            #[cfg(feature = "simd")]
+            execution_mode: ExecutionMode::Auto,
+            #[cfg(not(feature = "simd"))]
+            execution_mode: ExecutionMode::Scalar,
             transform: Affine::IDENTITY,
         }
     }
@@ -89,8 +90,7 @@ impl RenderContext {
             pixmap.width,
             pixmap.height,
             &mut pixmap.buf,
-            #[cfg(feature = "simd")]
-            self.use_simd,
+            self.execution_mode,
         );
 
         let width_tiles = self.width.div_ceil(WIDE_TILE_WIDTH);
@@ -120,8 +120,7 @@ impl RenderContext {
                 &mut self.strip_buf,
                 &mut self.alphas,
                 fill_rule,
-                #[cfg(feature = "simd")]
-                self.use_simd,
+                self.execution_mode,
             );
 
             self.generate_commands(fill_rule, paint);

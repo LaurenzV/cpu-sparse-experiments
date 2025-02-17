@@ -14,7 +14,7 @@
 use crate::dispatcher::Dispatcher;
 use crate::tiling::{Footprint, Tiles};
 use crate::wide_tile::STRIP_HEIGHT;
-use crate::FillRule;
+use crate::{ExecutionMode, FillRule};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
@@ -30,14 +30,13 @@ pub fn render_strips(
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
     fill_rule: FillRule,
-    #[cfg(feature = "simd")] use_simd: bool,
+    execution_mode: ExecutionMode,
 ) {
     let dispatcher = Dispatcher {
         scalar: Box::new(|(strip_buf, alpha_buf)| {
             render_strips_scalar(tiles, strip_buf, alpha_buf, fill_rule)
         }),
-        #[cfg(feature = "simd")]
-        use_simd,
+        execution_mode: execution_mode,
         #[cfg(all(target_arch = "aarch64", feature = "simd"))]
         neon: Box::new(|(strip_buf, alpha_buf)| unsafe {
             neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule)
