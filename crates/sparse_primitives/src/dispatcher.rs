@@ -2,9 +2,9 @@ use crate::ExecutionMode;
 
 pub struct Dispatcher<'a, T> {
     pub scalar: Box<dyn Fn(T) + 'a>,
-    pub execution_mode: ExecutionMode,
     #[cfg(all(target_arch = "aarch64", feature = "simd"))]
     pub neon: Box<dyn Fn(T) + 'a>,
+    pub execution_mode: ExecutionMode,
 }
 
 impl<'a, T> Dispatcher<'a, T> {

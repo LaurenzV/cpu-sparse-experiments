@@ -36,11 +36,11 @@ pub fn render_strips(
         scalar: Box::new(|(strip_buf, alpha_buf)| {
             scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule)
         }),
-        execution_mode,
         #[cfg(all(target_arch = "aarch64", feature = "simd"))]
         neon: Box::new(|(strip_buf, alpha_buf)| unsafe {
             neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule)
         }),
+        execution_mode,
     };
 
     dispatcher.dispatch((strip_buf, alpha_buf));
