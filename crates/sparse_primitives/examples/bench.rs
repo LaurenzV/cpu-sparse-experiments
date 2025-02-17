@@ -1,4 +1,4 @@
-use bench_gen::{Command, Params, PolyIterator};
+use bench_gen::{Command, Params, PolyIterator, RectIterator, RectType};
 use peniko::kurbo::{Cap, Join, Stroke};
 use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
@@ -12,7 +12,7 @@ const STROKE_WIDTH: f64 = 2.0;
 fn main() {
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
 
-    for size in [8, 16, 32, 64, 128, 256] {
+    for size in [256].repeat(200) {
         ctx.reset();
 
         let params = Params {
@@ -23,7 +23,7 @@ fn main() {
             size,
         };
 
-        let commands = PolyIterator::new(params, 40, false)
+        let commands = RectIterator::new(params, RectType::Aligned)
             .take(RENDER_CALLS as usize)
             .collect::<Vec<_>>();
 
@@ -39,7 +39,7 @@ fn main() {
         let elapsed = start.elapsed();
 
         println!("Runtime for {}x{}: {:?}", size, size, elapsed);
-        write_pixmap(&mut pixmap, size);
+        // write_pixmap(&mut pixmap, size);
     }
 }
 

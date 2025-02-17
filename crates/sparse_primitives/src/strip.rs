@@ -11,10 +11,9 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::dispatcher::Dispatcher;
 use crate::tiling::Tiles;
 use crate::wide_tile::STRIP_HEIGHT;
-use crate::{ExecutionMode, FillRule};
+use crate::{dispatch, ExecutionMode, FillRule};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
@@ -32,18 +31,11 @@ pub fn render_strips(
     fill_rule: FillRule,
     execution_mode: ExecutionMode,
 ) {
-    let dispatcher = Dispatcher {
-        scalar: Box::new(|(strip_buf, alpha_buf)| {
-            scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule)
-        }),
-        #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-        neon: Box::new(|(strip_buf, alpha_buf)| unsafe {
-            neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule)
-        }),
-        execution_mode,
-    };
-
-    dispatcher.dispatch((strip_buf, alpha_buf));
+    dispatch!(
+        scalar: scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule),
+        neon: neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule),
+        execution_mode: execution_mode
+    );
 }
 
 impl Strip {

@@ -1,32 +1,28 @@
-use crate::ExecutionMode;
-
-pub struct Dispatcher<'a, T> {
-    pub scalar: Box<dyn Fn(T) + 'a>,
-    #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-    pub neon: Box<dyn Fn(T) + 'a>,
-    pub execution_mode: ExecutionMode,
-}
-
-impl<'a, T> Dispatcher<'a, T> {
-    pub fn dispatch(&self, params: T) {
-        match self.execution_mode {
+#[macro_export]
+macro_rules! dispatch {
+    (
+        scalar: $scalar:expr,
+        neon: $neon:expr,
+        execution_mode: $execution_mode:expr
+    ) => {
+        match $execution_mode {
             ExecutionMode::Scalar => {
-                return (self.scalar)(params);
+                return $scalar;
             }
             #[cfg(feature = "simd")]
             ExecutionMode::Auto => {
                 #[cfg(target_arch = "aarch64")]
                 if std::arch::is_aarch64_feature_detected!("neon") {
-                    return (self.neon)(params);
+                    return unsafe { $neon };
                 }
 
                 // Fallback.
-                return (self.scalar)(params);
+                return $scalar;
             }
             #[cfg(all(target_arch = "aarch64", feature = "simd"))]
             ExecutionMode::Neon => {
                 if std::arch::is_aarch64_feature_detected!("neon") {
-                    return (self.neon)(params);
+                    return unsafe { $neon };
                 }
 
                 panic!(
@@ -34,5 +30,6 @@ impl<'a, T> Dispatcher<'a, T> {
                 );
             }
         }
-    }
+    };
 }
+

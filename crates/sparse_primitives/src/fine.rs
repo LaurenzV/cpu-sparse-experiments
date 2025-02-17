@@ -3,10 +3,9 @@
 
 //! Fine rasterization
 
-use crate::dispatcher::Dispatcher;
 use crate::paint::Paint;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
-use crate::ExecutionMode;
+use crate::{dispatch, ExecutionMode};
 
 pub(crate) const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
 
@@ -77,16 +76,11 @@ impl<'a> Fine<'a> {
             Paint::Solid(c) => {
                 let color = c.premultiply().to_rgba8().to_u8_array();
 
-                let dispatcher = Dispatcher {
-                    scalar: Box::new(|scratch| scalar::fill_solid(scratch, &color, x, width)),
-                    #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-                    neon: Box::new(|scratch| unsafe {
-                        neon::fill_solid(scratch, &color, x, width)
-                    }),
-                    execution_mode: self.execution_mode,
-                };
-
-                dispatcher.dispatch(&mut self.scratch);
+                dispatch!(
+                    scalar: scalar::fill_solid(&mut self.scratch, &color, x, width),
+                    neon: neon::fill_solid(&mut self.scratch, &color, x, width),
+                    execution_mode: self.execution_mode
+                );
             }
             Paint::Pattern(_) => unimplemented!(),
         }
@@ -100,18 +94,11 @@ impl<'a> Fine<'a> {
             Paint::Solid(s) => {
                 let color = s.premultiply().to_rgba8().to_u8_array();
 
-                let dispatcher = Dispatcher {
-                    scalar: Box::new(|scratch| {
-                        scalar::strip_solid(scratch, &color, x, width, alphas)
-                    }),
-                    #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-                    neon: Box::new(|scratch| unsafe {
-                        neon::strip_solid(scratch, &color, x, width, alphas)
-                    }),
-                    execution_mode: self.execution_mode,
-                };
-
-                dispatcher.dispatch(&mut self.scratch);
+                dispatch!(
+                    scalar: scalar::strip_solid(&mut self.scratch, &color, x, width, alphas),
+                    neon: neon::strip_solid(&mut self.scratch, &color, x, width, alphas),
+                    execution_mode: self.execution_mode
+                );
             }
             Paint::Pattern(_) => unimplemented!(),
         }
