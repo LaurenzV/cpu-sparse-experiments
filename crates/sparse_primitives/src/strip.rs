@@ -40,7 +40,7 @@ pub fn render_strips(
         use_simd,
         #[cfg(all(target_arch = "aarch64", feature = "simd"))]
         neon: Box::new(|(strip_buf, alpha_buf)| unsafe {
-            neon::render_strips(tiles, strip_buf, alpha_buf)
+            neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule)
         }),
     };
 
@@ -160,8 +160,9 @@ fn render_strips_scalar(
                             let add_val = even as f32;
                             // 1 for even, -1 for odd.
                             let sign = (-2 * even + 1) as f32;
+                            let area_fract = area.fract();
 
-                            ((add_val + sign * area.fract()) * 255.0 + 0.5) as u32
+                            ((add_val + sign * area_fract) * 255.0 + 0.5) as u32
                         }
                     };
 
@@ -220,28 +221,29 @@ impl Strip {
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
 mod neon {
-    use std::arch::aarch64::*;
-
     use crate::strip::Strip;
-    use crate::tiling::{Tile, Tiles};
+    use crate::tiling::{Footprint, Tile, Tiles};
+    use crate::FillRule;
+    use std::arch::aarch64::*;
 
     /// SAFETY: Caller must ensure that target feature `neon` is available.
     pub unsafe fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
+        fill_rule: FillRule,
     ) {
         // TODO: Clean up and improve this impementation
-        // TODO: Add even-odd filling.
         unsafe {
             strip_buf.clear();
 
             let mut strip_start = true;
             let mut cols = alpha_buf.len() as u32;
             let mut prev_tile = tiles.get_tile(0);
-            let mut fp = prev_tile.footprint().0;
+            let mut fp = prev_tile.footprint();
             let mut seg_start = 0;
             let mut delta = 0;
+
             // Note: the input should contain a sentinel tile, to avoid having
             // logic here to process the final strip.
             const IOTA: [f32; 4] = [0.0, 1.0, 2.0, 3.0];
@@ -251,12 +253,15 @@ mod neon {
                 if prev_tile.loc() != tile.loc() {
                     let start_delta = delta;
                     let same_strip = prev_tile.loc().same_strip(&tile.loc());
+
                     if same_strip {
-                        fp |= 8;
+                        fp.extend(3);
                     }
-                    let x0 = fp.trailing_zeros();
-                    let x1 = 32 - fp.leading_zeros();
+
+                    let x0 = fp.x0();
+                    let x1 = fp.x1();
                     let mut areas = [[start_delta as f32; 4]; 4];
+
                     for j in seg_start..i {
                         let tile = tiles.get_tile(j);
                         // small gain possible here to unpack in simd, but llvm goes halfway
@@ -302,36 +307,69 @@ mod neon {
                             vst1q_f32(areas.as_mut_ptr().add(x as usize) as *mut f32, varea);
                         }
                     }
+
                     for x in x0..x1 {
                         let mut alphas = 0u32;
-                        let varea = vld1q_f32(areas.as_ptr().add(x as usize) as *const f32);
-                        let vnzw = vminq_f32(vabsq_f32(varea), vdupq_n_f32(1.0));
-                        let vscaled = vmulq_f32(vnzw, vdupq_n_f32(255.0));
-                        let vbits = vreinterpretq_u8_u32(vcvtnq_u32_f32(vscaled));
-                        let vbits2 = vuzp1q_u8(vbits, vbits);
-                        let vbits3 = vreinterpretq_u32_u8(vuzp1q_u8(vbits2, vbits2));
-                        vst1q_lane_u32::<0>(&mut alphas, vbits3);
+                        match fill_rule {
+                            FillRule::NonZero => {
+                                let varea = vld1q_f32(areas.as_ptr().add(x as usize) as *const f32);
+                                let vnzw = vminq_f32(vabsq_f32(varea), vdupq_n_f32(1.0));
+                                let vscaled = vmulq_f32(vnzw, vdupq_n_f32(255.0));
+                                let vbits = vreinterpretq_u8_u32(vcvtnq_u32_f32(vscaled));
+                                let vbits2 = vuzp1q_u8(vbits, vbits);
+                                let vbits3 = vreinterpretq_u32_u8(vuzp1q_u8(vbits2, vbits2));
+                                vst1q_lane_u32::<0>(&mut alphas, vbits3);
+                            }
+                            FillRule::EvenOdd => {
+                                let area = vld1q_f32(areas.as_ptr().add(x as usize) as *const f32);
+                                let even = {
+                                    let im1 = vdupq_n_s32(1);
+                                    let im2 = vcvtq_s32_f32(area);
+                                    vandq_s32(im1, im2)
+                                };
+                                let add_val = vcvtq_f32_s32(even);
+                                let sign = vfmaq_f32(vdupq_n_f32(1.0), vdupq_n_f32(-2.0), add_val);
+                                let area_fract = vsubq_f32(area, vrndmq_f32(area));
+                                let vbits = vreinterpretq_u8_u32(vcvtnq_u32_f32(vmulq_f32(
+                                    vfmaq_f32(add_val, sign, area_fract),
+                                    vdupq_n_f32(255.0),
+                                )));
+                                let vbits2 = vuzp1q_u8(vbits, vbits);
+                                let vbits3 = vreinterpretq_u32_u8(vuzp1q_u8(vbits2, vbits2));
+                                vst1q_lane_u32::<0>(&mut alphas, vbits3);
+                            }
+                        }
                         alpha_buf.push(alphas);
                     }
 
                     if strip_start {
                         let strip = Strip {
                             x: 4 * prev_tile.x() + x0 as i32,
-                            y: (4 * prev_tile.y()) as u32,
+                            y: 4 * prev_tile.y() as u32,
                             col: cols,
                             winding: start_delta,
                         };
+
                         strip_buf.push(strip);
                     }
+
                     cols += x1 - x0;
-                    fp = if same_strip { 1 } else { 0 };
+                    fp = if same_strip {
+                        Footprint::from_index(0)
+                    } else {
+                        Footprint::empty()
+                    };
+
                     strip_start = !same_strip;
                     seg_start = i;
+
                     if !prev_tile.loc().same_row(&tile.loc()) {
                         delta = 0;
                     }
                 }
-                fp |= tile.footprint().0;
+
+                fp.merge(&tile.footprint());
+
                 prev_tile = tile;
             }
         }
