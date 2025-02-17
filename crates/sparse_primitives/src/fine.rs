@@ -6,6 +6,7 @@
 use crate::dispatcher::Dispatcher;
 use crate::paint::Paint;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
+use crate::ExecutionMode;
 
 pub(crate) const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
 
@@ -18,8 +19,7 @@ pub(crate) struct Fine<'a> {
     // That said, if we use u8, then this is basically a block of
     // untyped memory.
     pub(crate) scratch: [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-    #[cfg(feature = "simd")]
-    use_simd: bool,
+    execution_mode: ExecutionMode,
 }
 
 impl<'a> Fine<'a> {
@@ -27,7 +27,7 @@ impl<'a> Fine<'a> {
         width: usize,
         height: usize,
         out_buf: &'a mut [u8],
-        #[cfg(feature = "simd")] use_simd: bool,
+        execution_mode: ExecutionMode,
     ) -> Self {
         let scratch = [0; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4];
         Self {
@@ -35,8 +35,7 @@ impl<'a> Fine<'a> {
             height,
             out_buf,
             scratch,
-            #[cfg(feature = "simd")]
-            use_simd,
+            execution_mode,
         }
     }
 
@@ -76,8 +75,7 @@ impl<'a> Fine<'a> {
     pub(crate) fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
         let dispatcher = Dispatcher {
             scalar: Box::new(|scratch| fill_scalar(scratch, x, width, paint)),
-            #[cfg(feature = "simd")]
-            use_simd: self.use_simd,
+            execution_mode: self.execution_mode,
             #[cfg(all(target_arch = "aarch64", feature = "simd"))]
             neon: Box::new(|scratch| unsafe { neon::fill_simd(scratch, x, width, paint) }),
         };
@@ -89,8 +87,7 @@ impl<'a> Fine<'a> {
     pub(crate) fn strip(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
         let dispatcher = Dispatcher {
             scalar: Box::new(|scratch| strip_scalar(scratch, x, width, alphas, paint)),
-            #[cfg(feature = "simd")]
-            use_simd: self.use_simd,
+            execution_mode: self.execution_mode,
             #[cfg(all(target_arch = "aarch64", feature = "simd"))]
             neon: Box::new(|scratch| unsafe { neon::strip_simd(scratch, x, width, alphas, paint) }),
         };
