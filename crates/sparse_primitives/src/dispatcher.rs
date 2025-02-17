@@ -32,4 +32,3 @@ macro_rules! dispatch {
         }
     };
 }
-
