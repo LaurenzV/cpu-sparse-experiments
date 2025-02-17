@@ -168,16 +168,10 @@ mod scalar {
         let colors = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
             .chunks_exact_mut(STRIP_HEIGHT_F32);
 
-        if alpha == 255 {
-            for z in colors {
-                z.copy_from_slice(&color_buf);
-            }
-        } else {
-            let inv_alpha = 255 - alpha as u16;
-            for z in colors {
-                for i in 0..STRIP_HEIGHT_F32 {
-                    z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color_buf[i];
-                }
+        let inv_alpha = 255 - alpha as u16;
+        for z in colors {
+            for i in 0..STRIP_HEIGHT_F32 {
+                z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color_buf[i];
             }
         }
     }
@@ -242,13 +236,13 @@ mod neon {
                 col.copy_from_slice(&color_buf);
             }
         } else {
-            let inv_alpha = vdupq_n_u16(255 - alpha as u16);
+            let inv_alpha = vdup_n_u8(255 - alpha);
 
             for z in strip_cols {
                 for i in 0..2 {
                     let index = i * 8;
-                    let z_vals = vmovl_u8(vld1_u8(z.as_mut_ptr().add(index)));
-                    let im_1 = vmulq_u16(z_vals, inv_alpha);
+                    let z_vals = vld1_u8(z.as_mut_ptr().add(index));
+                    let im_1 = vmull_u8(z_vals, inv_alpha);
                     let im_2 = div_255(im_1);
                     let im_3 = vmovn_u16(im_2);
                     let im_4 = vadd_u8(im_3, color_buf_simd);
@@ -303,6 +297,7 @@ mod neon {
         }
     }
 
+    #[inline]
     unsafe fn div_255(val: uint16x8_t) -> uint16x8_t {
         let val_shifted = vshrq_n_u16::<8>(val);
         let one = vdupq_n_u16(1);
