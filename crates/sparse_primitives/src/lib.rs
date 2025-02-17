@@ -49,5 +49,19 @@ pub enum ExecutionMode {
     Neon,
 }
 
+#[cfg(feature = "simd")]
+impl Default for ExecutionMode {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+#[cfg(not(feature = "simd"))]
+impl Default for ExecutionMode {
+    fn default() -> Self {
+        Self::Scalar
+    }
+}
+
 pub use pixmap::Pixmap;
 pub use render::RenderContext;

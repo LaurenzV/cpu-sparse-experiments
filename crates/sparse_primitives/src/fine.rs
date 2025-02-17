@@ -3,10 +3,9 @@
 
 //! Fine rasterization
 
-use crate::dispatcher::Dispatcher;
 use crate::paint::Paint;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
-use crate::ExecutionMode;
+use crate::{dispatch, ExecutionMode};
 
 pub(crate) const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
 
@@ -73,104 +72,36 @@ impl<'a> Fine<'a> {
 
     #[inline(never)]
     pub(crate) fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
-        let dispatcher = Dispatcher {
-            scalar: Box::new(|scratch| fill_scalar(scratch, x, width, paint)),
-            execution_mode: self.execution_mode,
-            #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-            neon: Box::new(|scratch| unsafe { neon::fill_simd(scratch, x, width, paint) }),
-        };
+        match paint {
+            Paint::Solid(c) => {
+                let color = c.premultiply().to_rgba8().to_u8_array();
 
-        dispatcher.dispatch(&mut self.scratch);
+                dispatch!(
+                    scalar: scalar::fill_solid(&mut self.scratch, &color, x, width),
+                    neon: neon::fill_solid(&mut self.scratch, &color, x, width),
+                    execution_mode: self.execution_mode
+                );
+            }
+            Paint::Pattern(_) => unimplemented!(),
+        }
     }
 
     #[inline(never)]
     pub(crate) fn strip(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
-        let dispatcher = Dispatcher {
-            scalar: Box::new(|scratch| strip_scalar(scratch, x, width, alphas, paint)),
-            execution_mode: self.execution_mode,
-            #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-            neon: Box::new(|scratch| unsafe { neon::strip_simd(scratch, x, width, alphas, paint) }),
-        };
+        debug_assert!(alphas.len() >= width);
 
-        dispatcher.dispatch(&mut self.scratch);
-    }
-}
+        match paint {
+            Paint::Solid(s) => {
+                let color = s.premultiply().to_rgba8().to_u8_array();
 
-#[inline(always)]
-fn div_255(val: u16) -> u16 {
-    // For some reason, doing this instead of / 255 makes strip_scalar 3x faster on ARM.
-    // TODO: Measure behavior on x86
-    (val + 1 + (val >> 8)) >> 8
-}
-
-fn fill_scalar(
-    scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-    x: usize,
-    width: usize,
-    paint: &Paint,
-) {
-    match paint {
-        Paint::Solid(c) => {
-            let (color_buf, alpha) = {
-                let mut buf = [0; STRIP_HEIGHT_F32];
-                let premul_color = c.premultiply().to_rgba8().to_u8_array();
-
-                for i in 0..STRIP_HEIGHT {
-                    buf[i * 4..((i + 1) * 4)].copy_from_slice(&premul_color);
-                }
-
-                (buf, buf[3])
-            };
-
-            let colors = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                .chunks_exact_mut(STRIP_HEIGHT_F32);
-
-            if alpha == 255 {
-                for z in colors {
-                    z.copy_from_slice(&color_buf);
-                }
-            } else {
-                let inv_alpha = 255 - alpha as u16;
-                for z in colors {
-                    for i in 0..STRIP_HEIGHT_F32 {
-                        z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color_buf[i];
-                    }
-                }
+                dispatch!(
+                    scalar: scalar::strip_solid(&mut self.scratch, &color, x, width, alphas),
+                    neon: neon::strip_solid(&mut self.scratch, &color, x, width, alphas),
+                    execution_mode: self.execution_mode
+                );
             }
+            Paint::Pattern(_) => unimplemented!(),
         }
-        Paint::Pattern(_) => unimplemented!(),
-    }
-}
-
-fn strip_scalar(
-    scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-    x: usize,
-    width: usize,
-    alphas: &[u32],
-    paint: &Paint,
-) {
-    match paint {
-        Paint::Solid(s) => {
-            let color = s.premultiply().to_rgba8().to_u8_array();
-
-            debug_assert!(alphas.len() >= width);
-            for (z, a) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                .chunks_exact_mut(16)
-                .zip(alphas)
-            {
-                for j in 0..4 {
-                    let mask_alpha = ((*a >> (j * 8)) & 0xff) as u16;
-                    let inv_alpha = 255 - (mask_alpha * color[3] as u16) / 255;
-                    for i in 0..4 {
-                        let im1 = z[j * 4 + i] as u16 * inv_alpha;
-                        let im2 = mask_alpha * color[i] as u16;
-                        let im3 = div_255(im1 + im2);
-                        z[j * 4 + i] = im3 as u8;
-                    }
-                }
-            }
-        }
-        Paint::Pattern(_) => unimplemented!(),
     }
 }
 
@@ -204,117 +135,171 @@ fn pack(
     }
 }
 
+mod scalar {
+    use crate::fine::STRIP_HEIGHT_F32;
+    use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
+
+    #[inline(always)]
+    fn div_255(val: u16) -> u16 {
+        // For some reason, doing this instead of / 255 makes strip_scalar 3x faster on ARM.
+        // TODO: Measure behavior on x86
+        (val + 1 + (val >> 8)) >> 8
+    }
+
+    // TODO: It seems like autovectorization deteriorated after compared to
+    // 50cd5b4f. Investigate.
+
+    pub(super) fn fill_solid(
+        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+        color: &[u8; 4],
+        x: usize,
+        width: usize,
+    ) {
+        let (color_buf, alpha) = {
+            let mut buf = [0; STRIP_HEIGHT_F32];
+
+            for i in 0..STRIP_HEIGHT {
+                buf[i * 4..((i + 1) * 4)].copy_from_slice(color);
+            }
+
+            (buf, buf[3])
+        };
+
+        let colors = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+            .chunks_exact_mut(STRIP_HEIGHT_F32);
+
+        if alpha == 255 {
+            for z in colors {
+                z.copy_from_slice(&color_buf);
+            }
+        } else {
+            let inv_alpha = 255 - alpha as u16;
+            for z in colors {
+                for i in 0..STRIP_HEIGHT_F32 {
+                    z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color_buf[i];
+                }
+            }
+        }
+    }
+
+    pub(super) fn strip_solid(
+        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+        color: &[u8; 4],
+        x: usize,
+        width: usize,
+        alphas: &[u32],
+    ) {
+        for (z, a) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+            .chunks_exact_mut(16)
+            .zip(alphas)
+        {
+            for j in 0..4 {
+                let mask_alpha = ((*a >> (j * 8)) & 0xff) as u16;
+                let inv_alpha = 255 - (mask_alpha * color[3] as u16) / 255;
+                for i in 0..4 {
+                    let im1 = z[j * 4 + i] as u16 * inv_alpha;
+                    let im2 = mask_alpha * color[i] as u16;
+                    let im3 = div_255(im1 + im2);
+                    z[j * 4 + i] = im3 as u8;
+                }
+            }
+        }
+    }
+}
+
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
 mod neon {
     use std::arch::aarch64::*;
 
     use crate::fine::STRIP_HEIGHT_F32;
-    use crate::paint::Paint;
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
     // Note: This method currently seems to be slower than the scalar version.
-    pub(super) unsafe fn fill_simd(
+    pub(super) unsafe fn fill_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+        color: &[u8; 4],
         x: usize,
         width: usize,
-        paint: &Paint,
     ) {
-        use std::arch::aarch64::*;
+        let (color_buf, alpha) = {
+            let mut buf = [0; STRIP_HEIGHT_F32];
 
-        match paint {
-            Paint::Solid(c) => {
-                let (color_buf, alpha) = {
-                    let mut buf = [0; STRIP_HEIGHT_F32];
-                    let premul_color = c.premultiply().to_rgba8().to_u8_array();
+            for i in 0..STRIP_HEIGHT {
+                buf[i * 4..((i + 1) * 4)].copy_from_slice(color);
+            }
 
-                    for i in 0..STRIP_HEIGHT {
-                        buf[i * 4..((i + 1) * 4)].copy_from_slice(&premul_color);
-                    }
+            (buf, buf[3])
+        };
 
-                    (buf, buf[3])
-                };
+        let color_buf_simd = vld1_u8(color_buf[0..].as_ptr());
 
-                let color_buf_simd = vld1_u8(color_buf[0..].as_ptr());
+        let mut strip_cols = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+            .chunks_exact_mut(STRIP_HEIGHT_F32);
 
-                let mut strip_cols = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(STRIP_HEIGHT_F32);
+        if alpha == 255 {
+            for col in strip_cols {
+                col.copy_from_slice(&color_buf);
+            }
+        } else {
+            let inv_alpha = vdupq_n_u16(255 - alpha as u16);
 
-                if alpha == 255 {
-                    for col in strip_cols {
-                        col.copy_from_slice(&color_buf);
-                    }
-                } else {
-                    let inv_alpha = vdupq_n_u16(255 - alpha as u16);
-
-                    for z in strip_cols {
-                        for i in 0..2 {
-                            let index = i * 8;
-                            let z_vals = vmovl_u8(vld1_u8(z.as_mut_ptr().add(index)));
-                            let im_1 = vmulq_u16(z_vals, inv_alpha);
-                            let im_2 = div_255(im_1);
-                            let im_3 = vmovn_u16(im_2);
-                            let im_4 = vadd_u8(im_3, color_buf_simd);
-                            vst1_u8(z.as_mut_ptr().add(index), im_4);
-                        }
-                    }
+            for z in strip_cols {
+                for i in 0..2 {
+                    let index = i * 8;
+                    let z_vals = vmovl_u8(vld1_u8(z.as_mut_ptr().add(index)));
+                    let im_1 = vmulq_u16(z_vals, inv_alpha);
+                    let im_2 = div_255(im_1);
+                    let im_3 = vmovn_u16(im_2);
+                    let im_4 = vadd_u8(im_3, color_buf_simd);
+                    vst1_u8(z.as_mut_ptr().add(index), im_4);
                 }
             }
-            Paint::Pattern(_) => unimplemented!(),
         }
     }
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
-    #[inline(never)]
-    pub(super) unsafe fn strip_simd(
+    pub(super) unsafe fn strip_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+        color: &[u8; 4],
         x: usize,
         width: usize,
         alphas: &[u32],
-        paint: &Paint,
     ) {
-        match paint {
-            Paint::Solid(s) => {
-                let color = s.premultiply().to_rgba8().to_u8_array();
-                let color_alpha = vdupq_n_u16(color[3] as u16);
-                let simd_color = {
-                    let color = u32::from_le_bytes(color) as u64;
-                    let color = color | (color << 32);
-                    vmovl_u8(vcreate_u8(color))
+        let color_alpha = vdupq_n_u16(color[3] as u16);
+
+        let simd_color = {
+            let color = u32::from_le_bytes(*color) as u64;
+            let color = color | (color << 32);
+            vmovl_u8(vcreate_u8(color))
+        };
+
+        let tff = vdupq_n_u16(255);
+
+        for (z, a) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+            .chunks_exact_mut(16)
+            .zip(alphas)
+        {
+            for j in 0..2 {
+                let index = j * 8;
+
+                let mask_alpha = {
+                    let first_mask = vdup_n_u16(((*a >> 2 * index) & 0xff) as u16);
+                    let second_mask = vdup_n_u16(((*a >> (2 * index + 8)) & 0xff) as u16);
+                    vcombine_u16(first_mask, second_mask)
                 };
 
-                let tff = vdupq_n_u16(255);
+                let inv_alpha = {
+                    let im1 = vmulq_u16(mask_alpha, color_alpha);
+                    let im2 = div_255(im1);
+                    vsubq_u16(tff, im2)
+                };
 
-                debug_assert!(alphas.len() >= width);
-
-                for (z, a) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(16)
-                    .zip(alphas)
-                {
-                    for j in 0..2 {
-                        let index = j * 8;
-
-                        let mask_alpha = {
-                            let first_mask = vdup_n_u16(((*a >> 2 * index) & 0xff) as u16);
-                            let second_mask = vdup_n_u16(((*a >> (2 * index + 8)) & 0xff) as u16);
-                            vcombine_u16(first_mask, second_mask)
-                        };
-
-                        let inv_alpha = {
-                            let im1 = vmulq_u16(mask_alpha, color_alpha);
-                            let im2 = div_255(im1);
-                            vsubq_u16(tff, im2)
-                        };
-
-                        let im1 =
-                            vmulq_u16(vmovl_u8(vld1_u8(z.as_mut_ptr().add(index))), inv_alpha);
-                        let im2 = vmulq_u16(mask_alpha, simd_color);
-                        let im3 = vmovn_u16(div_255(vaddq_u16(im1, im2)));
-                        vst1_u8(z.as_mut_ptr().add(index), im3);
-                    }
-                }
+                let im1 = vmulq_u16(vmovl_u8(vld1_u8(z.as_mut_ptr().add(index))), inv_alpha);
+                let im2 = vmulq_u16(mask_alpha, simd_color);
+                let im3 = vmovn_u16(div_255(vaddq_u16(im1, im2)));
+                vst1_u8(z.as_mut_ptr().add(index), im3);
             }
-            Paint::Pattern(_) => unimplemented!(),
         }
     }
 
