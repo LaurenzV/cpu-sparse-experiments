@@ -3,6 +3,7 @@
 
 //! Fine rasterization
 
+use crate::dispatcher::Dispatcher;
 use crate::paint::Paint;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
@@ -17,7 +18,6 @@ pub(crate) struct Fine<'a> {
     // That said, if we use u8, then this is basically a block of
     // untyped memory.
     pub(crate) scratch: [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-    #[cfg(feature = "simd")]
     use_simd: bool,
 }
 
@@ -26,7 +26,7 @@ impl<'a> Fine<'a> {
         width: usize,
         height: usize,
         out_buf: &'a mut [u8],
-        #[cfg(feature = "simd")] use_simd: bool,
+        use_simd: bool,
     ) -> Self {
         let scratch = [0; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4];
         Self {
@@ -34,7 +34,6 @@ impl<'a> Fine<'a> {
             height,
             out_buf,
             scratch,
-            #[cfg(feature = "simd")]
             use_simd,
         }
     }
@@ -73,16 +72,17 @@ impl<'a> Fine<'a> {
 
     #[inline(never)]
     pub(crate) fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
-        #[cfg(feature = "simd")]
-        if self.use_simd {
-            #[cfg(target_arch = "aarch64")]
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                // SAFETY: We ensured that the `neon` target feature is available.
-                return unsafe { neon::fill_simd(&mut self.scratch, x, width, paint) };
-            }
+        let mut dispatcher = Dispatcher::new(
+            |scratch| fill_scalar(scratch, x, width, paint),
+            self.use_simd,
+        );
+
+        #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+        {
+            dispatcher = dispatcher.with_neon(|scratch| unsafe { neon::fill_simd(scratch, x, width, paint) });
         }
 
-        fill_scalar(&mut self.scratch, x, width, paint);
+        dispatcher.dispatch(&mut self.scratch);
     }
 
     #[inline(never)]
