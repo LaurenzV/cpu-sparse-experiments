@@ -222,7 +222,6 @@ mod neon {
     use std::arch::aarch64::*;
 
     use crate::fine::STRIP_HEIGHT_F32;
-    use crate::paint::Paint;
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
