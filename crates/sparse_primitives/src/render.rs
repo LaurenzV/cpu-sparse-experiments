@@ -69,7 +69,8 @@ impl RenderContext {
             tiles,
             strip_buf,
             #[cfg(feature = "simd")]
-            use_simd: option_env!("SIMD").is_some(),
+            // TODO: Allow to configure
+            use_simd: true,
             transform: Affine::IDENTITY,
         }
     }

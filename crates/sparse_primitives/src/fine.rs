@@ -3,6 +3,7 @@
 
 //! Fine rasterization
 
+use crate::dispatcher::Dispatcher;
 use crate::paint::Paint;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
@@ -73,30 +74,28 @@ impl<'a> Fine<'a> {
 
     #[inline(never)]
     pub(crate) fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
-        #[cfg(feature = "simd")]
-        if self.use_simd {
-            #[cfg(target_arch = "aarch64")]
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                // SAFETY: We ensured that the `neon` target feature is available.
-                return unsafe { neon::fill_simd(&mut self.scratch, x, width, paint) };
-            }
-        }
+        let dispatcher = Dispatcher {
+            scalar: Box::new(|scratch| fill_scalar(scratch, x, width, paint)),
+            #[cfg(feature = "simd")]
+            use_simd: self.use_simd,
+            #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+            neon: Box::new(|scratch| unsafe { neon::fill_simd(scratch, x, width, paint) }),
+        };
 
-        fill_scalar(&mut self.scratch, x, width, paint);
+        dispatcher.dispatch(&mut self.scratch);
     }
 
     #[inline(never)]
     pub(crate) fn strip(&mut self, x: usize, width: usize, alphas: &[u32], paint: &Paint) {
-        #[cfg(feature = "simd")]
-        if self.use_simd {
-            #[cfg(target_arch = "aarch64")]
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                // SAFETY: We ensured that the `neon` target feature is available.
-                return unsafe { neon::strip_simd(&mut self.scratch, x, width, alphas, paint) };
-            }
-        }
+        let dispatcher = Dispatcher {
+            scalar: Box::new(|scratch| strip_scalar(scratch, x, width, alphas, paint)),
+            #[cfg(feature = "simd")]
+            use_simd: self.use_simd,
+            #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+            neon: Box::new(|scratch| unsafe { neon::strip_simd(scratch, x, width, alphas, paint) }),
+        };
 
-        strip_scalar(&mut self.scratch, x, width, alphas, paint);
+        dispatcher.dispatch(&mut self.scratch);
     }
 }
 

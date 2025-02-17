@@ -3,6 +3,7 @@
 
 #![cfg_attr(not(feature = "simd"), forbid(unsafe_code))]
 
+mod dispatcher;
 pub mod fine;
 pub mod flatten;
 pub mod paint;

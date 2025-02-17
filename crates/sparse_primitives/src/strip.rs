@@ -11,6 +11,7 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
+use crate::dispatcher::Dispatcher;
 use crate::tiling::{Footprint, Tiles};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
@@ -31,16 +32,19 @@ pub fn render_strips(
     fill_rule: FillRule,
     #[cfg(feature = "simd")] use_simd: bool,
 ) {
-    #[cfg(feature = "simd")]
-    if use_simd {
-        #[cfg(target_arch = "aarch64")]
-        if std::arch::is_aarch64_feature_detected!("neon") {
-            // SAFETY: We checked that the target feature `neon` is available.
-            return unsafe { neon::render_strips(tiles, strip_buf, alpha_buf) };
-        }
-    }
+    let dispatcher = Dispatcher {
+        scalar: Box::new(|(strip_buf, alpha_buf)| {
+            render_strips_scalar(tiles, strip_buf, alpha_buf, fill_rule)
+        }),
+        #[cfg(feature = "simd")]
+        use_simd,
+        #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+        neon: Box::new(|(strip_buf, alpha_buf)| unsafe {
+            neon::render_strips(tiles, strip_buf, alpha_buf)
+        }),
+    };
 
-    render_strips_scalar(tiles, strip_buf, alpha_buf, fill_rule);
+    dispatcher.dispatch((strip_buf, alpha_buf));
 }
 
 fn render_strips_scalar(
