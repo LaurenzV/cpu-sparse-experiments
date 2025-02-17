@@ -8,7 +8,6 @@ pub struct Dispatcher<'a, T> {
 }
 
 impl<'a, T> Dispatcher<'a, T> {
-    #[allow(unreachable_code)]
     pub fn dispatch(&self, params: T) {
         match self.execution_mode {
             ExecutionMode::Scalar => {
@@ -35,8 +34,5 @@ impl<'a, T> Dispatcher<'a, T> {
                 );
             }
         }
-
-        // Just as a sanity check that we didn't forget the `return` anywhere.
-        unreachable!();
     }
 }
