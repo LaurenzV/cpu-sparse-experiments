@@ -16,6 +16,8 @@ pub mod svg;
 pub mod tiling;
 pub mod wide_tile;
 
+pub use peniko::*;
+
 #[derive(Clone, Copy)]
 pub enum FillRule {
     NonZero,

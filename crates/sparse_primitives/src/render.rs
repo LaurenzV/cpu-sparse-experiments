@@ -207,16 +207,16 @@ impl RenderContext {
     }
 
     /// Fill a path.
-    pub fn fill_path(&mut self, path: &Path, fill_rule: FillRule, paint: Paint) {
+    pub fn fill_path(&mut self, path: &BezPath, fill_rule: FillRule, paint: Paint) {
         let affine = self.current_transform();
-        crate::flatten::fill(&path.path, affine, &mut self.line_buf);
+        crate::flatten::fill(&path, affine, &mut self.line_buf);
         self.render_path(fill_rule, paint);
     }
 
     /// Stroke a path.
-    pub fn stroke_path(&mut self, path: &Path, stroke: &kurbo::Stroke, paint: Paint) {
+    pub fn stroke_path(&mut self, path: &BezPath, stroke: &kurbo::Stroke, paint: Paint) {
         let affine = self.current_transform();
-        crate::flatten::stroke(&path.path, stroke, affine, &mut self.line_buf);
+        crate::flatten::stroke(&path, stroke, affine, &mut self.line_buf);
         self.render_path(FillRule::NonZero, paint);
     }
 
@@ -241,16 +241,6 @@ impl RenderContext {
     }
 }
 
-#[derive(Clone)]
-pub struct Path {
-    pub path: BezPath,
-}
-
-impl From<BezPath> for Path {
-    fn from(value: BezPath) -> Self {
-        Self { path: value }
-    }
-}
 
 /// Get the color from the brush.
 ///

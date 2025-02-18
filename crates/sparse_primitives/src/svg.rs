@@ -1,4 +1,3 @@
-use crate::render::Path;
 use crate::{FillRule, RenderContext};
 use peniko::color::AlphaColor;
 use peniko::kurbo::{Affine, BezPath, Stroke};
@@ -131,7 +130,7 @@ fn convert_transform(transform: &usvg::Transform) -> Affine {
     ])
 }
 
-fn convert_path_data(path: &usvg::Path) -> Path {
+fn convert_path_data(path: &usvg::Path) -> BezPath {
     let mut bez_path = BezPath::new();
 
     for e in path.data().segments() {
@@ -154,5 +153,5 @@ fn convert_path_data(path: &usvg::Path) -> Path {
         }
     }
 
-    bez_path.into()
+    bez_path
 }
