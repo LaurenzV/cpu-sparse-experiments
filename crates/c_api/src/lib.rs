@@ -1,11 +1,13 @@
 #![allow(non_camel_case_types)]
 #![allow(clippy::missing_safety_doc)]
 
-use std::f64::consts::PI;
 use sparse_primitives::color::{AlphaColor, Srgb};
-use sparse_primitives::{FillRule, Pixmap, RenderContext};
-use sparse_primitives::kurbo::{Affine, BezPath, Cap, Join, Point, Rect, RoundedRectRadii, Shape, Stroke};
+use sparse_primitives::kurbo::{
+    Affine, BezPath, Cap, Join, Point, Rect, RoundedRectRadii, Shape, Stroke,
+};
 use sparse_primitives::paint::Paint;
+use sparse_primitives::{FillRule, Pixmap, RenderContext};
+use std::f64::consts::PI;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -59,12 +61,7 @@ impl From<Affine> for sp_transform {
 
 impl From<sp_transform> for Affine {
     fn from(value: sp_transform) -> Self {
-        Affine::new([value.sx,
-            value.kx,
-            value.ky,
-            value.sy,
-            value.tx,
-            value.ty,])
+        Affine::new([value.sx, value.kx, value.ky, value.sy, value.tx, value.ty])
     }
 }
 
@@ -152,7 +149,7 @@ pub extern "C" fn sp_transform_translate(tx: f64, ty: f64) -> sp_transform {
 
 #[no_mangle]
 pub extern "C" fn sp_transform_rotate(angle: f64) -> sp_transform {
-    Affine::rotate(angle ).into()
+    Affine::rotate(angle).into()
 }
 
 #[no_mangle]
@@ -181,12 +178,7 @@ pub unsafe extern "C" fn sp_quad_to(path: *mut sp_path, p0: sp_point, p1: sp_poi
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sp_cubic_to(
-    path: *mut sp_path,
-    p0: sp_point,
-    p1: sp_point,
-    p2: sp_point
-) {
+pub unsafe extern "C" fn sp_cubic_to(path: *mut sp_path, p0: sp_point, p1: sp_point, p2: sp_point) {
     (*path).0.curve_to(p0, p1, p2);
 }
 
@@ -240,13 +232,8 @@ pub unsafe extern "C" fn sp_render_to_pixmap(pixmap: *mut sp_pixmap, context: *m
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sp_set_transform(
-    ctx: *mut sp_context,
-    transform: sp_transform,
-) {
-    (*ctx)
-        .0
-        .set_transform(transform.into())
+pub unsafe extern "C" fn sp_set_transform(ctx: *mut sp_context, transform: sp_transform) {
+    (*ctx).0.set_transform(transform.into())
 }
 
 #[no_mangle]
@@ -258,11 +245,8 @@ pub unsafe extern "C" fn sp_fill_path(
 ) {
     let paint = convert_paint(paint);
 
-    (*ctx)
-        .0
-        .fill_path(&(*path).0, fill_rule.into(), paint);
+    (*ctx).0.fill_path(&(*path).0, fill_rule.into(), paint);
 }
-
 
 #[no_mangle]
 pub unsafe extern "C" fn sp_stroke_path(
@@ -273,25 +257,15 @@ pub unsafe extern "C" fn sp_stroke_path(
 ) {
     let paint = convert_paint(paint);
 
-    (*ctx)
-        .0
-        .stroke_path(&(*path).0, &stroke.into(), paint);
+    (*ctx).0.stroke_path(&(*path).0, &stroke.into(), paint);
 }
-
 
 #[no_mangle]
-pub unsafe extern "C" fn sp_fill_rect(
-    ctx: *mut sp_context,
-    rect: sp_rect,
-    paint: sp_paint,
-) {
+pub unsafe extern "C" fn sp_fill_rect(ctx: *mut sp_context, rect: sp_rect, paint: sp_paint) {
     let paint = convert_paint(paint);
 
-    (*ctx)
-        .0
-        .fill_rect(&rect.into(), paint);
+    (*ctx).0.fill_rect(&rect.into(), paint);
 }
-
 
 pub struct sp_argb(Vec<u8>);
 
@@ -301,7 +275,7 @@ pub unsafe extern "C" fn sp_data(pixmap: *mut sp_pixmap) -> *mut sp_argb {
 
     // (*pixmap).0.unpremultiply();
 
-    for pixel in (*pixmap).0.data().chunks_exact(4){
+    for pixel in (*pixmap).0.data().chunks_exact(4) {
         buffer.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
     }
 
@@ -358,11 +332,7 @@ pub unsafe extern "C" fn sp_stroke_rect(
 ) {
     let paint = convert_paint(paint);
 
-    (*ctx).0.stroke_rect(
-        &rect.into(),
-        &stroke.into(),
-        paint,
-    );
+    (*ctx).0.stroke_rect(&rect.into(), &stroke.into(), paint);
 }
 
 // #[no_mangle]
