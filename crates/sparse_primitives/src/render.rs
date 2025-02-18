@@ -23,6 +23,7 @@ use peniko::{
     BrushRef,
 };
 use std::collections::BTreeMap;
+use crate::fine::FillRange;
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
 
@@ -200,7 +201,7 @@ impl RenderContext {
                     let x_tile_rel = x % WIDE_TILE_WIDTH as u32;
                     let width = x2.min(((xtile + 1) * WIDE_TILE_WIDTH) as u32) - x;
                     x += width;
-                    self.wide_tiles[row_start + xtile].fill(x_tile_rel, width, paint.clone());
+                    self.wide_tiles[row_start + xtile].fill(x_tile_rel, width, paint.clone(), FillRange::All);
                 }
             }
         }

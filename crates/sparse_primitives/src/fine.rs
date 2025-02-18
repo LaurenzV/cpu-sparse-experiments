@@ -3,6 +3,7 @@
 
 //! Fine rasterization
 
+use std::ops::Range;
 use crate::paint::Paint;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use crate::{dispatch, ExecutionMode};
@@ -19,6 +20,21 @@ pub struct Fine<'a> {
     // untyped memory.
     pub(crate) scratch: [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
     execution_mode: ExecutionMode,
+}
+
+#[derive(Clone, Debug)]
+pub enum FillRange {
+    All,
+    Ranged(Range<u8>)
+}
+
+impl FillRange {
+    fn get_range(&self) -> &Range<u8> {
+        match self {
+            FillRange::All => &(0..STRIP_HEIGHT as u8),
+            FillRange::Ranged(r) => r
+        }
+    }
 }
 
 impl<'a> Fine<'a> {
@@ -61,7 +77,7 @@ impl<'a> Fine<'a> {
     pub(crate) fn run_cmd(&mut self, cmd: &Cmd, alphas: &[u32]) {
         match cmd {
             Cmd::Fill(f) => {
-                self.fill(f.x as usize, f.width as usize, &f.paint);
+                self.fill(f.x as usize, f.width as usize, &f.paint, &f.fill_range);
             }
             Cmd::Strip(s) => {
                 let aslice = &alphas[s.alpha_ix..];
@@ -71,16 +87,27 @@ impl<'a> Fine<'a> {
     }
 
     #[inline(never)]
-    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
+    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint, fill_range: &FillRange) {
         match paint {
             Paint::Solid(c) => {
                 let color = c.premultiply().to_rgba8().to_u8_array();
 
+                let color_buf = {
+                    let mut buf = [0; STRIP_HEIGHT_F32];
+
+                    for i in fill_range.get_range().clone() {
+                        let i = i as usize;
+                        buf[i * 4..((i + 1) * 4)].copy_from_slice(&color);
+                    }
+
+                    buf
+                };
+
                 dispatch!(
-                    scalar: scalar::fill_solid(&mut self.scratch, &color, x, width),
+                    scalar: scalar::fill_solid(&mut self.scratch, &color_buf, x, width),
                     // Scalar version seems to autovectorize better than our neon impl, so
                     // for now we just use that one.
-                    neon: scalar::fill_solid(&mut self.scratch, &color, x, width),
+                    neon: scalar::fill_solid(&mut self.scratch, &color_buf, x, width),
                     execution_mode: self.execution_mode
                 );
             }
@@ -148,19 +175,11 @@ mod scalar {
 
     pub(super) fn fill_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-        color: &[u8; 4],
+        color: &[u8; STRIP_HEIGHT_F32],
         x: usize,
         width: usize,
     ) {
-        let (color_buf, alpha) = {
-            let mut buf = [0; STRIP_HEIGHT_F32];
-
-            for i in 0..STRIP_HEIGHT {
-                buf[i * 4..((i + 1) * 4)].copy_from_slice(color);
-            }
-
-            (buf, buf[3])
-        };
+        let alpha = color[3];
 
         let colors = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
             .chunks_exact_mut(STRIP_HEIGHT_F32);
@@ -168,7 +187,7 @@ mod scalar {
         let inv_alpha = 255 - alpha as u16;
         for z in colors {
             for i in 0..STRIP_HEIGHT_F32 {
-                z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color_buf[i];
+                z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color[i];
             }
         }
     }

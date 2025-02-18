@@ -2,7 +2,7 @@ use criterion::measurement::WallTime;
 use criterion::{BatchSize, BenchmarkGroup, Criterion};
 use peniko::color::palette::css::LIME_GREEN;
 use peniko::color::AlphaColor;
-use sparse_primitives::fine::Fine;
+use sparse_primitives::fine::{FillRange, Fine};
 use sparse_primitives::tiling::Tiles;
 use sparse_primitives::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use sparse_primitives::ExecutionMode;
@@ -21,7 +21,7 @@ pub fn filling(c: &mut Criterion) {
             );
 
             for i in 0..1000 {
-                fine.fill(0, WIDE_TILE_WIDTH, &LIME_GREEN.into());
+                fine.fill(0, WIDE_TILE_WIDTH, &LIME_GREEN.into(), &FillRange::All);
             }
         })
     });
