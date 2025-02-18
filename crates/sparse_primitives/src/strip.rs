@@ -167,15 +167,21 @@ mod scalar {
                         let area_u8 = match fill_rule {
                             FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
                             FillRule::EvenOdd => {
-                                let even = area as i32 % 2;
+                                let area_abs = area.abs();
+                                let area_fract = area_abs.fract();
+                                let odd = area_abs as i32 & 1;
+                                // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
+                                // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
+                                // `add_val` represents the 1, sign represents the minus.
                                 // If we have for example 2.68, then opacity is 68%, while for
                                 // 1.68 it would be (1 - 0.68) = 32%.
-                                let add_val = even as f32;
+                                // So for odd, add_val should be 1, while for even it should be 0.
+                                let add_val = odd as f32;
                                 // 1 for even, -1 for odd.
-                                let sign = (-2 * even + 1) as f32;
-                                let area_fract = area.fract();
+                                let sign = (-2 * odd + 1) as f32;
+                                let factor = add_val + sign * area_fract;
 
-                                ((add_val + sign * area_fract) * 255.0 + 0.5) as u32
+                                (factor * 255.0 + 0.5) as u32
                             }
                         };
 
@@ -317,22 +323,26 @@ mod neon {
                             vst1q_lane_u32::<0>(&mut alphas, vbits3);
                         }
                         FillRule::EvenOdd => {
-                            let area = vld1q_f32(areas.as_ptr().add(x as usize) as *const f32);
-                            let even = {
+                            let area_abs =
+                                vabsq_f32(vld1q_f32(areas.as_ptr().add(x as usize) as *const f32));
+                            let area_fract = vsubq_f32(area_abs, vrndmq_f32(area_abs));
+                            let odd = {
                                 let im1 = vdupq_n_s32(1);
-                                let im2 = vcvtq_s32_f32(area);
+                                let im2 = vcvtq_s32_f32(area_abs);
                                 vandq_s32(im1, im2)
                             };
-                            let add_val = vcvtq_f32_s32(even);
+                            let add_val = vcvtq_f32_s32(odd);
                             let sign = vfmaq_f32(vdupq_n_f32(1.0), vdupq_n_f32(-2.0), add_val);
-                            let area_fract = vsubq_f32(area, vrndmq_f32(area));
-                            let vbits = vreinterpretq_u8_u32(vcvtnq_u32_f32(vmulq_f32(
-                                vfmaq_f32(add_val, sign, area_fract),
+                            let factor = vfmaq_f32(add_val, sign, area_fract);
+                            let res = vreinterpretq_u8_u32(vcvtnq_u32_f32(vmulq_f32(
+                                factor,
                                 vdupq_n_f32(255.0),
                             )));
-                            let vbits2 = vuzp1q_u8(vbits, vbits);
-                            let vbits3 = vreinterpretq_u32_u8(vuzp1q_u8(vbits2, vbits2));
-                            vst1q_lane_u32::<0>(&mut alphas, vbits3);
+
+                            // Pack into a single u32.
+                            let packed1 = vuzp1q_u8(res, res);
+                            let packed2 = vreinterpretq_u32_u8(vuzp1q_u8(packed1, packed1));
+                            vst1q_lane_u32::<0>(&mut alphas, packed2);
                         }
                     }
                     alpha_buf.push(alphas);

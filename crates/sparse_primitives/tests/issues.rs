@@ -1,6 +1,6 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
 use peniko::color::palette;
-use peniko::kurbo::{BezPath, Stroke};
+use peniko::kurbo::{Affine, BezPath, Stroke};
 use sparse_primitives::FillRule;
 
 mod util;
@@ -236,4 +236,19 @@ fn issue_30_shape_at_wide_tile_boundary() {
 
     // Just make sure we don't panic.
     render_pixmap(&ctx);
+}
+
+#[test]
+fn issue_eo_filling_missing_anti_aliasing() {
+    let mut ctx = get_ctx(50, 50, false);
+    let mut path = BezPath::new();
+    path.move_to((0.0, 0.0));
+    path.line_to((50.0, 50.0));
+    path.line_to((0.0, 50.0));
+    path.line_to((50.0, 0.0));
+    path.close_path();
+
+    ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
+
+    check_ref(&ctx, "issue_eo_filling_missing_anti_aliasing");
 }
