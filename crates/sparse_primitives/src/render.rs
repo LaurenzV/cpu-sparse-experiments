@@ -241,7 +241,6 @@ impl RenderContext {
     }
 }
 
-
 /// Get the color from the brush.
 ///
 /// This is a hacky function that will go away when we implement
