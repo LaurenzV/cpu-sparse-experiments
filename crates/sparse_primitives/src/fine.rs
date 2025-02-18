@@ -229,18 +229,24 @@ mod neon {
         let mut strip_cols = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
             .chunks_exact_mut(STRIP_HEIGHT_F32);
 
-        let inv_alpha = vdupq_n_u8(255 - alpha);
+        if alpha == 255 {
+            for col in strip_cols {
+                col.copy_from_slice(&color_buf);
+            }
+        } else {
+            let inv_alpha = vdupq_n_u8(255 - alpha);
 
-        for z in strip_cols {
-            let z_vals = vld1q_u8(z.as_mut_ptr());
-            let mut low = vmull_u8(vget_low_u8(z_vals), vget_low_u8(inv_alpha));
-            let mut high = vmull_high_u8(z_vals, inv_alpha);
-            high = vshrq_n_u16::<8>(high);
-            low = vsraq_n_u16::<8>(low, low);
-            high = vmlal_high_u8(high, z_vals, inv_alpha);
-            let low = vaddhn_u16(low, vdupq_n_u16(1));
-            let res = vaddq_u8(vaddhn_high_u16(low, high, vdupq_n_u16(1)), color_buf_simd);
-            vst1q_u8(z.as_mut_ptr(), res);
+            for z in strip_cols {
+                let z_vals = vld1q_u8(z.as_mut_ptr());
+                let mut low = vmull_u8(vget_low_u8(z_vals), vget_low_u8(inv_alpha));
+                let mut high = vmull_high_u8(z_vals, inv_alpha);
+                high = vshrq_n_u16::<8>(high);
+                low = vsraq_n_u16::<8>(low, low);
+                high = vmlal_high_u8(high, z_vals, inv_alpha);
+                let low = vaddhn_u16(low, vdupq_n_u16(1));
+                let res = vaddq_u8(vaddhn_high_u16(low, high, vdupq_n_u16(1)), color_buf_simd);
+                vst1q_u8(z.as_mut_ptr(), res);
+            }
         }
     }
 
