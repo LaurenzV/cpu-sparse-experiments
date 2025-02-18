@@ -300,7 +300,7 @@ pub struct sp_stroke {
 impl From<sp_stroke> for Stroke {
     fn from(value: sp_stroke) -> Self {
         Self {
-            width: value.width as f64,
+            width: value.width,
             join: Join::Bevel,
             start_cap: Cap::Butt,
             end_cap: Cap::Butt,
