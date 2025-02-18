@@ -3,6 +3,7 @@ use peniko::kurbo::{Affine, BezPath, Point, Rect, RoundedRectRadii, Shape};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::f64::consts::PI;
+use std::path::PathBuf;
 
 const SEED: [u8; 32] = [0; 32];
 
@@ -188,6 +189,68 @@ impl Iterator for PolyIterator {
             Some(Command::StrokePath(path.into(), color))
         } else {
             Some(Command::FillPath(path.into(), color, self.nz))
+        }
+    }
+}
+
+pub enum ShapeType {
+    Dragon,
+    Butterfly,
+    Fish,
+    World,
+}
+
+impl ShapeType {
+    fn str(&self) -> &'static str {
+        match self {
+            ShapeType::Dragon => "dragon",
+            ShapeType::Butterfly => "butterfly",
+            ShapeType::Fish => "fish",
+            ShapeType::World => "world"
+        }
+    }
+}
+
+
+pub struct ShapeIterator {
+    params: Params,
+    shape_path: BezPath,
+    rng: StdRng,
+}
+
+impl ShapeIterator {
+    pub fn new(params: Params, shape: ShapeType) -> Self {
+        let base_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("assets/{}.txt", shape.str()));
+
+        let scale_factor = params.size as f64 / 8.0;
+        let mut shape_path = BezPath::from_svg(std::str::from_utf8(&std::fs::read(&base_path).unwrap()).unwrap()).unwrap();
+        shape_path = Affine::scale(scale_factor) * shape_path;
+
+        Self {
+            params,
+            shape_path,
+            rng: StdRng::from_seed(SEED),
+        }
+    }
+}
+
+impl Iterator for ShapeIterator {
+    type Item = Command;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let size = self.params.size;
+
+        let x = self.rng.random_range(0..=(self.params.width - size)) as f64;
+        let y = self.rng.random_range(0..=(self.params.height - size)) as f64;
+        let path = Affine::translate((x, y)) * self.shape_path.clone();
+
+
+        let color = gen_color(&mut self.rng, self.params.alpha);
+
+        if self.params.stroke {
+            Some(Command::StrokePath(path, color))
+        } else {
+            Some(Command::FillPath(path, color, true))
         }
     }
 }
