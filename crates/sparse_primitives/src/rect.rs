@@ -17,26 +17,23 @@ use peniko::kurbo::{Affine, Join, Rect, Shape};
 
 impl RenderContext {
     /// Fill a rectangle.
-    pub fn fill_rect(&mut self, rect: &Rect, paint: Paint) {
+    pub fn fill_rect(&mut self, rect: &Rect) {
         let affine = self.current_transform();
 
         if !affine.has_skew() {
             // If there is no skewing transform, we can use the rectangle fast path and transform
             // the points manually.
             let rect = transform_non_skewed_rect(rect, affine);
-            self.render_filled_rect(&rect, paint);
+            self.render_filled_rect(&rect, self.paint.clone());
         } else {
-            self.fill_path(
-                &rect.to_path(DEFAULT_TOLERANCE).into(),
-                FillRule::NonZero,
-                paint,
-            );
+            self.fill_path(&rect.to_path(DEFAULT_TOLERANCE).into());
         }
     }
 
     /// Stroke a rectangle.
-    pub fn stroke_rect(&mut self, rect: &Rect, stroke: &kurbo::Stroke, paint: Paint) {
+    pub fn stroke_rect(&mut self, rect: &Rect) {
         let affine = self.current_transform();
+        let stroke = &self.stroke;
 
         // If we have no skew and miter join, we can use a fast path
         // to render the rectangle as a combination of four sub-rectangles, one for each side,
@@ -54,17 +51,17 @@ impl RenderContext {
 
             if inner_rect.area() <= 0.0 {
                 // Stroke is so big that inner part of rect is completely filled, so we can just fill the outer rect.
-                self.fill_rect(&outer_rect, paint);
+                self.fill_rect(&outer_rect);
             } else if inner_rect.y0.fract() == 0.0 && inner_rect.y1.fract() == 0.0 {
                 // If the inner rect is y-aligned, we can draw the stroke as a combination of 4 rectangles,
                 // which is also very inefficient. This unfortunately doesn't work for unaligned y,
                 // because we would get aliasing artifacts at the intersection of the rectangles.
-                self.draw_rect_strokes(&outer_rect, &inner_rect, paint);
+                self.draw_rect_strokes(&outer_rect, &inner_rect, self.paint.clone());
             } else {
-                self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into(), stroke, paint);
+                self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into());
             }
         } else {
-            self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into(), stroke, paint);
+            self.stroke_path(&rect.to_path(DEFAULT_TOLERANCE).into());
         }
     }
 

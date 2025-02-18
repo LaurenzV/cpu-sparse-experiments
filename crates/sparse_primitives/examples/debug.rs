@@ -1,5 +1,6 @@
 use peniko::color::palette;
 use peniko::kurbo::{Affine, BezPath};
+use sparse_primitives::color::palette::css::LIME;
 use sparse_primitives::paint::Paint;
 use sparse_primitives::strip::Strip;
 use sparse_primitives::tiling::{FlatLine, Tiles, TILE_SIZE};
@@ -47,8 +48,10 @@ fn ctx() -> RenderContext {
         path
     };
 
-    ctx.transform(Affine::translate((1.0, 0.0)));
-    ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
+    ctx.pre_concat_transform(Affine::translate((1.0, 0.0)));
+    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
     // let stroke = Stroke::new(3.0);
     // ctx.stroke(&piet_path, &stroke, palette::css::DARK_BLUE.into());
 

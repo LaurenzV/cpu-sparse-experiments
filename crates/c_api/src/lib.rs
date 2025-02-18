@@ -237,34 +237,33 @@ pub unsafe extern "C" fn sp_set_transform(ctx: *mut sp_context, transform: sp_tr
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sp_fill_path(
-    ctx: *mut sp_context,
-    path: *const sp_path,
-    paint: sp_paint,
-    fill_rule: sp_fill_rule,
-) {
-    let paint = convert_paint(paint);
-
-    (*ctx).0.fill_path(&(*path).0, fill_rule.into(), paint);
+pub unsafe extern "C" fn sp_set_fill_rule(ctx: *mut sp_context, fill_rule: sp_fill_rule) {
+    (*ctx).0.set_fill_rule(fill_rule.into());
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sp_stroke_path(
-    ctx: *mut sp_context,
-    path: *const sp_path,
-    paint: sp_paint,
-    stroke: sp_stroke,
-) {
-    let paint = convert_paint(paint);
-
-    (*ctx).0.stroke_path(&(*path).0, &stroke.into(), paint);
+pub unsafe extern "C" fn sp_set_paint(ctx: *mut sp_context, paint: sp_paint) {
+    (*ctx).0.set_paint(convert_paint(paint));
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sp_fill_rect(ctx: *mut sp_context, rect: sp_rect, paint: sp_paint) {
-    let paint = convert_paint(paint);
+pub unsafe extern "C" fn sp_set_stroke(ctx: *mut sp_context, stroke: sp_stroke) {
+    (*ctx).0.set_stroke(stroke.into());
+}
 
-    (*ctx).0.fill_rect(&rect.into(), paint);
+#[no_mangle]
+pub unsafe extern "C" fn sp_fill_path(ctx: *mut sp_context, path: *const sp_path) {
+    (*ctx).0.fill_path(&(*path).0);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn sp_stroke_path(ctx: *mut sp_context, path: *const sp_path) {
+    (*ctx).0.stroke_path(&(*path).0);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn sp_fill_rect(ctx: *mut sp_context, rect: sp_rect) {
+    (*ctx).0.fill_rect(&rect.into());
 }
 
 pub struct sp_argb(Vec<u8>);
@@ -272,8 +271,6 @@ pub struct sp_argb(Vec<u8>);
 #[no_mangle]
 pub unsafe extern "C" fn sp_data(pixmap: *mut sp_pixmap) -> *mut sp_argb {
     let mut buffer = Vec::with_capacity((*pixmap).0.data().len());
-
-    // (*pixmap).0.unpremultiply();
 
     for pixel in (*pixmap).0.data().chunks_exact(4) {
         buffer.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
@@ -324,15 +321,8 @@ unsafe fn convert_paint(paint: sp_paint) -> Paint {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn sp_stroke_rect(
-    ctx: *mut sp_context,
-    rect: sp_rect,
-    paint: sp_paint,
-    stroke: sp_stroke,
-) {
-    let paint = convert_paint(paint);
-
-    (*ctx).0.stroke_rect(&rect.into(), &stroke.into(), paint);
+pub unsafe extern "C" fn sp_stroke_rect(ctx: *mut sp_context, rect: sp_rect) {
+    (*ctx).0.stroke_rect(&rect.into());
 }
 
 // #[no_mangle]

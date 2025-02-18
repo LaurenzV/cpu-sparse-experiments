@@ -80,11 +80,9 @@ fn render_path(ctx: &mut RenderContext, sctx: &mut SVGContext, path: &usvg::Path
                 _ => return,
             };
 
-            ctx.fill_path(
-                &convert_path_data(path),
-                convert_fill_rule(fill.rule()),
-                color.into(),
-            );
+            ctx.set_fill_rule(convert_fill_rule(fill.rule()));
+            ctx.set_paint(color.into());
+            ctx.fill_path(&convert_path_data(path));
         }
     };
 
@@ -99,7 +97,9 @@ fn render_path(ctx: &mut RenderContext, sctx: &mut SVGContext, path: &usvg::Path
 
             let stroke = Stroke::new(stroke.width().get() as f64);
 
-            ctx.stroke_path(&convert_path_data(path), &stroke, color.into());
+            ctx.set_stroke(stroke);
+            ctx.set_paint(color.into());
+            ctx.stroke_path(&convert_path_data(path));
         }
     };
 

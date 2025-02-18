@@ -3,6 +3,7 @@
 
 use peniko::color::palette;
 use peniko::kurbo::BezPath;
+use sparse_primitives::color::palette::css::DARK_BLUE;
 use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
 
@@ -21,11 +22,9 @@ pub fn main() {
     // path.line_to((7.5, 10.0));
     path.close_path();
     let piet_path = path.into();
-    ctx.fill_path(
-        &piet_path,
-        FillRule::NonZero,
-        palette::css::DARK_BLUE.into(),
-    );
+    ctx.set_fill_rule(FillRule::NonZero);
+    ctx.set_paint(DARK_BLUE.into());
+    ctx.fill_path(&piet_path);
     // let stroke = Stroke::new(1.0);
     // ctx.stroke(&piet_path, &stroke, palette::css::DARK_BLUE.into());
     let filename = std::env::args().nth(1).unwrap();

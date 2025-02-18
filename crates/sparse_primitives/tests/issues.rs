@@ -1,6 +1,7 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
 use peniko::color::palette;
 use peniko::kurbo::{Affine, BezPath, Stroke};
+use sparse_primitives::color::palette::css::{DARK_BLUE, LIME};
 use sparse_primitives::FillRule;
 
 mod util;
@@ -16,7 +17,8 @@ fn issue_2_incorrect_filling_1() {
 
     let mut ctx = get_ctx(8, 8, false);
 
-    ctx.fill_path(&p.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&p.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_1");
 }
@@ -32,7 +34,8 @@ fn issue_2_incorrect_filling_2() {
 
     let mut ctx = get_ctx(64, 64, false);
 
-    ctx.fill_path(&p.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&p.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_2");
 }
@@ -48,7 +51,8 @@ fn issue_2_incorrect_filling_3() {
 
     let mut ctx = get_ctx(9, 9, false);
 
-    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_3");
 }
@@ -70,7 +74,8 @@ fn issue_2_incorrect_filling_4() {
 
     let mut ctx = get_ctx(64, 64, false);
 
-    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_4");
 }
@@ -86,7 +91,8 @@ fn issue_2_incorrect_filling_5() {
 
     let mut ctx = get_ctx(32, 32, false);
 
-    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_5");
 }
@@ -102,7 +108,8 @@ fn issue_2_incorrect_filling_6() {
 
     let mut ctx = get_ctx(32, 32, false);
 
-    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_6");
 }
@@ -118,7 +125,8 @@ fn issue_2_incorrect_filling_7() {
 
     let mut ctx = get_ctx(32, 32, false);
 
-    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_7");
 }
@@ -140,7 +148,8 @@ fn issue_2_incorrect_filling_8() {
 
     let mut ctx = get_ctx(32, 32, false);
 
-    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_2_incorrect_filling_8");
 }
@@ -150,12 +159,14 @@ fn issue_11_out_of_bound_strip() {
     let mut path = BezPath::new();
     path.move_to((258.0, 254.0));
     path.line_to((265.0, 254.0));
+    let stroke = Stroke::new(1.0);
 
     let mut ctx = get_ctx(256, 256, true);
 
-    let stroke = Stroke::new(1.0);
+    ctx.set_paint(DARK_BLUE.into());
+    ctx.set_stroke(stroke);
     // Just make sure we don't panic.
-    ctx.stroke_path(&path.into(), &stroke, palette::css::DARK_BLUE.into());
+    ctx.stroke_path(&path.into());
 }
 
 #[test]
@@ -164,10 +175,10 @@ fn issue_12_filling_unclosed_path_1() {
     path.move_to((75.0, 25.0));
     path.line_to((25.0, 25.0));
     path.line_to((25.0, 75.0));
-
     let mut ctx = get_ctx(100, 100, false);
 
-    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_12_filling_unclosed_path_1");
 }
@@ -187,7 +198,8 @@ fn issue_12_filling_unclosed_path_2() {
 
     let mut ctx = get_ctx(100, 100, false);
 
-    ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::LIME.into());
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_12_filling_unclosed_path_2");
 }
@@ -202,7 +214,9 @@ fn issue_28_triangle_exceeding_viewport_1() {
 
     let mut ctx = get_ctx(15, 8, false);
 
-    ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
+    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_28_triangle_exceeding_viewport_1");
 }
@@ -217,14 +231,15 @@ fn issue_28_triangle_exceeding_viewport_2() {
 
     let mut ctx = get_ctx(15, 8, false);
 
-    ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
+    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_28_triangle_exceeding_viewport_2");
 }
 
 #[test]
 fn issue_30_shape_at_wide_tile_boundary() {
-    let mut ctx = get_ctx(256, 4, false);
     let mut path = BezPath::new();
     path.move_to((248.0, 0.0));
     path.line_to((257.0, 0.0));
@@ -232,7 +247,11 @@ fn issue_30_shape_at_wide_tile_boundary() {
     path.line_to((248.0, 2.0));
     path.close_path();
 
-    ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
+    let mut ctx = get_ctx(256, 4, false);
+
+    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     // Just make sure we don't panic.
     render_pixmap(&ctx);
@@ -240,7 +259,6 @@ fn issue_30_shape_at_wide_tile_boundary() {
 
 #[test]
 fn issue_eo_filling_missing_anti_aliasing() {
-    let mut ctx = get_ctx(50, 50, false);
     let mut path = BezPath::new();
     path.move_to((0.0, 0.0));
     path.line_to((50.0, 50.0));
@@ -248,7 +266,11 @@ fn issue_eo_filling_missing_anti_aliasing() {
     path.line_to((50.0, 0.0));
     path.close_path();
 
-    ctx.fill_path(&path.into(), FillRule::EvenOdd, palette::css::LIME.into());
+    let mut ctx = get_ctx(50, 50, false);
+
+    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_paint(LIME.into());
+    ctx.fill_path(&path.into());
 
     check_ref(&ctx, "issue_eo_filling_missing_anti_aliasing");
 }

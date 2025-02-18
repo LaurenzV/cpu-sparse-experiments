@@ -56,11 +56,15 @@ fn write_pixmap(pixmap: &mut Pixmap, size: usize) {
 fn run_cmd(ctx: &mut RenderContext, cmd: &Command) {
     match cmd {
         Command::FillRect(r, c) => {
-            ctx.fill_rect(r, (*c).into());
+            ctx.set_paint((*c).into());
+            ctx.fill_rect(r);
         }
         Command::StrokeRect(r, c) => {
             let stroke = stroke();
-            ctx.stroke_rect(r, &stroke, (*c).into());
+
+            ctx.set_paint((*c).into());
+            ctx.set_stroke(stroke);
+            ctx.stroke_rect(r);
         }
         Command::FillPath(p, c, nz) => {
             let fill_rule = if *nz {
@@ -68,11 +72,18 @@ fn run_cmd(ctx: &mut RenderContext, cmd: &Command) {
             } else {
                 FillRule::EvenOdd
             };
-            ctx.fill_path(&p.clone().into(), fill_rule, (*c).into());
+
+            ctx.set_fill_rule(fill_rule);
+            ctx.set_paint((*c).into());
+
+            ctx.fill_path(&p.clone().into());
         }
         Command::StrokePath(p, c) => {
             let stroke = stroke();
-            ctx.stroke_path(&p.clone().into(), &stroke, (*c).into());
+
+            ctx.set_stroke(stroke);
+            ctx.set_paint((*c).into());
+            ctx.stroke_path(&p.clone().into());
         }
     }
 }
