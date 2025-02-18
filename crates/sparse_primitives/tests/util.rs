@@ -2,7 +2,7 @@ use image::{load_from_memory, Rgba, RgbaImage};
 use once_cell::sync::Lazy;
 use peniko::color::palette;
 use peniko::kurbo::{Rect, Shape};
-use sparse_primitives::{FillRule, Pixmap, RenderContext};
+use sparse_primitives::{Pixmap, RenderContext};
 use std::cmp::max;
 use std::path::PathBuf;
 use std::sync::LazyLock;
@@ -23,7 +23,8 @@ pub fn get_ctx(width: usize, height: usize, transparent: bool) -> RenderContext 
     if !transparent {
         let path = Rect::new(0.0, 0.0, width as f64, height as f64).to_path(0.1);
 
-        ctx.fill_path(&path.into(), FillRule::NonZero, palette::css::WHITE.into());
+        ctx.set_paint(palette::css::WHITE.into());
+        ctx.fill_path(&path.into());
     }
 
     ctx

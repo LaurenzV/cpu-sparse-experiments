@@ -1,28 +1,25 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-// Lots of unused arguments from todo methods. Remove when all methods are implemented.
-#![allow(unused)]
-
+use crate::color::palette::css::BLACK;
+use crate::kurbo::{Cap, Join, Stroke};
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
 use crate::strip::render_strips;
-use crate::tiling::{Point, Tile, Tiles};
+use crate::tiling::Tiles;
 use crate::{
     fine::Fine,
-    strip::{self, Strip},
-    tiling::{self, FlatLine},
+    strip::Strip,
+    tiling::FlatLine,
     wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
     ExecutionMode, FillRule, Pixmap,
 };
-use peniko::kurbo::{BezPath, Rect, Shape};
+use peniko::kurbo::BezPath;
 use peniko::{
     color::{palette, AlphaColor, Srgb},
-    kurbo,
     kurbo::Affine,
     BrushRef,
 };
-use std::collections::BTreeMap;
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
 
@@ -31,15 +28,15 @@ pub struct RenderContext {
     pub height: usize,
     pub wide_tiles: Vec<WideTile>,
     pub alphas: Vec<u32>,
-
-    /// These are all scratch buffers, to be used for path rendering. They're here solely
-    /// so the allocations can be reused.
     pub line_buf: Vec<FlatLine>,
     pub tiles: Tiles,
     pub strip_buf: Vec<Strip>,
-    execution_mode: ExecutionMode,
+    pub(crate) paint: Paint,
+    pub(crate) stroke: Stroke,
 
+    execution_mode: ExecutionMode,
     transform: Affine,
+    fill_rule: FillRule,
 }
 
 impl RenderContext {
@@ -59,6 +56,22 @@ impl RenderContext {
         let line_buf = vec![];
         let tiles = Tiles::new();
         let strip_buf = vec![];
+
+        #[cfg(feature = "simd")]
+        let execution_mode = ExecutionMode::Auto;
+        #[cfg(not(feature = "simd"))]
+        let execution_mode = ExecutionMode::Scalar;
+        let transform = Affine::IDENTITY;
+        let fill_rule = FillRule::NonZero;
+        let paint = BLACK.into();
+        let stroke = Stroke {
+            width: 1.0,
+            join: Join::Bevel,
+            start_cap: Cap::Butt,
+            end_cap: Cap::Butt,
+            ..Default::default()
+        };
+
         Self {
             width,
             height,
@@ -67,13 +80,64 @@ impl RenderContext {
             line_buf,
             tiles,
             strip_buf,
-            // TODO: Allow to configure
-            #[cfg(feature = "simd")]
-            execution_mode: ExecutionMode::Auto,
-            #[cfg(not(feature = "simd"))]
-            execution_mode: ExecutionMode::Scalar,
-            transform: Affine::IDENTITY,
+            execution_mode,
+            transform,
+            paint,
+            fill_rule,
+            stroke,
         }
+    }
+
+    /// Fill a path.
+    pub fn fill_path(&mut self, path: &BezPath) {
+        crate::flatten::fill(&path, self.transform, &mut self.line_buf);
+        self.render_path(self.fill_rule, self.paint.clone());
+    }
+
+    /// Stroke a path.
+    pub fn stroke_path(&mut self, path: &BezPath) {
+        crate::flatten::stroke(&path, &self.stroke, self.transform, &mut self.line_buf);
+        self.render_path(FillRule::NonZero, self.paint.clone());
+    }
+
+    /// Set the stroking properties for stroking operations.
+    pub fn set_stroke(&mut self, stroke: Stroke) {
+        self.stroke = stroke;
+    }
+
+    /// Set the paint for filling and stroking operations.
+    pub fn set_paint(&mut self, paint: Paint) {
+        self.paint = paint;
+    }
+
+    /// Set the fill rule for filling operations.
+    pub fn set_fill_rule(&mut self, fill_rule: FillRule) {
+        self.fill_rule = fill_rule;
+    }
+
+    /// Pre-concatenate a transform to the current transformation matrix.
+    pub fn pre_concat_transform(&mut self, transform: Affine) {
+        self.transform *= transform;
+    }
+
+    /// Post-concatenate a new transform to the current transformation matrix.
+    pub fn post_concat_transform(&mut self, transform: Affine) {
+        self.transform = transform * self.transform;
+    }
+
+    /// Set the current transformation matrix.
+    pub fn set_transform(&mut self, transform: Affine) {
+        self.transform = transform;
+    }
+
+    /// Reset the current transformation matrix to the identity matrix.
+    pub fn reset_transform(&mut self) {
+        self.transform = Affine::IDENTITY;
+    }
+
+    /// Get the current transformation matrix.
+    pub fn current_transform(&self) -> Affine {
+        self.transform
     }
 
     /// Reset the current render context.
@@ -205,49 +269,8 @@ impl RenderContext {
             }
         }
     }
-
-    /// Fill a path.
-    pub fn fill_path(&mut self, path: &BezPath, fill_rule: FillRule, paint: Paint) {
-        let affine = self.current_transform();
-        crate::flatten::fill(&path, affine, &mut self.line_buf);
-        self.render_path(fill_rule, paint);
-    }
-
-    /// Stroke a path.
-    pub fn stroke_path(&mut self, path: &BezPath, stroke: &kurbo::Stroke, paint: Paint) {
-        let affine = self.current_transform();
-        crate::flatten::stroke(&path, stroke, affine, &mut self.line_buf);
-        self.render_path(FillRule::NonZero, paint);
-    }
-
-    /// Pre-concatenate a new transform to the current transformation matrix.
-    pub fn transform(&mut self, transform: Affine) {
-        self.transform *= transform;
-    }
-
-    /// Set the current transformation matrix.
-    pub fn set_transform(&mut self, transform: Affine) {
-        self.transform = transform;
-    }
-
-    /// Set the current transformation matrix.
-    pub fn reset_transform(&mut self) {
-        self.transform = Affine::IDENTITY;
-    }
-
-    /// Return the current transformation matrix.
-    pub fn current_transform(&self) -> Affine {
-        self.transform
-    }
 }
 
-/// Get the color from the brush.
-///
-/// This is a hacky function that will go away when we implement
-/// other brushes. The general form is to match on whether it's a
-/// solid color. If not, then issue a cmd to render the brush into
-/// a brush buffer, then fill/strip as needed to composite into
-/// the main buffer.
 fn brush_to_color(brush: BrushRef) -> AlphaColor<Srgb> {
     match brush {
         BrushRef::Solid(c) => c,
