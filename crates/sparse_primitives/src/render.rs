@@ -94,8 +94,8 @@ impl RenderContext {
             self.execution_mode,
         );
 
-        let width_tiles = self.width.div_ceil(WIDE_TILE_WIDTH);
-        let height_tiles = self.height.div_ceil(STRIP_HEIGHT);
+        let width_tiles = self.wide_tiles_per_row();
+        let height_tiles = self.wide_tiles_per_column();
         for y in 0..height_tiles {
             for x in 0..width_tiles {
                 let tile = &self.wide_tiles[y * width_tiles + x];
@@ -128,8 +128,12 @@ impl RenderContext {
         }
     }
 
-    fn wide_tiles_per_row(&self) -> usize {
+    pub(crate) fn wide_tiles_per_row(&self) -> usize {
         self.width.div_ceil(WIDE_TILE_WIDTH)
+    }
+
+    pub(crate) fn wide_tiles_per_column(&self) -> usize {
+        self.height.div_ceil(STRIP_HEIGHT)
     }
 
     /// Generate the strip and fill commands for each wide tile using the current `strip_buf`.

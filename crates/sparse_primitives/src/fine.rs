@@ -184,9 +184,9 @@ mod scalar {
         let colors = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
             .chunks_exact_mut(STRIP_HEIGHT_F32);
 
-        let inv_alpha = 255 - alpha as u16;
         for z in colors {
             for i in 0..STRIP_HEIGHT_F32 {
+                eprintln!("{:?}, {:?}, {:?}", z[i], inv_alpha, color[i]);
                 z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color[i];
             }
         }

@@ -54,7 +54,7 @@ pub struct CmdStrip {
 impl WideTile {
     pub(crate) fn fill(&mut self, x: u32, width: u32, paint: Paint, fill_range: FillRange) {
         if let Paint::Solid(s) = &paint {
-            if x == 0 && width == WIDE_TILE_WIDTH as u32 && s.components[3] == 1.0 {
+            if x == 0 && width >= WIDE_TILE_WIDTH as u32 && s.components[3] == 1.0 {
                 self.cmds.clear();
                 self.bg = *s;
             } else {

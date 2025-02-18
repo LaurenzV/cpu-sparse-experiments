@@ -10,7 +10,7 @@ use crate::paint::Paint;
 use crate::render::DEFAULT_TOLERANCE;
 use crate::strip::Strip;
 use crate::tiling::FlatLine;
-use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
+use crate::wide_tile::{Cmd, CmdFill, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use crate::{FillRule, RenderContext};
 use peniko::kurbo;
 use peniko::kurbo::{Affine, Join, Rect, Shape};
@@ -93,13 +93,25 @@ impl RenderContext {
     /// Render the given rectangle with a fill. This involves first stripping it
     /// using the optimized strip kernel, and then generating the tile commands, like for
     /// normal paths.
+    ///
+    /// This method will not take the current transform into account, so the rectangle
+    /// must have already been transformed!
     pub(crate) fn render_filled_rect(&mut self, rect: &Rect, paint: Paint) {
+        self.strip_buf.clear();
+
         // TODO: Negative area rects? Come up with a principled way of dealing with them (also in
         // other areas of the code)
-        if rect.x0 <= 0.0
+        let whole_viewport = rect.x0 <= 0.0
             && rect.y0 <= 0.0
             && rect.x1 >= self.width as f64
-            && rect.y1 >= self.height as f64
+            && rect.y1 >= self.height as f64;
+
+        let pixel_aligned = rect.x0.fract() == 0.0
+            && rect.y0.fract() == 0.0
+            && rect.x1.fract() == 0.0
+            && rect.y1.fract() == 0.0;
+
+        if whole_viewport
         {
             // Another optimization: Rectangle covers the full viewport, so we can just fill all
             // wide tiles with the color as a background color, instead of stripping and generating
@@ -108,8 +120,10 @@ impl RenderContext {
             for tile in &mut self.wide_tiles {
                 tile.fill(0, WIDE_TILE_WIDTH as u32, paint.clone(), FillRange::All);
             }
-        } else {
-            self.strip_filled_rect(rect);
+        } else if pixel_aligned {
+            self.generate_aligned_filled_rect_comments(rect, paint);
+        }   else {
+            self.strip_unaligned_filled_rect(rect);
             self.generate_commands(FillRule::NonZero, paint);
         }
     }
@@ -122,14 +136,7 @@ impl RenderContext {
     /// part of the rectangle, then we generate strips for the vertical left and right
     /// line segments of the rectangle, and finally strips that cover the bottom-horizontal
     /// part of the rectangle.
-    pub(crate) fn strip_filled_rect(&mut self, rect: &Rect) {
-        self.strip_buf.clear();
-
-        // Don't try to draw empty rects
-        if rect.is_zero_area() {
-            return;
-        }
-
+    pub(crate) fn strip_unaligned_filled_rect(&mut self, rect: &Rect) {
         // Note that we currently deal with negative-area rects as positive-area rects.
         // Shouldn't be a problem for solid fill, but might be for gradients and patterns.
         let (x0, x1, y0, y1) = (
@@ -282,6 +289,51 @@ impl RenderContext {
             col: self.alphas.len() as u32,
             winding: 0,
         })
+    }
+
+    pub(crate) fn generate_aligned_filled_rect_comments(&mut self, rect: &Rect, paint: Paint) {
+        let (x0, x1, y0, y1) = (
+            rect.min_x() as i32,
+            rect.max_x() as i32,
+            rect.min_y() as i32,
+            rect.max_y() as i32,
+        );
+
+
+        let width_tiles = self.wide_tiles_per_row();
+        let height_tiles = self.wide_tiles_per_column();
+
+        // Also clip to viewport so we don't get out-of-bounds accesses.
+        let (x0_tile, y0_tile, x1_tile, y1_tile) = (
+            (x0 as usize / WIDE_TILE_WIDTH).max(0),
+            (y0 as usize / STRIP_HEIGHT).max(0),
+            (x1 as usize).div_ceil(WIDE_TILE_WIDTH).min(width_tiles),
+            (y1 as usize).div_ceil(STRIP_HEIGHT).min(height_tiles),
+        );
+
+
+        for y in y0_tile..y1_tile {
+            let tile_y_start = (y * STRIP_HEIGHT) as i32;
+            let y_start = (y0 - tile_y_start).clamp(0, 4) as u8;
+            let y_end = (y1 - tile_y_start).clamp(0, 4) as u8;
+            let fill_range = FillRange::Ranged(y_start..y_end);
+
+            for x in x0_tile..x1_tile {
+                let tile_x_start = (x * WIDE_TILE_WIDTH) as i32;
+                let x_start = (x0 - tile_x_start).clamp(0, WIDE_TILE_WIDTH as i32);
+                let x_end = (x1 - tile_x_start).clamp(0, WIDE_TILE_WIDTH as i32);
+
+                if x_start < x_end {
+                    let tile_idx = y * width_tiles + x;
+                    self.wide_tiles[tile_idx].push(Cmd::Fill(CmdFill {
+                        x: x_start as u32,
+                        width: (x_end - x_start) as u32,
+                        fill_range: fill_range.clone(),
+                        paint: paint.clone(),
+                    }))
+                }
+            }
+        }
     }
 }
 
