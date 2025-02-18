@@ -143,13 +143,9 @@ mod scalar {
 
     #[inline(always)]
     fn div_255(val: u16) -> u16 {
-        // For some reason, doing this instead of / 255 makes strip_scalar 3x faster on ARM.
-        // TODO: Measure behavior on x86
         (val + 1 + (val >> 8)) >> 8
     }
 
-    // TODO: It seems like autovectorization deteriorated after compared to
-    // 50cd5b4f. Investigate.
     pub(super) fn fill_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
         color: &[u8; 4],
