@@ -167,13 +167,18 @@ mod scalar {
                         let area_u8 = match fill_rule {
                             FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
                             FillRule::EvenOdd => {
-                                let even = area as i32 % 2;
+                                let area_abs = area.abs();
+                                let area_fract = area_abs.fract();
+                                let odd = area_abs as i32 % 2;
+                                // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
+                                // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
+                                // `add_val` represents the 1, sign represents the minus.
                                 // If we have for example 2.68, then opacity is 68%, while for
                                 // 1.68 it would be (1 - 0.68) = 32%.
-                                let add_val = even as f32;
+                                // So for odd, add_val should be 1, while for even it should be 0.
+                                let add_val = odd as f32;
                                 // 1 for even, -1 for odd.
-                                let sign = (-2 * even + 1) as f32;
-                                let area_fract = area.fract();
+                                let sign = (-2 * odd + 1) as f32;
 
                                 ((add_val + sign * area_fract) * 255.0 + 0.5) as u32
                             }
