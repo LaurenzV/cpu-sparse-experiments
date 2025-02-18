@@ -322,20 +322,6 @@ mod neon {
                             let vbits3 = vreinterpretq_u32_u8(vuzp1q_u8(vbits2, vbits2));
                             vst1q_lane_u32::<0>(&mut alphas, vbits3);
                         }
-                        // let area_abs = area.abs();
-                        // let area_fract = area_abs.fract();
-                        // let odd = area_abs as i32 % 2;
-                        // // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
-                        // // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
-                        // // `add_val` represents the 1, sign represents the minus.
-                        // // If we have for example 2.68, then opacity is 68%, while for
-                        // // 1.68 it would be (1 - 0.68) = 32%.
-                        // // So for odd, add_val should be 1, while for even it should be 0.
-                        // let add_val = odd as f32;
-                        // // 1 for even, -1 for odd.
-                        // let sign = (-2 * odd + 1) as f32;
-                        //
-                        // ((add_val + sign * area_fract) * 255.0 + 0.5) as u32
                         FillRule::EvenOdd => {
                             let area_abs =
                                 vabsq_f32(vld1q_f32(areas.as_ptr().add(x as usize) as *const f32));
