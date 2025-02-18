@@ -9,7 +9,7 @@ use crate::{dispatch, ExecutionMode};
 
 pub(crate) const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
 
-pub(crate) struct Fine<'a> {
+pub struct Fine<'a> {
     pub(crate) width: usize,
     pub(crate) height: usize,
     // rgba pixels
@@ -22,7 +22,7 @@ pub(crate) struct Fine<'a> {
 }
 
 impl<'a> Fine<'a> {
-    pub(crate) fn new(
+    pub fn new(
         width: usize,
         height: usize,
         out_buf: &'a mut [u8],
@@ -39,7 +39,7 @@ impl<'a> Fine<'a> {
     }
 
     #[inline(never)]
-    pub(crate) fn clear(&mut self, premul_color: [u8; 4]) {
+    pub fn clear(&mut self, premul_color: [u8; 4]) {
         if premul_color[0] == premul_color[1]
             && premul_color[1] == premul_color[2]
             && premul_color[2] == premul_color[3]
@@ -71,14 +71,16 @@ impl<'a> Fine<'a> {
     }
 
     #[inline(never)]
-    pub(crate) fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
+    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
         match paint {
             Paint::Solid(c) => {
                 let color = c.premultiply().to_rgba8().to_u8_array();
 
                 dispatch!(
                     scalar: scalar::fill_solid(&mut self.scratch, &color, x, width),
-                    neon: neon::fill_solid(&mut self.scratch, &color, x, width),
+                    // Scalar version seems to autovectorize better than our neon impl, so
+                    // for now we just use that one.
+                    neon: scalar::fill_solid(&mut self.scratch, &color, x, width),
                     execution_mode: self.execution_mode
                 );
             }
@@ -141,13 +143,8 @@ mod scalar {
 
     #[inline(always)]
     fn div_255(val: u16) -> u16 {
-        // For some reason, doing this instead of / 255 makes strip_scalar 3x faster on ARM.
-        // TODO: Measure behavior on x86
         (val + 1 + (val >> 8)) >> 8
     }
-
-    // TODO: It seems like autovectorization deteriorated after compared to
-    // 50cd5b4f. Investigate.
 
     pub(super) fn fill_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
@@ -168,16 +165,10 @@ mod scalar {
         let colors = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
             .chunks_exact_mut(STRIP_HEIGHT_F32);
 
-        if alpha == 255 {
-            for z in colors {
-                z.copy_from_slice(&color_buf);
-            }
-        } else {
-            let inv_alpha = 255 - alpha as u16;
-            for z in colors {
-                for i in 0..STRIP_HEIGHT_F32 {
-                    z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color_buf[i];
-                }
+        let inv_alpha = 255 - alpha as u16;
+        for z in colors {
+            for i in 0..STRIP_HEIGHT_F32 {
+                z[i] = div_255(z[i] as u16 * inv_alpha) as u8 + color_buf[i];
             }
         }
     }
@@ -195,7 +186,7 @@ mod scalar {
         {
             for j in 0..4 {
                 let mask_alpha = ((*a >> (j * 8)) & 0xff) as u16;
-                let inv_alpha = 255 - (mask_alpha * color[3] as u16) / 255;
+                let inv_alpha = 255 - div_255(mask_alpha * color[3] as u16);
                 for i in 0..4 {
                     let im1 = z[j * 4 + i] as u16 * inv_alpha;
                     let im2 = mask_alpha * color[i] as u16;
@@ -216,6 +207,7 @@ mod neon {
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
     // Note: This method currently seems to be slower than the scalar version.
+    // TODO: Investiage why this is still slower.
     pub(super) unsafe fn fill_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
         color: &[u8; 4],
@@ -232,7 +224,7 @@ mod neon {
             (buf, buf[3])
         };
 
-        let color_buf_simd = vld1_u8(color_buf[0..].as_ptr());
+        let color_buf_simd = vld1q_u8(color_buf[0..].as_ptr());
 
         let mut strip_cols = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
             .chunks_exact_mut(STRIP_HEIGHT_F32);
@@ -242,18 +234,18 @@ mod neon {
                 col.copy_from_slice(&color_buf);
             }
         } else {
-            let inv_alpha = vdupq_n_u16(255 - alpha as u16);
+            let inv_alpha = vdupq_n_u8(255 - alpha);
 
             for z in strip_cols {
-                for i in 0..2 {
-                    let index = i * 8;
-                    let z_vals = vmovl_u8(vld1_u8(z.as_mut_ptr().add(index)));
-                    let im_1 = vmulq_u16(z_vals, inv_alpha);
-                    let im_2 = div_255(im_1);
-                    let im_3 = vmovn_u16(im_2);
-                    let im_4 = vadd_u8(im_3, color_buf_simd);
-                    vst1_u8(z.as_mut_ptr().add(index), im_4);
-                }
+                let z_vals = vld1q_u8(z.as_mut_ptr());
+                let mut low = vmull_u8(vget_low_u8(z_vals), vget_low_u8(inv_alpha));
+                let mut high = vmull_high_u8(z_vals, inv_alpha);
+                high = vshrq_n_u16::<8>(high);
+                low = vsraq_n_u16::<8>(low, low);
+                high = vmlal_high_u8(high, z_vals, inv_alpha);
+                let low = vaddhn_u16(low, vdupq_n_u16(1));
+                let res = vaddq_u8(vaddhn_high_u16(low, high, vdupq_n_u16(1)), color_buf_simd);
+                vst1q_u8(z.as_mut_ptr(), res);
             }
         }
     }
@@ -303,6 +295,7 @@ mod neon {
         }
     }
 
+    #[inline]
     unsafe fn div_255(val: uint16x8_t) -> uint16x8_t {
         let val_shifted = vshrq_n_u16::<8>(val);
         let one = vdupq_n_u16(1);
