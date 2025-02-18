@@ -9,7 +9,7 @@ use crate::{dispatch, ExecutionMode};
 
 pub(crate) const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
 
-pub(crate) struct Fine<'a> {
+pub struct Fine<'a> {
     pub(crate) width: usize,
     pub(crate) height: usize,
     // rgba pixels
@@ -22,7 +22,7 @@ pub(crate) struct Fine<'a> {
 }
 
 impl<'a> Fine<'a> {
-    pub(crate) fn new(
+    pub fn new(
         width: usize,
         height: usize,
         out_buf: &'a mut [u8],
@@ -39,7 +39,7 @@ impl<'a> Fine<'a> {
     }
 
     #[inline(never)]
-    pub(crate) fn clear(&mut self, premul_color: [u8; 4]) {
+    pub fn clear(&mut self, premul_color: [u8; 4]) {
         if premul_color[0] == premul_color[1]
             && premul_color[1] == premul_color[2]
             && premul_color[2] == premul_color[3]
@@ -71,14 +71,16 @@ impl<'a> Fine<'a> {
     }
 
     #[inline(never)]
-    pub(crate) fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
+    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint) {
         match paint {
             Paint::Solid(c) => {
                 let color = c.premultiply().to_rgba8().to_u8_array();
 
                 dispatch!(
                     scalar: scalar::fill_solid(&mut self.scratch, &color, x, width),
-                    neon: neon::fill_solid(&mut self.scratch, &color, x, width),
+                    // Scalar version seems to autovectorize better than our neon impl, so
+                    // for now we just use that one.
+                    neon: scalar::fill_solid(&mut self.scratch, &color, x, width),
                     execution_mode: self.execution_mode
                 );
             }
@@ -148,7 +150,6 @@ mod scalar {
 
     // TODO: It seems like autovectorization deteriorated after compared to
     // 50cd5b4f. Investigate.
-
     pub(super) fn fill_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
         color: &[u8; 4],
@@ -189,7 +190,7 @@ mod scalar {
         {
             for j in 0..4 {
                 let mask_alpha = ((*a >> (j * 8)) & 0xff) as u16;
-                let inv_alpha = 255 - (mask_alpha * color[3] as u16) / 255;
+                let inv_alpha = 255 - div_255(mask_alpha * color[3] as u16);
                 for i in 0..4 {
                     let im1 = z[j * 4 + i] as u16 * inv_alpha;
                     let im2 = mask_alpha * color[i] as u16;
@@ -210,6 +211,7 @@ mod neon {
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
     // Note: This method currently seems to be slower than the scalar version.
+    // TODO: Investiage why this is still slower.
     pub(super) unsafe fn fill_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
         color: &[u8; 4],
@@ -235,27 +237,14 @@ mod neon {
 
         for z in strip_cols {
             let z_vals = vld1q_u8(z.as_mut_ptr());
-            let temp_low = vmull_u8(vget_low_u8(z_vals), vget_low_u8(inv_alpha));
-            let temp_high = vmull_high_u8(z_vals, inv_alpha);
-
-            // Implement the shift and accumulate operations:
-            // ushr v5.8h, v5.8h, #8
-            // usra v4.8h, v4.8h, #8
-            let temp_high = vshrq_n_u16::<8>(temp_high);
-            let temp_low = vsraq_n_u16::<8>(temp_low, temp_low);
-
-            // umlal2 v5.8h, v2.16b, v3.16b
-            let temp_high = vmlal_high_u8(temp_high, z_vals, inv_alpha);
-
-            // addhn and addhn2 operations
-            let result_low = vaddhn_u16(temp_low, vdupq_n_u16(1));
-            let result = vaddhn_high_u16(result_low, temp_high, vdupq_n_u16(1));
-
-            // Final addition
-            let final_result = vaddq_u8(result, color_buf_simd);
-
-            vst1q_u8(z.as_mut_ptr(), final_result);
-
+            let mut low = vmull_u8(vget_low_u8(z_vals), vget_low_u8(inv_alpha));
+            let mut high = vmull_high_u8(z_vals, inv_alpha);
+            high = vshrq_n_u16::<8>(high);
+            low = vsraq_n_u16::<8>(low, low);
+            high = vmlal_high_u8(high, z_vals, inv_alpha);
+            let low = vaddhn_u16(low, vdupq_n_u16(1));
+            let res = vaddq_u8(vaddhn_high_u16(low, high, vdupq_n_u16(1)), color_buf_simd);
+            vst1q_u8(z.as_mut_ptr(), res);
         }
     }
 
