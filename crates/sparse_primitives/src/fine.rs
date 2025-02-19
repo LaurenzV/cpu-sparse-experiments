@@ -8,13 +8,14 @@ use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use crate::{dispatch, ExecutionMode};
 use peniko::Compose;
 
-pub(crate) const STRIP_HEIGHT_F32: usize = STRIP_HEIGHT * 4;
+pub(crate) const COLOR_COMPONENTS: usize = 4;
+pub(crate) const TOTAL_STRIP_HEIGHT: usize = STRIP_HEIGHT * COLOR_COMPONENTS;
 
 pub struct Fine<'a> {
     pub(crate) width: usize,
     pub(crate) height: usize,
     pub(crate) out_buf: &'a mut [u8],
-    pub(crate) scratch: [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+    pub(crate) scratch: [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
     execution_mode: ExecutionMode,
 }
 
@@ -25,7 +26,7 @@ impl<'a> Fine<'a> {
         out_buf: &'a mut [u8],
         execution_mode: ExecutionMode,
     ) -> Self {
-        let scratch = [0; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4];
+        let scratch = [0; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS];
         Self {
             width,
             height,
@@ -44,7 +45,7 @@ impl<'a> Fine<'a> {
             // All components are the same, so we can use memset instead.
             self.scratch.fill(premul_color[0])
         } else {
-            for z in self.scratch.chunks_exact_mut(4) {
+            for z in self.scratch.chunks_exact_mut(COLOR_COMPONENTS) {
                 z.copy_from_slice(&premul_color);
             }
         }
@@ -113,36 +114,37 @@ impl<'a> Fine<'a> {
 
 fn pack(
     out_buf: &mut [u8],
-    scratch: &[u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
+    scratch: &[u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
     width: usize,
     height: usize,
     x: usize,
     y: usize,
 ) {
-    let base_ix = (y * STRIP_HEIGHT * width + x * WIDE_TILE_WIDTH) * 4;
+    let base_ix = (y * STRIP_HEIGHT * width + x * WIDE_TILE_WIDTH) * COLOR_COMPONENTS;
 
     // Make sure we don't process rows outside the range of the pixmap.
     let max_height = (height - y * STRIP_HEIGHT).min(STRIP_HEIGHT);
 
     for j in 0..max_height {
-        let line_ix = base_ix + j * width * 4;
+        let line_ix = base_ix + j * width * COLOR_COMPONENTS;
 
         // Make sure we don't process columns outside the range of the pixmap.
         let max_width = (width - x * WIDE_TILE_WIDTH).min(WIDE_TILE_WIDTH);
-        let target_len = max_width * 4;
+        let target_len = max_width * COLOR_COMPONENTS;
         // This helps the compiler to understand that any access to `dest` cannot
         // be out of bounds, and thus saves corresponding checks in the for loop.
         let dest = &mut out_buf[line_ix..][..target_len];
 
         for i in 0..max_width {
-            let src = &scratch[(i * STRIP_HEIGHT + j) * 4..][..4];
-            dest[i * 4..][..4].copy_from_slice(&src[..4]);
+            let src = &scratch[(i * STRIP_HEIGHT + j) * COLOR_COMPONENTS..][..COLOR_COMPONENTS];
+            dest[i * COLOR_COMPONENTS..][..COLOR_COMPONENTS]
+                .copy_from_slice(&src[..COLOR_COMPONENTS]);
         }
     }
 }
 
 mod scalar {
-    use crate::fine::STRIP_HEIGHT_F32;
+    use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
     use peniko::Compose;
 
@@ -152,8 +154,8 @@ mod scalar {
     }
 
     pub(super) fn fill_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-        color: &[u8; 4],
+        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
         mut compose: Compose,
@@ -164,16 +166,16 @@ mod scalar {
         }
 
         let (cs, alpha) = {
-            let mut buf = [0; STRIP_HEIGHT_F32];
+            let mut buf = [0; TOTAL_STRIP_HEIGHT];
 
             for i in 0..STRIP_HEIGHT {
-                buf[i * 4..((i + 1) * 4)].copy_from_slice(color);
+                buf[i * COLOR_COMPONENTS..((i + 1) * COLOR_COMPONENTS)].copy_from_slice(color);
             }
 
             (buf, buf[3] as u16)
         };
 
-        let mut target = &mut scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width];
+        let mut target = &mut scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width];
 
         // All the formulas in the comments are with premultiplied alpha for Cs and Cb.
         match compose {
@@ -181,7 +183,7 @@ mod scalar {
             Compose::Copy => {
                 // Destination buffer has already been cleared in `RenderContext::ignore`, so
                 // we can just copy the pixels.
-                let dest = target.chunks_exact_mut(STRIP_HEIGHT_F32);
+                let dest = target.chunks_exact_mut(TOTAL_STRIP_HEIGHT);
 
                 for cb in dest {
                     cb.copy_from_slice(&cs);
@@ -190,10 +192,10 @@ mod scalar {
             // Cs + Cb * (1 – αs)
             Compose::SrcOver => {
                 let inv_as = 255 - alpha;
-                let dest = target.chunks_exact_mut(STRIP_HEIGHT_F32);
+                let dest = target.chunks_exact_mut(TOTAL_STRIP_HEIGHT);
 
                 for cb in dest {
-                    for i in 0..STRIP_HEIGHT_F32 {
+                    for i in 0..TOTAL_STRIP_HEIGHT {
                         cb[i] = cs[i] + div_255(cb[i] as u16 * inv_as) as u8;
                     }
                 }
@@ -204,7 +206,7 @@ mod scalar {
                 for cb in dest {
                     let inv_ab = (255 - cb[3]) as u16;
 
-                    for i in 0..4 {
+                    for i in 0..COLOR_COMPONENTS {
                         cb[i] = div_255(cs[i] as u16 * inv_ab) as u8 + cb[i];
                     }
                 }
@@ -216,7 +218,7 @@ mod scalar {
                 for cb in dest {
                     let inv_as = (255 - cs[3]) as u16;
 
-                    for i in 0..4 {
+                    for i in 0..COLOR_COMPONENTS {
                         let ab = cb[3] as u16;
                         let im1 = div_255(cs[i] as u16 * ab) as u8;
                         let im2 = div_255(cb[i] as u16 * inv_as) as u8;
@@ -245,7 +247,7 @@ mod scalar {
                 let inv_as = 255 - cs[3] as u16;
 
                 for cb in dest {
-                    for i in 0..4 {
+                    for i in 0..COLOR_COMPONENTS {
                         cb[i] = div_255(cb[i] as u16 * inv_as) as u8;
                     }
                 }
@@ -257,7 +259,7 @@ mod scalar {
                 for cb in dest {
                     let inv_as = 255 - cs[3] as u16;
 
-                    for i in 0..4 {
+                    for i in 0..COLOR_COMPONENTS {
                         let inv_ab = 255 - cb[3] as u16;
                         let im1 = div_255(cs[i] as u16 * inv_ab) as u8;
                         let im2 = div_255(cb[i] as u16 * inv_as) as u8;
@@ -268,10 +270,10 @@ mod scalar {
             }
             // Cs + Cb
             Compose::Plus => {
-                let dest = target.chunks_exact_mut(STRIP_HEIGHT_F32);
+                let dest = target.chunks_exact_mut(TOTAL_STRIP_HEIGHT);
 
                 for cb in dest {
-                    for i in 0..STRIP_HEIGHT_F32 {
+                    for i in 0..TOTAL_STRIP_HEIGHT {
                         cb[i] = cs[i].saturating_add(cb[i]);
                     }
                 }
@@ -281,15 +283,15 @@ mod scalar {
             // Has already been handled.
             // 0
             Compose::Clear => {
-                scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width].fill(0);
+                scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width].fill(0);
             }
             _ => unimplemented!(),
         }
     }
 
     pub(super) fn strip_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-        cs: &[u8; 4],
+        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        cs: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
         alphas: &[u32],
@@ -300,11 +302,11 @@ mod scalar {
         match compose {
             // Cs * am
             Compose::Copy => {
-                for (cb, masks) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(STRIP_HEIGHT_F32)
+                for (cb, masks) in scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+                    .chunks_exact_mut(TOTAL_STRIP_HEIGHT)
                     .zip(alphas)
                 {
-                    for j in 0..4 {
+                    for j in 0..STRIP_HEIGHT {
                         // This one unfortunately needs a bit of a hacky solution. The problem
                         // is that strips are always of a size of 4, meaning that if we always
                         // copy Cs * am, we might override parts of the destination that are within
@@ -317,7 +319,7 @@ mod scalar {
                         let do_src_over = 1 - do_src_copy;
                         let inv_as_am = 255 - div_255(am * cs[3] as u16);
 
-                        for i in 0..4 {
+                        for i in 0..COLOR_COMPONENTS {
                             let im1 = cb[j * 4 + i] as u16 * inv_as_am;
                             let im2 = cs[i] as u16 * am;
                             let src_over = div_255(im1 + im2) as u8;
@@ -329,15 +331,15 @@ mod scalar {
             }
             // Cs * am + Cb * (1 – αs * am)
             Compose::SrcOver => {
-                for (cb, masks) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(STRIP_HEIGHT_F32)
+                for (cb, masks) in scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+                    .chunks_exact_mut(TOTAL_STRIP_HEIGHT)
                     .zip(alphas)
                 {
-                    for j in 0..4 {
+                    for j in 0..STRIP_HEIGHT {
                         let am = ((*masks >> (j * 8)) & 0xff) as u16;
                         let inv_as_am = 255 - div_255(am * cs[3] as u16);
 
-                        for i in 0..4 {
+                        for i in 0..COLOR_COMPONENTS {
                             let im1 = cb[j * 4 + i] as u16 * inv_as_am;
                             let im2 = cs[i] as u16 * am;
                             let im3 = div_255(im1 + im2);
@@ -348,14 +350,14 @@ mod scalar {
             }
             // Cs * am * (1 – αb) + Cb
             Compose::DestOver => {
-                for (cb, masks) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(STRIP_HEIGHT_F32)
+                for (cb, masks) in scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+                    .chunks_exact_mut(TOTAL_STRIP_HEIGHT)
                     .zip(alphas)
                 {
-                    for j in 0..4 {
+                    for j in 0..STRIP_HEIGHT {
                         let am = ((*masks >> (j * 8)) & 0xff) as u16;
-                        for i in 0..4 {
-                            let idx = j * 4;
+                        for i in 0..COLOR_COMPONENTS {
+                            let idx = j * COLOR_COMPONENTS;
                             let inv_ab = (255 - cb[idx + 3]) as u16;
                             let im1 = div_255(am * inv_ab);
                             let im2 = div_255(cs[i] as u16 * im1) as u8;
@@ -366,16 +368,16 @@ mod scalar {
             }
             // Cs * αb * am + Cb * (1 – αs * am)
             Compose::SrcAtop => {
-                for (cb, masks) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(STRIP_HEIGHT_F32)
+                for (cb, masks) in scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+                    .chunks_exact_mut(TOTAL_STRIP_HEIGHT)
                     .zip(alphas)
                 {
-                    for j in 0..4 {
+                    for j in 0..STRIP_HEIGHT {
                         let am = ((*masks >> (j * 8)) & 0xff) as u16;
                         let inv_as_am = 255 - div_255(cs[3] as u16 * am);
 
-                        for i in 0..4 {
-                            let idx = j * 4;
+                        for i in 0..COLOR_COMPONENTS {
+                            let idx = j * COLOR_COMPONENTS;
                             let ab = cb[idx + 3] as u16;
                             let im1 = div_255(cs[i] as u16 * div_255(ab * am)) as u8;
                             let im2 = div_255(cb[idx + i] as u16 * inv_as_am) as u8;
@@ -386,15 +388,15 @@ mod scalar {
             }
             // Cs * am * (1 - αb) + Cb * (1 - αs * am)
             Compose::Xor => {
-                for (cb, masks) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(STRIP_HEIGHT_F32)
+                for (cb, masks) in scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+                    .chunks_exact_mut(TOTAL_STRIP_HEIGHT)
                     .zip(alphas)
                 {
-                    for j in 0..4 {
+                    for j in 0..STRIP_HEIGHT {
                         let am = ((*masks >> (j * 8)) & 0xff) as u16;
                         let idx = j * 4;
 
-                        for i in 0..4 {
+                        for i in 0..COLOR_COMPONENTS {
                             let cs_am = div_255(cs[i] as u16 * am);
                             let inv_as_am = 255 - div_255(cs[3] as u16 * am);
                             let inv_ab = (255 - cb[idx + 3]) as u16;
@@ -408,15 +410,15 @@ mod scalar {
             }
             // Cb * (1 - as * am)
             Compose::DestOut => {
-                for (cb, masks) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(STRIP_HEIGHT_F32)
+                for (cb, masks) in scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+                    .chunks_exact_mut(TOTAL_STRIP_HEIGHT)
                     .zip(alphas)
                 {
-                    for j in 0..4 {
+                    for j in 0..STRIP_HEIGHT {
                         let am = ((*masks >> (j * 8)) & 0xff) as u16;
                         let idx = j * 4;
 
-                        for i in 0..4 {
+                        for i in 0..COLOR_COMPONENTS {
                             let inv_as_am = 255 - div_255(cs[3] as u16 * am);
                             cb[idx + i] = div_255(cb[idx + i] as u16 * inv_as_am) as u8;
                         }
@@ -425,15 +427,15 @@ mod scalar {
             }
             // Cs * am + Cb
             Compose::Plus => {
-                for (cb, masks) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(STRIP_HEIGHT_F32)
+                for (cb, masks) in scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+                    .chunks_exact_mut(TOTAL_STRIP_HEIGHT)
                     .zip(alphas)
                 {
-                    for j in 0..4 {
+                    for j in 0..STRIP_HEIGHT {
                         let am = ((*masks >> (j * 8)) & 0xff) as u16;
                         let idx = j * 4;
 
-                        for i in 0..4 {
+                        for i in 0..COLOR_COMPONENTS {
                             let cs_am = div_255(cs[i] as u16 * am) as u8;
                             cb[idx + i] = cs_am.saturating_add(cb[idx + i]);
                         }
@@ -446,15 +448,15 @@ mod scalar {
             Compose::Clear => {
                 // Similar to `Copy`, we can't just set all values to 0, since not all pixels in
                 // the strip are actually covered by the shape.
-                for (cb, masks) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-                    .chunks_exact_mut(STRIP_HEIGHT_F32)
+                for (cb, masks) in scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+                    .chunks_exact_mut(TOTAL_STRIP_HEIGHT)
                     .zip(alphas)
                 {
-                    for j in 0..4 {
+                    for j in 0..STRIP_HEIGHT {
                         let inv_am = 255 - ((*masks >> (j * 8)) & 0xff) as u16;
-                        let idx = j * 4;
+                        let idx = j * COLOR_COMPONENTS;
 
-                        for i in 0..4 {
+                        for i in 0..COLOR_COMPONENTS {
                             cb[idx + i] = div_255(cb[idx + i] as u16 * inv_am) as u8;
                         }
                     }
@@ -469,23 +471,23 @@ mod scalar {
 mod neon {
     use std::arch::aarch64::*;
 
-    use crate::fine::STRIP_HEIGHT_F32;
+    use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
     // Note: This method currently seems to be slower than the scalar version.
     // TODO: Investiage why this is still slower.
     pub(super) unsafe fn fill_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-        color: &[u8; 4],
+        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
     ) {
         let (color_buf, alpha) = {
-            let mut buf = [0; STRIP_HEIGHT_F32];
+            let mut buf = [0; TOTAL_STRIP_HEIGHT];
 
             for i in 0..STRIP_HEIGHT {
-                buf[i * 4..((i + 1) * 4)].copy_from_slice(color);
+                buf[i * COLOR_COMPONENTS..((i + 1) * COLOR_COMPONENTS)].copy_from_slice(color);
             }
 
             (buf, buf[3])
@@ -493,8 +495,8 @@ mod neon {
 
         let color_buf_simd = vld1q_u8(color_buf[0..].as_ptr());
 
-        let mut strip_cols = scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
-            .chunks_exact_mut(STRIP_HEIGHT_F32);
+        let mut strip_cols = scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+            .chunks_exact_mut(TOTAL_STRIP_HEIGHT);
 
         if alpha == 255 {
             for col in strip_cols {
@@ -519,8 +521,8 @@ mod neon {
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
     pub(super) unsafe fn strip_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * 4],
-        color: &[u8; 4],
+        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
         alphas: &[u32],
@@ -535,7 +537,7 @@ mod neon {
 
         let tff = vdupq_n_u16(255);
 
-        for (z, a) in scratch[x * STRIP_HEIGHT_F32..][..STRIP_HEIGHT_F32 * width]
+        for (z, a) in scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
             .chunks_exact_mut(16)
             .zip(alphas)
         {
