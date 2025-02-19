@@ -26,13 +26,13 @@ use std::marker::PhantomData;
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
 
 pub(crate) struct InnerContext<EXEC: Executor> {
-    pub width: usize,
-    pub height: usize,
-    pub wide_tiles: Vec<WideTile>,
-    pub alphas: Vec<u32>,
-    pub line_buf: Vec<FlatLine>,
-    pub tiles: Tiles,
-    pub strip_buf: Vec<Strip>,
+    pub(crate) width: usize,
+    pub(crate) height: usize,
+    pub(crate) wide_tiles: Vec<WideTile>,
+    pub(crate) alphas: Vec<u32>,
+    pub(crate) line_buf: Vec<FlatLine>,
+    pub(crate) tiles: Tiles,
+    pub(crate) strip_buf: Vec<Strip>,
     pub(crate) paint: Paint,
     pub(crate) stroke: Stroke,
     pub(crate) transform: Affine,
@@ -175,6 +175,26 @@ impl<EXEC: Executor> InnerContext<EXEC> {
 
     pub(crate) fn height(&self) -> usize {
         self.height
+    }
+
+    pub(crate) fn wide_tiles(&self) -> &[WideTile] {
+        &self.wide_tiles
+    }
+
+    pub(crate) fn alphas(&self) -> &[u32] {
+        &self.alphas
+    }
+
+    pub(crate) fn line_buf(&self) -> &[FlatLine] {
+        &self.line_buf
+    }
+
+    pub(crate) fn tiles(&self) -> &Tiles {
+        &self.tiles
+    }
+
+    pub(crate) fn strip_buf(&self) -> &[Strip] {
+        &self.strip_buf
     }
 
     fn render_path(&mut self, fill_rule: FillRule, paint: Paint) {

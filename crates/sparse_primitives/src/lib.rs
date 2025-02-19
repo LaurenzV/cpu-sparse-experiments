@@ -172,6 +172,31 @@ impl RenderContext {
     pub fn height(&self) -> usize {
         dispatch!(func: height(), self)
     }
+
+    /// Get the wide tiles of the render context.
+    pub fn wide_tiles(&self) -> &[WideTile] {
+        dispatch!(func: wide_tiles(), self)
+    }
+
+    /// Get the alpha values of the render context.
+    pub fn alphas(&self) -> &[u32] {
+        dispatch!(func: alphas(), self)
+    }
+
+    /// Get the line buffer of the render context.
+    pub fn line_buf(&self) -> &[FlatLine] {
+        dispatch!(func: line_buf(), self)
+    }
+
+    /// Get the tiles of the render context.
+    pub fn tiles(&self) -> &Tiles {
+        dispatch!(func: tiles(), self)
+    }
+
+    /// Get the strip buffer of the render context.
+    pub fn strip_buf(&self) -> &[Strip] {
+        dispatch!(func: strip_buf(), self)
+    }
 }
 
 /// NOTE: BE CAREFUL WHEN CHANGING THIS METHOD! We need to make sure to only choose an inner type
@@ -210,4 +235,7 @@ use crate::execute::{ExecutionMode, Neon, Scalar};
 use crate::kurbo::{Affine, BezPath, Rect, Stroke};
 use crate::paint::Paint;
 use crate::render::InnerContext;
+use crate::strip::Strip;
+use crate::tiling::{FlatLine, Tiles};
+use crate::wide_tile::WideTile;
 pub use pixmap::Pixmap;
