@@ -212,21 +212,21 @@ fn select_inner_context(
         ExecutionMode::Auto => {
             #[cfg(target_arch = "aarch64")]
             if std::arch::is_aarch64_feature_detected!("neon") {
-                InnerContextType::Neon(InnerContext::new(width, height))
-            } else {
-                // Fallback.
-                InnerContextType::Scalar(InnerContext::new(width, height))
+                return InnerContextType::Neon(InnerContext::new(width, height));
             }
+
+            // Fallback.
+            InnerContextType::Scalar(InnerContext::new(width, height))
         }
         #[cfg(all(target_arch = "aarch64", feature = "simd"))]
         ExecutionMode::Neon => {
             if std::arch::is_aarch64_feature_detected!("neon") {
-                InnerContextType::Neon(InnerContext::new(width, height))
-            } else {
-                panic!(
-                    "attempted to force execution mode NEON, but CPU doesn't support NEON instructions"
-                );
+                return InnerContextType::Neon(InnerContext::new(width, height));
             }
+
+            panic!(
+                "attempted to force execution mode NEON, but CPU doesn't support NEON instructions"
+            );
         }
     }
 }
