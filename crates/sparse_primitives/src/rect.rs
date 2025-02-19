@@ -102,7 +102,12 @@ impl RenderContext {
             // commands. Since this is a quite common action (for example to fill a page completely
             // white), it's a worthwhile optimization.
             for tile in &mut self.wide_tiles {
-                tile.fill(0, WIDE_TILE_WIDTH as u32, paint.clone());
+                tile.fill(
+                    0,
+                    WIDE_TILE_WIDTH as u32,
+                    paint.clone(),
+                    self.blend_mode.compose,
+                );
             }
         } else {
             self.strip_filled_rect(rect);

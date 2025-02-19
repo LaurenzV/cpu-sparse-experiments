@@ -1,9 +1,11 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
+use peniko::color::palette::css::{DARK_BLUE, DARK_GREEN};
 use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
+use peniko::{BlendMode, Compose, Mix};
 use sparse_primitives::color::palette::css::{
     BEIGE, BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED,
 };
-use sparse_primitives::FillRule;
+use sparse_primitives::{FillRule, RenderContext};
 use std::f64::consts::PI;
 
 mod util;
@@ -453,4 +455,103 @@ fn miter_stroke_2() -> Stroke {
         join: Join::Miter,
         ..Default::default()
     }
+}
+
+fn bevel_stroke_2() -> Stroke {
+    Stroke {
+        width: 2.0,
+        join: Join::Bevel,
+        ..Default::default()
+    }
+}
+
+fn compose_destination() -> RenderContext {
+    let mut ctx = get_ctx(50, 50, true);
+    let rect = Rect::new(4.5, 4.5, 35.5, 35.5);
+    ctx.set_paint(DARK_BLUE.with_alpha(0.5).into());
+    ctx.set_stroke(bevel_stroke_2());
+    ctx.fill_rect(&rect);
+
+    ctx
+}
+
+fn compose_source(ctx: &mut RenderContext) {
+    let rect = Rect::new(14.5, 14.5, 45.5, 45.5);
+    ctx.set_paint(DARK_GREEN.with_alpha(0.5).into());
+    ctx.fill_rect(&rect);
+}
+
+macro_rules! compose_impl {
+    ($mode:path, $name:expr) => {
+        let mut ctx = compose_destination();
+        ctx.set_blend_mode(BlendMode::new(Mix::Normal, $mode));
+        compose_source(&mut ctx);
+
+        check_ref(&ctx, $name);
+    };
+}
+
+#[test]
+fn compose_solid_clear() {
+    compose_impl!(Compose::Clear, "compose_solid_clear");
+}
+
+#[test]
+fn compose_solid_copy() {
+    compose_impl!(Compose::Copy, "compose_solid_copy");
+}
+
+#[test]
+fn compose_solid_dest() {
+    compose_impl!(Compose::Dest, "compose_solid_dest");
+}
+
+#[test]
+fn compose_solid_src_over() {
+    compose_impl!(Compose::SrcOver, "compose_solid_src_over");
+}
+
+#[test]
+fn compose_solid_dest_over() {
+    compose_impl!(Compose::DestOver, "compose_solid_dest_over");
+}
+
+// #[test]
+// fn compose_solid_src_in() {
+//     compose_impl!(Compose::SrcIn, "compose_solid_src_in");
+// }
+
+// #[test]
+// fn compose_solid_dest_in() {
+//     compose_impl!(Compose::DestIn, "compose_solid_dest_in");
+// }
+//
+// #[test]
+// fn compose_solid_src_out() {
+//     compose_impl!(Compose::SrcOut, "compose_solid_src_out");
+// }
+
+#[test]
+fn compose_solid_dest_out() {
+    compose_impl!(Compose::DestOut, "compose_solid_dest_out");
+}
+
+#[test]
+fn compose_solid_src_atop() {
+    compose_impl!(Compose::SrcAtop, "compose_solid_src_atop");
+}
+//
+// #[test]
+// fn compose_solid_dest_atop() {
+//     compose_impl!(Compose::DestAtop, "compose_solid_dest_atop");
+// }
+
+#[test]
+fn compose_solid_xor() {
+    compose_impl!(Compose::Xor, "compose_solid_xor");
+}
+
+#[test]
+fn compose_solid_plus() {
+    compose_impl!(Compose::Plus, "compose_solid_plus");
 }

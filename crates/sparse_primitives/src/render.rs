@@ -18,7 +18,7 @@ use peniko::kurbo::BezPath;
 use peniko::{
     color::{palette, AlphaColor, Srgb},
     kurbo::Affine,
-    BrushRef,
+    BlendMode, BrushRef, Compose, Mix,
 };
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
@@ -37,6 +37,9 @@ pub struct RenderContext {
     execution_mode: ExecutionMode,
     transform: Affine,
     fill_rule: FillRule,
+    pub(crate) blend_mode: BlendMode,
+    // Whether the current context is cleared.
+    resetted: bool,
 }
 
 impl RenderContext {
@@ -56,6 +59,7 @@ impl RenderContext {
         let line_buf = vec![];
         let tiles = Tiles::new();
         let strip_buf = vec![];
+        let cleared = true;
 
         #[cfg(feature = "simd")]
         let execution_mode = ExecutionMode::Auto;
@@ -71,6 +75,7 @@ impl RenderContext {
             end_cap: Cap::Butt,
             ..Default::default()
         };
+        let blend_mode = BlendMode::new(Mix::Normal, Compose::SrcOver);
 
         Self {
             width,
@@ -85,6 +90,8 @@ impl RenderContext {
             paint,
             fill_rule,
             stroke,
+            blend_mode,
+            resetted: cleared,
         }
     }
 
@@ -98,6 +105,10 @@ impl RenderContext {
     pub fn stroke_path(&mut self, path: &BezPath) {
         crate::flatten::stroke(&path, &self.stroke, self.transform, &mut self.line_buf);
         self.render_path(FillRule::NonZero, self.paint.clone());
+    }
+
+    pub fn set_blend_mode(&mut self, blend_mode: BlendMode) {
+        self.blend_mode = blend_mode;
     }
 
     /// Set the stroking properties for stroking operations.
@@ -142,9 +153,13 @@ impl RenderContext {
 
     /// Reset the current render context.
     pub fn reset(&mut self) {
-        for tile in &mut self.wide_tiles {
-            tile.bg = AlphaColor::TRANSPARENT;
-            tile.cmds.clear();
+        if !self.resetted {
+            for tile in &mut self.wide_tiles {
+                tile.bg = AlphaColor::TRANSPARENT;
+                tile.cmds.clear();
+            }
+
+            self.resetted = true;
         }
     }
 
@@ -164,7 +179,7 @@ impl RenderContext {
                 let tile = &self.wide_tiles[y * width_tiles + x];
                 fine.clear(tile.bg.premultiply().to_rgba8().to_u8_array());
                 for cmd in &tile.cmds {
-                    fine.run_cmd(cmd, &self.alphas);
+                    fine.run_cmd(cmd, &self.alphas, cmd.compose());
                 }
                 fine.pack(x, y);
             }
@@ -202,6 +217,10 @@ impl RenderContext {
         if self.strip_buf.is_empty() {
             return;
         }
+
+        // It's of course still possible that we end up drawing nothing, but better
+        // safe than sorry.
+        self.resetted = false;
 
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
@@ -245,6 +264,7 @@ impl RenderContext {
                     width,
                     alpha_ix: col as usize,
                     paint: paint.clone(),
+                    compose: self.blend_mode.compose,
                 };
                 x += width;
                 col += width;
@@ -264,7 +284,12 @@ impl RenderContext {
                     let x_tile_rel = x % WIDE_TILE_WIDTH as u32;
                     let width = x2.min(((xtile + 1) * WIDE_TILE_WIDTH) as u32) - x;
                     x += width;
-                    self.wide_tiles[row_start + xtile].fill(x_tile_rel, width, paint.clone());
+                    self.wide_tiles[row_start + xtile].fill(
+                        x_tile_rel,
+                        width,
+                        paint.clone(),
+                        self.blend_mode.compose,
+                    );
                 }
             }
         }
