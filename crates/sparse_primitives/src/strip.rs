@@ -11,9 +11,10 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
+use crate::execute::Executor;
 use crate::tiling::Tiles;
 use crate::wide_tile::STRIP_HEIGHT;
-use crate::{dispatch, ExecutionMode, FillRule};
+use crate::FillRule;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
@@ -24,22 +25,15 @@ pub struct Strip {
 }
 
 #[inline(never)]
-pub fn render_strips(
+pub fn render_strips<EXEC: Executor>(
     tiles: &Tiles,
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
     fill_rule: FillRule,
-    execution_mode: ExecutionMode,
 ) {
     strip_buf.clear();
 
-    // There's unfortunately some hard-to-avoid code duplication between the different
-    // kernels, so when changing something we need to make sure to keep it in sync.
-    dispatch!(
-        scalar: scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule),
-        neon: neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule),
-        execution_mode: execution_mode
-    );
+    EXEC::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
 }
 
 impl Strip {
@@ -57,12 +51,12 @@ impl Strip {
     }
 }
 
-mod scalar {
+pub(crate) mod scalar {
     use crate::strip::Strip;
     use crate::tiling::{Footprint, Tiles};
     use crate::FillRule;
 
-    pub(super) fn render_strips(
+    pub(crate) fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
@@ -225,14 +219,14 @@ mod scalar {
 }
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-mod neon {
+pub(crate) mod neon {
     use crate::strip::Strip;
     use crate::tiling::{Footprint, Tile, Tiles};
     use crate::FillRule;
     use std::arch::aarch64::*;
 
     /// SAFETY: Caller must ensure that target feature `neon` is available.
-    pub(super) unsafe fn render_strips(
+    pub(crate) unsafe fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,

@@ -26,11 +26,11 @@ fn main() {
     // render_tree(&mut ctx, &mut sctx, &tree);
 
     draw_grid(&mut document);
-    draw_line_segments(&mut document, &ctx.line_buf);
-    draw_tile_areas(&mut document, &ctx.tiles);
-    draw_tile_intersections(&mut document, &ctx.tiles);
-    draw_strips(&mut document, &ctx.strip_buf, &ctx.alphas);
-    draw_wide_tiles(&mut document, &ctx.wide_tiles, &ctx.alphas);
+    draw_line_segments(&mut document, ctx.line_buf());
+    draw_tile_areas(&mut document, ctx.tiles());
+    draw_tile_intersections(&mut document, ctx.tiles());
+    draw_strips(&mut document, ctx.strip_buf(), ctx.alphas());
+    draw_wide_tiles(&mut document, ctx.wide_tiles(), ctx.alphas());
 
     svg::save("../../target/out.svg", &document).unwrap();
 }

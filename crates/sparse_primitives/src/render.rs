@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::color::palette::css::BLACK;
+use crate::execute::Executor;
 use crate::kurbo::{Cap, Join, Stroke};
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
@@ -12,7 +13,7 @@ use crate::{
     strip::Strip,
     tiling::FlatLine,
     wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
-    ExecutionMode, FillRule, Pixmap,
+    FillRule, Pixmap,
 };
 use peniko::kurbo::BezPath;
 use peniko::{
@@ -20,30 +21,29 @@ use peniko::{
     kurbo::Affine,
     BlendMode, BrushRef, Compose, Mix,
 };
+use std::marker::PhantomData;
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
 
-pub struct RenderContext {
-    pub width: usize,
-    pub height: usize,
-    pub wide_tiles: Vec<WideTile>,
-    pub alphas: Vec<u32>,
-    pub line_buf: Vec<FlatLine>,
-    pub tiles: Tiles,
-    pub strip_buf: Vec<Strip>,
+pub(crate) struct InnerContext<EXEC: Executor> {
+    pub(crate) width: usize,
+    pub(crate) height: usize,
+    pub(crate) wide_tiles: Vec<WideTile>,
+    pub(crate) alphas: Vec<u32>,
+    pub(crate) line_buf: Vec<FlatLine>,
+    pub(crate) tiles: Tiles,
+    pub(crate) strip_buf: Vec<Strip>,
     pub(crate) paint: Paint,
     pub(crate) stroke: Stroke,
-
-    execution_mode: ExecutionMode,
-    transform: Affine,
-    fill_rule: FillRule,
+    pub(crate) transform: Affine,
+    pub(crate) fill_rule: FillRule,
     pub(crate) blend_mode: BlendMode,
     // Whether the current context is cleared.
     resetted: bool,
+    phantom_data: PhantomData<EXEC>,
 }
 
-impl RenderContext {
-    /// Create a new render context.
+impl<EXEC: Executor> InnerContext<EXEC> {
     pub fn new(width: usize, height: usize) -> Self {
         let width_tiles = width.div_ceil(WIDE_TILE_WIDTH);
         let height_tiles = height.div_ceil(STRIP_HEIGHT);
@@ -61,10 +61,6 @@ impl RenderContext {
         let strip_buf = vec![];
         let cleared = true;
 
-        #[cfg(feature = "simd")]
-        let execution_mode = ExecutionMode::Auto;
-        #[cfg(not(feature = "simd"))]
-        let execution_mode = ExecutionMode::Scalar;
         let transform = Affine::IDENTITY;
         let fill_rule = FillRule::NonZero;
         let paint = BLACK.into();
@@ -85,74 +81,67 @@ impl RenderContext {
             line_buf,
             tiles,
             strip_buf,
-            execution_mode,
             transform,
             paint,
             fill_rule,
             stroke,
             blend_mode,
             resetted: cleared,
+            phantom_data: Default::default(),
         }
     }
 
-    /// Fill a path.
-    pub fn fill_path(&mut self, path: &BezPath) {
+    pub(crate) fn fill_path(&mut self, path: &BezPath) {
         crate::flatten::fill(&path, self.transform, &mut self.line_buf);
         self.render_path(self.fill_rule, self.paint.clone());
     }
 
-    /// Stroke a path.
-    pub fn stroke_path(&mut self, path: &BezPath) {
+    pub(crate) fn stroke_path(&mut self, path: &BezPath) {
         crate::flatten::stroke(&path, &self.stroke, self.transform, &mut self.line_buf);
         self.render_path(FillRule::NonZero, self.paint.clone());
     }
 
-    pub fn set_blend_mode(&mut self, blend_mode: BlendMode) {
+    pub(crate) fn set_blend_mode(&mut self, blend_mode: BlendMode) {
         self.blend_mode = blend_mode;
     }
 
-    /// Set the stroking properties for stroking operations.
-    pub fn set_stroke(&mut self, stroke: Stroke) {
+    pub(crate) fn blend_mode(&self) -> BlendMode {
+        self.blend_mode
+    }
+
+    pub(crate) fn set_stroke(&mut self, stroke: Stroke) {
         self.stroke = stroke;
     }
 
-    /// Set the paint for filling and stroking operations.
-    pub fn set_paint(&mut self, paint: Paint) {
+    pub(crate) fn set_paint(&mut self, paint: Paint) {
         self.paint = paint;
     }
 
-    /// Set the fill rule for filling operations.
-    pub fn set_fill_rule(&mut self, fill_rule: FillRule) {
+    pub(crate) fn set_fill_rule(&mut self, fill_rule: FillRule) {
         self.fill_rule = fill_rule;
     }
 
-    /// Pre-concatenate a transform to the current transformation matrix.
-    pub fn pre_concat_transform(&mut self, transform: Affine) {
+    pub(crate) fn pre_concat_transform(&mut self, transform: Affine) {
         self.transform *= transform;
     }
 
-    /// Post-concatenate a new transform to the current transformation matrix.
-    pub fn post_concat_transform(&mut self, transform: Affine) {
+    pub(crate) fn post_concat_transform(&mut self, transform: Affine) {
         self.transform = transform * self.transform;
     }
 
-    /// Set the current transformation matrix.
-    pub fn set_transform(&mut self, transform: Affine) {
+    pub(crate) fn set_transform(&mut self, transform: Affine) {
         self.transform = transform;
     }
 
-    /// Reset the current transformation matrix to the identity matrix.
-    pub fn reset_transform(&mut self) {
+    pub(crate) fn reset_transform(&mut self) {
         self.transform = Affine::IDENTITY;
     }
 
-    /// Get the current transformation matrix.
-    pub fn current_transform(&self) -> Affine {
+    pub(crate) fn current_transform(&self) -> Affine {
         self.transform
     }
 
-    /// Reset the current render context.
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         if !self.resetted {
             for tile in &mut self.wide_tiles {
                 tile.bg = AlphaColor::TRANSPARENT;
@@ -163,14 +152,8 @@ impl RenderContext {
         }
     }
 
-    /// Render the current render context into a pixmap.
-    pub fn render_to_pixmap(&self, pixmap: &mut Pixmap) {
-        let mut fine = Fine::new(
-            pixmap.width,
-            pixmap.height,
-            &mut pixmap.buf,
-            self.execution_mode,
-        );
+    pub(crate) fn render_to_pixmap(&self, pixmap: &mut Pixmap) {
+        let mut fine = Fine::<EXEC>::new(pixmap.width, pixmap.height, &mut pixmap.buf);
 
         let width_tiles = self.width.div_ceil(WIDE_TILE_WIDTH);
         let height_tiles = self.height.div_ceil(STRIP_HEIGHT);
@@ -186,6 +169,34 @@ impl RenderContext {
         }
     }
 
+    pub(crate) fn width(&self) -> usize {
+        self.width
+    }
+
+    pub(crate) fn height(&self) -> usize {
+        self.height
+    }
+
+    pub(crate) fn wide_tiles(&self) -> &[WideTile] {
+        &self.wide_tiles
+    }
+
+    pub(crate) fn alphas(&self) -> &[u32] {
+        &self.alphas
+    }
+
+    pub(crate) fn line_buf(&self) -> &[FlatLine] {
+        &self.line_buf
+    }
+
+    pub(crate) fn tiles(&self) -> &Tiles {
+        &self.tiles
+    }
+
+    pub(crate) fn strip_buf(&self) -> &[Strip] {
+        &self.strip_buf
+    }
+
     fn render_path(&mut self, fill_rule: FillRule, paint: Paint) {
         if let Some(rect) = lines_to_rect(&self.line_buf, self.width, self.height) {
             // Path is actually a rectangle, so used fast path for rectangles.
@@ -194,12 +205,11 @@ impl RenderContext {
             self.tiles.make_tiles(&self.line_buf);
             self.tiles.sort_tiles();
 
-            render_strips(
+            render_strips::<EXEC>(
                 &self.tiles,
                 &mut self.strip_buf,
                 &mut self.alphas,
                 fill_rule,
-                self.execution_mode,
             );
 
             self.generate_commands(fill_rule, paint);

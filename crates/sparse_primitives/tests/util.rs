@@ -2,6 +2,7 @@ use image::{load_from_memory, Rgba, RgbaImage};
 use once_cell::sync::Lazy;
 use peniko::color::palette;
 use peniko::kurbo::{Rect, Shape};
+use sparse_primitives::execute::ExecutionMode;
 use sparse_primitives::{Pixmap, RenderContext};
 use std::cmp::max;
 use std::path::PathBuf;
@@ -19,7 +20,7 @@ static DIFFS_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 
 pub fn get_ctx(width: usize, height: usize, transparent: bool) -> RenderContext {
-    let mut ctx = RenderContext::new(width, height);
+    let mut ctx = RenderContext::new_with_execution_mode(width, height, ExecutionMode::Scalar);
     if !transparent {
         let path = Rect::new(0.0, 0.0, width as f64, height as f64).to_path(0.1);
 
@@ -31,7 +32,7 @@ pub fn get_ctx(width: usize, height: usize, transparent: bool) -> RenderContext 
 }
 
 pub fn render_pixmap(ctx: &RenderContext) -> Pixmap {
-    let mut pixmap = Pixmap::new(ctx.width, ctx.height);
+    let mut pixmap = Pixmap::new(ctx.width(), ctx.height());
     ctx.render_to_pixmap(&mut pixmap);
 
     pixmap
@@ -43,7 +44,7 @@ pub fn check_ref(ctx: &RenderContext, name: &str) {
 
     let encoded_image = {
         let mut out = vec![];
-        let mut encoder = png::Encoder::new(&mut out, ctx.width as u32, ctx.height as u32);
+        let mut encoder = png::Encoder::new(&mut out, ctx.width() as u32, ctx.height() as u32);
         encoder.set_color(png::ColorType::Rgba);
         let mut writer = encoder.write_header().unwrap();
         writer.write_image_data(pixmap.data()).unwrap();
