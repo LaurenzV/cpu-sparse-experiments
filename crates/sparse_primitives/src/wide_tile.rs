@@ -3,6 +3,7 @@
 
 use crate::paint::Paint;
 use peniko::color::{AlphaColor, Srgb};
+use peniko::Compose;
 
 pub const WIDE_TILE_WIDTH: usize = 256;
 pub const STRIP_HEIGHT: usize = 4;
@@ -32,11 +33,21 @@ pub enum Cmd {
     Strip(CmdStrip),
 }
 
+impl Cmd {
+    pub fn compose(&self) -> Compose {
+        match self {
+            Cmd::Fill(f) => f.compose,
+            Cmd::Strip(s) => s.compose,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CmdFill {
     pub x: u32,
     pub width: u32,
     pub paint: Paint,
+    pub compose: Compose,
 }
 
 #[derive(Debug)]
@@ -45,19 +56,32 @@ pub struct CmdStrip {
     pub width: u32,
     pub alpha_ix: usize,
     pub paint: Paint,
+    pub compose: Compose,
 }
 
 impl WideTile {
-    pub(crate) fn fill(&mut self, x: u32, width: u32, paint: Paint) {
+    pub(crate) fn fill(&mut self, x: u32, width: u32, paint: Paint, compose: Compose) {
         if let Paint::Solid(s) = &paint {
-            if x == 0 && width == WIDE_TILE_WIDTH as u32 && s.components[3] == 1.0 {
+            let can_override = x == 0 && width == WIDE_TILE_WIDTH as u32 && s.components[3] == 1.0;
+            let shortcut_compose = matches!(compose, Compose::Copy | Compose::SrcOver);
+            if can_override && shortcut_compose {
                 self.cmds.clear();
                 self.bg = *s;
             } else {
-                self.cmds.push(Cmd::Fill(CmdFill { x, width, paint }));
+                self.cmds.push(Cmd::Fill(CmdFill {
+                    x,
+                    width,
+                    paint,
+                    compose,
+                }));
             }
         } else {
-            self.cmds.push(Cmd::Fill(CmdFill { x, width, paint }));
+            self.cmds.push(Cmd::Fill(CmdFill {
+                x,
+                width,
+                paint,
+                compose,
+            }));
         }
     }
 
