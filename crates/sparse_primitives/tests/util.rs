@@ -31,7 +31,7 @@ pub fn get_ctx(width: usize, height: usize, transparent: bool) -> RenderContext 
 }
 
 pub fn render_pixmap(ctx: &RenderContext) -> Pixmap {
-    let mut pixmap = Pixmap::new(ctx.width, ctx.height);
+    let mut pixmap = Pixmap::new(ctx.width(), ctx.height());
     ctx.render_to_pixmap(&mut pixmap);
 
     pixmap
@@ -43,7 +43,7 @@ pub fn check_ref(ctx: &RenderContext, name: &str) {
 
     let encoded_image = {
         let mut out = vec![];
-        let mut encoder = png::Encoder::new(&mut out, ctx.width as u32, ctx.height as u32);
+        let mut encoder = png::Encoder::new(&mut out, ctx.width() as u32, ctx.height() as u32);
         encoder.set_color(png::ColorType::Rgba);
         let mut writer = encoder.write_header().unwrap();
         writer.write_image_data(pixmap.data()).unwrap();

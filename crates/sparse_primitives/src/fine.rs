@@ -3,36 +3,33 @@
 
 //! Fine rasterization
 
+use crate::execute::Executor;
 use crate::paint::Paint;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
-use crate::{dispatch, ExecutionMode};
 use peniko::Compose;
+use std::marker::PhantomData;
 
 pub(crate) const COLOR_COMPONENTS: usize = 4;
 pub(crate) const TOTAL_STRIP_HEIGHT: usize = STRIP_HEIGHT * COLOR_COMPONENTS;
 
-pub struct Fine<'a> {
+pub struct Fine<'a, T: Executor> {
     pub(crate) width: usize,
     pub(crate) height: usize,
     pub(crate) out_buf: &'a mut [u8],
     pub(crate) scratch: [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
-    execution_mode: ExecutionMode,
+    phantom_data: PhantomData<T>,
 }
 
-impl<'a> Fine<'a> {
-    pub fn new(
-        width: usize,
-        height: usize,
-        out_buf: &'a mut [u8],
-        execution_mode: ExecutionMode,
-    ) -> Self {
+impl<'a, EXEC: Executor> Fine<'a, EXEC> {
+    pub fn new(width: usize, height: usize, out_buf: &'a mut [u8]) -> Self {
         let scratch = [0; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS];
+
         Self {
             width,
             height,
             out_buf,
             scratch,
-            execution_mode,
+            phantom_data: PhantomData::default(),
         }
     }
 
@@ -73,14 +70,7 @@ impl<'a> Fine<'a> {
         match paint {
             Paint::Solid(c) => {
                 let color = c.premultiply().to_rgba8().to_u8_array();
-
-                dispatch!(
-                    scalar: scalar::fill_solid(&mut self.scratch, &color, x, width, compose),
-                    // Scalar version seems to autovectorize better than our neon impl, so
-                    // for now we just use that one.
-                    neon: scalar::fill_solid(&mut self.scratch, &color, x, width, compose),
-                    execution_mode: self.execution_mode
-                );
+                EXEC::fill_solid(&mut self.scratch, &color, x, width, compose);
             }
             Paint::Pattern(_) => unimplemented!(),
         }
@@ -100,12 +90,7 @@ impl<'a> Fine<'a> {
         match paint {
             Paint::Solid(s) => {
                 let color = s.premultiply().to_rgba8().to_u8_array();
-
-                dispatch!(
-                    scalar: scalar::strip_solid(&mut self.scratch, &color, x, width, alphas, compose),
-                    neon: neon::strip_solid(&mut self.scratch, &color, x, width, alphas),
-                    execution_mode: self.execution_mode
-                );
+                EXEC::strip_solid(&mut self.scratch, &color, x, width, alphas, compose);
             }
             Paint::Pattern(_) => unimplemented!(),
         }
@@ -143,7 +128,7 @@ fn pack(
     }
 }
 
-mod scalar {
+pub(crate) mod scalar {
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
     use peniko::Compose;
@@ -153,7 +138,7 @@ mod scalar {
         (val + 1 + (val >> 8)) >> 8
     }
 
-    pub(super) fn fill_solid(
+    pub(crate) fn fill_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
@@ -289,7 +274,7 @@ mod scalar {
         }
     }
 
-    pub(super) fn strip_solid(
+    pub(crate) fn strip_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
         cs: &[u8; COLOR_COMPONENTS],
         x: usize,
@@ -468,7 +453,7 @@ mod scalar {
 }
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-mod neon {
+pub(crate) mod neon {
     use std::arch::aarch64::*;
 
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
@@ -477,7 +462,7 @@ mod neon {
     /// SAFETY: Caller must ensure target feature `neon` is available.
     // Note: This method currently seems to be slower than the scalar version.
     // TODO: Investiage why this is still slower.
-    pub(super) unsafe fn fill_solid(
+    pub(crate) unsafe fn fill_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
@@ -520,7 +505,7 @@ mod neon {
     }
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
-    pub(super) unsafe fn strip_solid(
+    pub(crate) unsafe fn strip_solid(
         scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
         color: &[u8; COLOR_COMPONENTS],
         x: usize,

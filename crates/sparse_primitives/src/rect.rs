@@ -6,8 +6,9 @@
 //! strips", but can instead straight away generate appropriate strip and fill commands for the
 //! corresponding wide tiles, based on the coordinates of the rectangle.
 
+use crate::execute::Executor;
 use crate::paint::Paint;
-use crate::render::DEFAULT_TOLERANCE;
+use crate::render::{InnerContext, DEFAULT_TOLERANCE};
 use crate::strip::Strip;
 use crate::tiling::FlatLine;
 use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
@@ -15,9 +16,8 @@ use crate::{FillRule, RenderContext};
 use peniko::kurbo;
 use peniko::kurbo::{Affine, Join, Rect, Shape};
 
-impl RenderContext {
-    /// Fill a rectangle.
-    pub fn fill_rect(&mut self, rect: &Rect) {
+impl<EXEC: Executor> InnerContext<EXEC> {
+    pub(crate) fn fill_rect(&mut self, rect: &Rect) {
         let affine = self.current_transform();
 
         if !affine.has_skew() {
@@ -30,8 +30,7 @@ impl RenderContext {
         }
     }
 
-    /// Stroke a rectangle.
-    pub fn stroke_rect(&mut self, rect: &Rect) {
+    pub(crate) fn stroke_rect(&mut self, rect: &Rect) {
         let affine = self.current_transform();
         let stroke = &self.stroke;
 
