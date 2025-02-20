@@ -11,7 +11,7 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::execute::Executor;
+use crate::execute::KernelExecutor;
 use crate::tiling::Tiles;
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
@@ -25,7 +25,7 @@ pub struct Strip {
 }
 
 #[inline(never)]
-pub fn render_strips<EXEC: Executor>(
+pub fn render_strips<KE: KernelExecutor>(
     tiles: &Tiles,
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
@@ -33,7 +33,7 @@ pub fn render_strips<EXEC: Executor>(
 ) {
     strip_buf.clear();
 
-    EXEC::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
+    KE::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
 }
 
 impl Strip {
