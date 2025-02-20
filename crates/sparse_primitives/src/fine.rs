@@ -13,13 +13,13 @@ pub(crate) const COLOR_COMPONENTS: usize = 4;
 pub(crate) const TOTAL_STRIP_HEIGHT: usize = STRIP_HEIGHT * COLOR_COMPONENTS;
 pub(crate) const SCRATCH_BUF_SIZE: usize = WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS;
 
-pub(crate) type SCRATCH_BUF = [u8; SCRATCH_BUF_SIZE];
+pub(crate) type ScratchBuf = [u8; SCRATCH_BUF_SIZE];
 
 pub struct Fine<'a, T: Executor> {
     pub(crate) width: usize,
     pub(crate) height: usize,
     pub(crate) out_buf: &'a mut [u8],
-    pub(crate) scratch: SCRATCH_BUF,
+    pub(crate) scratch: ScratchBuf,
     phantom_data: PhantomData<T>,
 }
 
@@ -102,7 +102,7 @@ impl<'a, EXEC: Executor> Fine<'a, EXEC> {
 
 fn pack(
     out_buf: &mut [u8],
-    scratch: &SCRATCH_BUF,
+    scratch: &ScratchBuf,
     width: usize,
     height: usize,
     x: usize,
@@ -132,7 +132,7 @@ fn pack(
 }
 
 pub(crate) mod scalar {
-    use crate::fine::{COLOR_COMPONENTS, SCRATCH_BUF, TOTAL_STRIP_HEIGHT};
+    use crate::fine::{COLOR_COMPONENTS, ScratchBuf, TOTAL_STRIP_HEIGHT};
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
     use peniko::Compose;
 
@@ -142,7 +142,7 @@ pub(crate) mod scalar {
     }
 
     pub(crate) fn fill_solid(
-        scratch: &mut SCRATCH_BUF,
+        scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
@@ -278,7 +278,7 @@ pub(crate) mod scalar {
     }
 
     pub(crate) fn strip_solid(
-        scratch: &mut SCRATCH_BUF,
+        scratch: &mut ScratchBuf,
         cs: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
@@ -459,12 +459,12 @@ pub(crate) mod scalar {
 pub(crate) mod neon {
     use std::arch::aarch64::*;
 
-    use crate::fine::{COLOR_COMPONENTS, SCRATCH_BUF, TOTAL_STRIP_HEIGHT};
+    use crate::fine::{COLOR_COMPONENTS, ScratchBuf, TOTAL_STRIP_HEIGHT};
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
     pub(crate) unsafe fn fill_solid(
-        scratch: &mut SCRATCH_BUF,
+        scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
@@ -507,7 +507,7 @@ pub(crate) mod neon {
 
     /// SAFETY: Caller must ensure target feature `neon` is available.
     pub(crate) unsafe fn strip_solid(
-        scratch: &mut SCRATCH_BUF,
+        scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
