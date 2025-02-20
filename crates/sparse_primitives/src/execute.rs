@@ -38,7 +38,7 @@ impl Default for ExecutionMode {
     }
 }
 
-pub(crate) trait Executor {
+pub(crate) trait KernelExecutor {
     fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
@@ -67,7 +67,7 @@ pub(crate) trait Executor {
 pub(crate) struct Scalar;
 pub(crate) struct Neon;
 
-impl Executor for Scalar {
+impl KernelExecutor for Scalar {
     fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
@@ -100,7 +100,7 @@ impl Executor for Scalar {
 }
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-impl Executor for Neon {
+impl KernelExecutor for Neon {
     fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,

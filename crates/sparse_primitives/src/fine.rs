@@ -3,7 +3,7 @@
 
 //! Fine rasterization
 
-use crate::execute::Executor;
+use crate::execute::KernelExecutor;
 use crate::paint::Paint;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use peniko::Compose;
@@ -15,7 +15,7 @@ pub(crate) const SCRATCH_BUF_SIZE: usize = WIDE_TILE_WIDTH * STRIP_HEIGHT * COLO
 
 pub(crate) type ScratchBuf = [u8; SCRATCH_BUF_SIZE];
 
-pub struct Fine<'a, T: Executor> {
+pub struct Fine<'a, T: KernelExecutor> {
     pub(crate) width: usize,
     pub(crate) height: usize,
     pub(crate) out_buf: &'a mut [u8],
@@ -23,7 +23,7 @@ pub struct Fine<'a, T: Executor> {
     phantom_data: PhantomData<T>,
 }
 
-impl<'a, EXEC: Executor> Fine<'a, EXEC> {
+impl<'a, KE: KernelExecutor> Fine<'a, KE> {
     pub fn new(width: usize, height: usize, out_buf: &'a mut [u8]) -> Self {
         let scratch = [0; SCRATCH_BUF_SIZE];
 
@@ -73,7 +73,7 @@ impl<'a, EXEC: Executor> Fine<'a, EXEC> {
         match paint {
             Paint::Solid(c) => {
                 let color = c.premultiply().to_rgba8().to_u8_array();
-                EXEC::fill_solid(&mut self.scratch, &color, x, width, compose);
+                KE::fill_solid(&mut self.scratch, &color, x, width, compose);
             }
             Paint::Pattern(_) => unimplemented!(),
         }
@@ -93,7 +93,7 @@ impl<'a, EXEC: Executor> Fine<'a, EXEC> {
         match paint {
             Paint::Solid(s) => {
                 let color = s.premultiply().to_rgba8().to_u8_array();
-                EXEC::strip_solid(&mut self.scratch, &color, x, width, alphas, compose);
+                KE::strip_solid(&mut self.scratch, &color, x, width, alphas, compose);
             }
             Paint::Pattern(_) => unimplemented!(),
         }

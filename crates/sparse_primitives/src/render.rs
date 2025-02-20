@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::color::palette::css::BLACK;
-use crate::execute::Executor;
+use crate::execute::KernelExecutor;
 use crate::kurbo::{Cap, Join, Stroke};
 use crate::paint::Paint;
 use crate::rect::lines_to_rect;
@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
 
-pub(crate) struct InnerContext<EXEC: Executor> {
+pub(crate) struct InnerContext<KE: KernelExecutor> {
     pub(crate) width: usize,
     pub(crate) height: usize,
     pub(crate) wide_tiles: Vec<WideTile>,
@@ -40,10 +40,10 @@ pub(crate) struct InnerContext<EXEC: Executor> {
     pub(crate) blend_mode: BlendMode,
     // Whether the current context is cleared.
     resetted: bool,
-    phantom_data: PhantomData<EXEC>,
+    phantom_data: PhantomData<KE>,
 }
 
-impl<EXEC: Executor> InnerContext<EXEC> {
+impl<KE: KernelExecutor> InnerContext<KE> {
     pub fn new(width: usize, height: usize) -> Self {
         let width_tiles = width.div_ceil(WIDE_TILE_WIDTH);
         let height_tiles = height.div_ceil(STRIP_HEIGHT);
@@ -153,7 +153,7 @@ impl<EXEC: Executor> InnerContext<EXEC> {
     }
 
     pub(crate) fn render_to_pixmap(&self, pixmap: &mut Pixmap) {
-        let mut fine = Fine::<EXEC>::new(pixmap.width, pixmap.height, &mut pixmap.buf);
+        let mut fine = Fine::<KE>::new(pixmap.width, pixmap.height, &mut pixmap.buf);
 
         let width_tiles = self.width.div_ceil(WIDE_TILE_WIDTH);
         let height_tiles = self.height.div_ceil(STRIP_HEIGHT);
@@ -205,7 +205,7 @@ impl<EXEC: Executor> InnerContext<EXEC> {
             self.tiles.make_tiles(&self.line_buf);
             self.tiles.sort_tiles();
 
-            render_strips::<EXEC>(
+            render_strips::<KE>(
                 &self.tiles,
                 &mut self.strip_buf,
                 &mut self.alphas,
