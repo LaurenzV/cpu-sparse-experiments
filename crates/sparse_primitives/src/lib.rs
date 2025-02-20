@@ -36,7 +36,9 @@ impl FillRule {
 enum InnerContextType {
     Scalar(InnerContext<Scalar>),
     #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-    Neon(InnerContext<Neon>),
+    Neon(InnerContext<execute::Neon>),
+    #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+    Avx2(InnerContext<execute::Avx2>),
 }
 
 macro_rules! dispatch_mut {
@@ -46,8 +48,10 @@ macro_rules! dispatch_mut {
     ) => {
         match &mut $self.0 {
             InnerContextType::Scalar(s) => s.$scalar($($args)*),
-             #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+            #[cfg(all(feature = "simd", target_arch = "aarch64"))]
             InnerContextType::Neon(n) => n.$scalar($($args)*),
+            #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+            InnerContextType::Avx2(n) => n.$scalar($($args)*)
         }
     };
 }
@@ -61,6 +65,8 @@ macro_rules! dispatch {
             InnerContextType::Scalar(s) => s.$scalar($($args)*),
              #[cfg(all(feature = "simd", target_arch = "aarch64"))]
             InnerContextType::Neon(n) => n.$scalar($($args)*),
+            #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+            InnerContextType::Avx2(n) => n.$scalar($($args)*),
         }
     };
 }
@@ -215,6 +221,11 @@ fn select_inner_context(
                 return InnerContextType::Neon(InnerContext::new(width, height));
             }
 
+            #[cfg(target_arch = "x86_64")]
+            if std::arch::is_x86_feature_detected!("avx2") {
+                return InnerContextType::Avx2(InnerContext::new(width, height));
+            }
+
             // Fallback.
             InnerContextType::Scalar(InnerContext::new(width, height))
         }
@@ -228,10 +239,20 @@ fn select_inner_context(
                 "attempted to force execution mode NEON, but CPU doesn't support NEON instructions"
             );
         }
+        #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+        ExecutionMode::Avx2 => {
+            if std::arch::is_x86_feature_detected!("avx2") {
+                return InnerContextType::Avx2(InnerContext::new(width, height));
+            }
+
+            panic!(
+                "attempted to force execution mode AVX2, but CPU doesn't support AVX2 instructions"
+            );
+        }
     }
 }
 
-use crate::execute::{ExecutionMode, Neon, Scalar};
+use crate::execute::{ExecutionMode, Scalar};
 use crate::kurbo::{Affine, BezPath, Rect, Stroke};
 use crate::paint::Paint;
 use crate::render::InnerContext;

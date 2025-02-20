@@ -553,3 +553,62 @@ pub(crate) mod neon {
         vshrq_n_u16::<8>(added)
     }
 }
+
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+pub(crate) mod avx2 {
+    use crate::fine::{ScratchBuf, COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
+    use crate::wide_tile::STRIP_HEIGHT;
+    use std::arch::x86_64::*;
+
+    #[target_feature(enable = "avx2")]
+    unsafe fn div_255(val: __m256i) -> __m256i {
+        _mm256_srli_epi16::<8>(_mm256_add_epi16(
+            _mm256_add_epi16(val, _mm256_set1_epi16(1)),
+            _mm256_srli_epi16::<8>(val),
+        ))
+    }
+
+    /// SAFETY: Caller must ensure target feature `avx2` is available.
+    #[target_feature(enable = "avx2")]
+    pub(crate) unsafe fn fill_solid(
+        scratch: &mut ScratchBuf,
+        color: &[u8; COLOR_COMPONENTS],
+        x: usize,
+        width: usize,
+    ) {
+        let (color_buf, alpha) = {
+            let mut buf = [0; TOTAL_STRIP_HEIGHT];
+
+            for i in 0..STRIP_HEIGHT {
+                buf[i * COLOR_COMPONENTS..((i + 1) * COLOR_COMPONENTS)].copy_from_slice(color);
+            }
+
+            (buf, buf[3])
+        };
+
+        let mut strip_cols = scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
+            .chunks_exact_mut(TOTAL_STRIP_HEIGHT);
+
+        if alpha == 255 {
+            for col in strip_cols {
+                col.copy_from_slice(&color_buf);
+            }
+        } else {
+            let color_buf =
+                _mm256_cvtepu8_epi16(_mm_loadu_si128(color_buf.as_ptr() as *const __m128i));
+            let inv_alpha = _mm256_set1_epi16(255 - alpha as i16);
+
+            for z in strip_cols {
+                let z_vals = _mm256_cvtepu8_epi16(_mm_loadu_si128(z.as_ptr() as *const __m128i));
+                let mulled = _mm256_mullo_epi16(z_vals, inv_alpha);
+                let dived = div_255(mulled);
+                let added = _mm256_add_epi16(color_buf, dived);
+                let casted = _mm_packus_epi16(
+                    _mm256_extracti128_si256::<0>(added),
+                    _mm256_extracti128_si256::<1>(added),
+                );
+                _mm_storeu_si128(z.as_mut_ptr() as *mut __m128i, casted);
+            }
+        }
+    }
+}

@@ -22,6 +22,8 @@ pub enum ExecutionMode {
     /// the CPU doesn't support neon.
     #[cfg(all(target_arch = "aarch64", feature = "simd"))]
     Neon,
+    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+    Avx2,
 }
 
 #[cfg(feature = "simd")]
@@ -65,6 +67,8 @@ pub(crate) trait KernelExecutor {
 }
 
 pub(crate) struct Scalar;
+
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
 pub(crate) struct Neon;
 
 impl KernelExecutor for Scalar {
@@ -85,6 +89,45 @@ impl KernelExecutor for Scalar {
         compose: Compose,
     ) {
         fine::scalar::fill_solid(scratch, color, x, width, compose);
+    }
+
+    fn strip_solid(
+        scratch: &mut ScratchBuf,
+        color: &[u8; COLOR_COMPONENTS],
+        x: usize,
+        width: usize,
+        alphas: &[u32],
+        compose: Compose,
+    ) {
+        fine::scalar::strip_solid(scratch, color, x, width, alphas, compose);
+    }
+}
+
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+pub(crate) struct Avx2;
+
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+impl KernelExecutor for Avx2 {
+    fn render_strips(
+        tiles: &Tiles,
+        strip_buf: &mut Vec<Strip>,
+        alpha_buf: &mut Vec<u32>,
+        fill_rule: FillRule,
+    ) {
+        strip::scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
+    }
+
+    fn fill_solid(
+        scratch: &mut ScratchBuf,
+        color: &[u8; COLOR_COMPONENTS],
+        x: usize,
+        width: usize,
+        _: Compose,
+    ) {
+        // SAFETY: We are guaranteed to be running on a CPU that supports `avx2`.
+        unsafe {
+            fine::avx2::fill_solid(scratch, color, x, width);
+        }
     }
 
     fn strip_solid(
