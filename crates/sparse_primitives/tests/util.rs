@@ -20,7 +20,19 @@ static DIFFS_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 
 pub fn get_ctx(width: usize, height: usize, transparent: bool) -> RenderContext {
-    let mut ctx = RenderContext::new_with_execution_mode(width, height, ExecutionMode::Scalar);
+    let mut execution_mode = ExecutionMode::Scalar;
+
+    #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+    if option_env!("NEON").is_some() {
+        execution_mode = ExecutionMode::Neon;
+    }
+
+    #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+    if option_env!("AVX2").is_some() {
+        execution_mode = ExecutionMode::Avx2;
+    }
+
+    let mut ctx = RenderContext::new_with_execution_mode(width, height, execution_mode);
     if !transparent {
         let path = Rect::new(0.0, 0.0, width as f64, height as f64).to_path(0.1);
 
