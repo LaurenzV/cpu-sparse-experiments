@@ -100,14 +100,7 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
     }
 }
 
-fn pack(
-    out_buf: &mut [u8],
-    scratch: &ScratchBuf,
-    width: usize,
-    height: usize,
-    x: usize,
-    y: usize,
-) {
+fn pack(out_buf: &mut [u8], scratch: &ScratchBuf, width: usize, height: usize, x: usize, y: usize) {
     let base_ix = (y * STRIP_HEIGHT * width + x * WIDE_TILE_WIDTH) * COLOR_COMPONENTS;
 
     // Make sure we don't process rows outside the range of the pixmap.
@@ -132,7 +125,7 @@ fn pack(
 }
 
 pub(crate) mod scalar {
-    use crate::fine::{COLOR_COMPONENTS, ScratchBuf, TOTAL_STRIP_HEIGHT};
+    use crate::fine::{ScratchBuf, COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
     use peniko::Compose;
 
@@ -459,7 +452,7 @@ pub(crate) mod scalar {
 pub(crate) mod neon {
     use std::arch::aarch64::*;
 
-    use crate::fine::{COLOR_COMPONENTS, ScratchBuf, TOTAL_STRIP_HEIGHT};
+    use crate::fine::{ScratchBuf, COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
     /// SAFETY: Caller must ensure target feature `neon` is available.

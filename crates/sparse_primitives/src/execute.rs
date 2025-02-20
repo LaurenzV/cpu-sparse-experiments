@@ -1,4 +1,4 @@
-use crate::fine::{COLOR_COMPONENTS, ScratchBuf};
+use crate::fine::{ScratchBuf, COLOR_COMPONENTS};
 use crate::paint::Paint;
 use crate::strip::Strip;
 use crate::tiling::Tiles;
