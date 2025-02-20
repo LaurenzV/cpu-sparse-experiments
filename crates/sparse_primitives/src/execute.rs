@@ -1,4 +1,4 @@
-use crate::fine::COLOR_COMPONENTS;
+use crate::fine::{ScratchBuf, COLOR_COMPONENTS};
 use crate::paint::Paint;
 use crate::strip::Strip;
 use crate::tiling::Tiles;
@@ -38,7 +38,7 @@ impl Default for ExecutionMode {
     }
 }
 
-pub(crate) trait Executor {
+pub(crate) trait KernelExecutor {
     fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
@@ -47,7 +47,7 @@ pub(crate) trait Executor {
     );
 
     fn fill_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
@@ -55,7 +55,7 @@ pub(crate) trait Executor {
     );
 
     fn strip_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
@@ -67,7 +67,7 @@ pub(crate) trait Executor {
 pub(crate) struct Scalar;
 pub(crate) struct Neon;
 
-impl Executor for Scalar {
+impl KernelExecutor for Scalar {
     fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
@@ -78,7 +78,7 @@ impl Executor for Scalar {
     }
 
     fn fill_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
@@ -88,7 +88,7 @@ impl Executor for Scalar {
     }
 
     fn strip_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
@@ -100,7 +100,7 @@ impl Executor for Scalar {
 }
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-impl Executor for Neon {
+impl KernelExecutor for Neon {
     fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
@@ -114,7 +114,7 @@ impl Executor for Neon {
     }
 
     fn fill_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,
@@ -127,7 +127,7 @@ impl Executor for Neon {
     }
 
     fn strip_solid(
-        scratch: &mut [u8; WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS],
+        scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
         x: usize,
         width: usize,

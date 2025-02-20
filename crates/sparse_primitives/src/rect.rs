@@ -6,7 +6,7 @@
 //! strips", but can instead straight away generate appropriate strip and fill commands for the
 //! corresponding wide tiles, based on the coordinates of the rectangle.
 
-use crate::execute::Executor;
+use crate::execute::KernelExecutor;
 use crate::paint::Paint;
 use crate::render::{InnerContext, DEFAULT_TOLERANCE};
 use crate::strip::Strip;
@@ -16,7 +16,7 @@ use crate::{FillRule, RenderContext};
 use peniko::kurbo;
 use peniko::kurbo::{Affine, Join, Rect, Shape};
 
-impl<EXEC: Executor> InnerContext<EXEC> {
+impl<KE: KernelExecutor> InnerContext<KE> {
     pub(crate) fn fill_rect(&mut self, rect: &Rect) {
         let affine = self.current_transform();
 

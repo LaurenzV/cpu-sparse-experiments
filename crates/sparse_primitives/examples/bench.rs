@@ -23,7 +23,7 @@ fn main() {
             size,
         };
 
-        let commands = RectIterator::new(params, RectType::Rotated)
+        let commands = RectIterator::new(params, RectType::Aligned)
             .take(RENDER_CALLS as usize)
             .collect::<Vec<_>>();
 
