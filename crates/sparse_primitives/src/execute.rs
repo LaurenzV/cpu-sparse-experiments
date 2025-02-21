@@ -48,14 +48,6 @@ pub(crate) trait KernelExecutor: compose::Compose {
         fill_rule: FillRule,
     );
 
-    fn fill_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-        compose: Compose,
-    );
-
     fn strip_solid(
         scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
@@ -79,16 +71,6 @@ impl KernelExecutor for Scalar {
         fill_rule: FillRule,
     ) {
         strip::scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
-    }
-
-    fn fill_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-        compose: Compose,
-    ) {
-        fine::scalar::fill_solid(scratch, color, x, width, compose);
     }
 
     fn strip_solid(
@@ -117,19 +99,6 @@ impl KernelExecutor for Avx2 {
         strip::scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
     }
 
-    fn fill_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-        _: Compose,
-    ) {
-        // SAFETY: We are guaranteed to be running on a CPU that supports `avx2`.
-        unsafe {
-            fine::avx2::fill_solid(scratch, color, x, width);
-        }
-    }
-
     fn strip_solid(
         scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
@@ -153,19 +122,6 @@ impl KernelExecutor for Neon {
         // SAFETY: We are guaranteed to be running on a CPU that supports `neon`.
         unsafe {
             strip::neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
-        }
-    }
-
-    fn fill_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-        compose: Compose,
-    ) {
-        // SAFETY: We are guaranteed to be running on a CPU that supports `neon`.
-        unsafe {
-            fine::neon::fill_solid(scratch, color, x, width);
         }
     }
 

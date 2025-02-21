@@ -7,8 +7,8 @@ pub(crate) trait Compose {
 
 pub(crate) mod scalar {
     use crate::execute::Scalar;
-    use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::fine::compose::Compose;
+    use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::util::scalar::{div_255, splat_x4};
 
     impl Compose for Scalar {
@@ -32,13 +32,12 @@ pub(crate) mod scalar {
 
     /// Composite using `SrcOver` (Cs + Cb * (1 – αs)).
     pub(crate) fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let alpha = cs[3];
+        let _as = cs[3];
         let cs = splat_x4(cs);
 
-        let inv_as = (255 - alpha) as u16;
-        let dest = target.chunks_exact_mut(TOTAL_STRIP_HEIGHT);
+        let inv_as = (255 - _as) as u16;
 
-        for cb in dest {
+        for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
             for i in 0..TOTAL_STRIP_HEIGHT {
                 cb[i] = cs[i] + div_255(cb[i] as u16 * inv_as) as u8;
             }
@@ -47,19 +46,16 @@ pub(crate) mod scalar {
 
     /// Composite using `SrcCopy` (Cs).
     pub(crate) fn src_copy(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let dest = target.chunks_exact_mut(TOTAL_STRIP_HEIGHT);
         let cs = splat_x4(cs);
 
-        for cb in dest {
+        for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
             cb.copy_from_slice(&cs);
         }
     }
 
     /// Composite using `DestOver` (Cs * (1 – αb) + Cb).
     pub(crate) fn dest_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let dest = target.chunks_exact_mut(4);
-
-        for cb in dest {
+        for cb in target.chunks_exact_mut(4) {
             let inv_ab = (255 - cb[3]) as u16;
 
             for i in 0..COLOR_COMPONENTS {
@@ -70,9 +66,7 @@ pub(crate) mod scalar {
 
     /// Composite using `SrcAtop` (Cs * αb + Cb * (1 – αs)).
     pub(crate) fn src_atop(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let dest = target.chunks_exact_mut(4);
-
-        for cb in dest {
+        for cb in target.chunks_exact_mut(4) {
             let inv_as = (255 - cs[3]) as u16;
 
             for i in 0..COLOR_COMPONENTS {
@@ -87,10 +81,9 @@ pub(crate) mod scalar {
 
     /// Composite using `DestOut` (Cb * (1 - as)).
     pub(crate) fn dest_out(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let dest = target.chunks_exact_mut(4);
         let inv_as = 255 - cs[3] as u16;
 
-        for cb in dest {
+        for cb in target.chunks_exact_mut(4) {
             for i in 0..COLOR_COMPONENTS {
                 cb[i] = div_255(cb[i] as u16 * inv_as) as u8;
             }
@@ -99,10 +92,9 @@ pub(crate) mod scalar {
 
     /// Composite using `Xor` (Cs * (1 - αb) + Cb * (1 - αs)).
     pub(crate) fn xor(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let dest = target.chunks_exact_mut(4);
         let inv_as = 255 - cs[3] as u16;
 
-        for cb in dest {
+        for cb in target.chunks_exact_mut(4) {
             for i in 0..COLOR_COMPONENTS {
                 let inv_ab = 255 - cb[3] as u16;
                 let im1 = div_255(cs[i] as u16 * inv_ab) as u8;
@@ -115,10 +107,9 @@ pub(crate) mod scalar {
 
     /// Composite using `Plus` (Cs + Cb).
     pub(crate) fn plus(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let dest = target.chunks_exact_mut(TOTAL_STRIP_HEIGHT);
         let cs = splat_x4(cs);
 
-        for cb in dest {
+        for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
             for i in 0..TOTAL_STRIP_HEIGHT {
                 cb[i] = cs[i].saturating_add(cb[i]);
             }
@@ -137,8 +128,8 @@ pub(crate) mod scalar {
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
 pub(crate) mod neon {
     use crate::execute::{Neon, Scalar};
-    use crate::fine::COLOR_COMPONENTS;
     use crate::fine::compose::Compose;
+    use crate::fine::COLOR_COMPONENTS;
 
     impl Compose for Neon {
         fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
@@ -150,12 +141,42 @@ pub(crate) mod neon {
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 pub(crate) mod avx2 {
     use crate::execute::{Avx2, Scalar};
-    use crate::fine::COLOR_COMPONENTS;
     use crate::fine::compose::Compose;
+    use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
+    use crate::util::avx2::{div_255, splat_x8};
+    use std::arch::x86_64::*;
 
     impl Compose for Avx2 {
         fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
-            Scalar::compose(target, cs, compose);
+            // SAFETY: We are guaranteed to be running on a CPU that supports `avx2`.
+            unsafe {
+                match compose {
+                    peniko::Compose::SrcOver => src_over(target, cs),
+                    _ => Scalar::compose(target, cs, compose),
+                }
+            }
+        }
+    }
+
+    /// SAFETY: Caller must ensure target feature `avx2` is available.
+    #[target_feature(enable = "avx2")]
+    pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+        // TODO: This code can be improved by processing TOTAL_STRIP_HEIGHT * 2
+        // elements at the time according to preliminary benchmarks
+
+        let inv_as = _mm256_set1_epi16(255 - cs[3] as i16);
+        let cs = splat_x8(cs);
+
+        for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
+            let cb_vals = _mm256_cvtepu8_epi16(_mm_loadu_si128(cb.as_ptr() as *const __m128i));
+            let im1 = _mm256_mullo_epi16(cb_vals, inv_as);
+            let im2 = div_255(im1);
+            let im3 = _mm256_add_epi16(cs, im2);
+            let im4 = _mm_packus_epi16(
+                _mm256_extracti128_si256::<0>(im3),
+                _mm256_extracti128_si256::<1>(im3),
+            );
+            _mm_storeu_si128(cb.as_mut_ptr() as *mut __m128i, im4);
         }
     }
 }

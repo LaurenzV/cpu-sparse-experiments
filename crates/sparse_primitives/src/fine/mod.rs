@@ -72,11 +72,20 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
     }
 
     #[inline(never)]
-    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint, compose: Compose) {
+    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint, mut compose: Compose) {
         match paint {
             Paint::Solid(c) => {
                 let color = c.premultiply().to_rgba8_fast();
-                KE::fill_solid(&mut self.scratch, &color, x, width, compose);
+
+                // If color is completely opaque with SrcOver, it's the same as filling using Copy.
+                if compose == Compose::SrcOver && color[3] == 255 {
+                    compose = Compose::Copy
+                }
+
+                let target =
+                    &mut self.scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width];
+
+                KE::compose(target, &color, compose);
             }
             Paint::Pattern(_) => unimplemented!(),
         }
@@ -135,35 +144,6 @@ pub(crate) mod scalar {
     use crate::util::scalar::div_255;
     use crate::wide_tile::STRIP_HEIGHT;
     use peniko::Compose;
-
-    pub(crate) fn fill_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-        mut compose: Compose,
-    ) {
-        // If color is completely opaque with SrcOver, it's the same as filling using Copy.
-        if compose == Compose::SrcOver && color[3] == 255 {
-            compose = Compose::Copy
-        }
-
-        let target = &mut scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width];
-
-        // All the formulas in the comments are with premultiplied alpha for Cs and Cb.
-        match compose {
-            Compose::Copy => src_copy(target, color),
-            Compose::SrcOver => src_over(target, color),
-            Compose::DestOver => dest_over(target, color),
-            Compose::SrcAtop => src_atop(target, color),
-            Compose::DestOut => dest_out(target, color),
-            Compose::Xor => xor(target, color),
-            Compose::Plus => plus(target, color),
-            Compose::Dest => dest(target, color),
-            Compose::Clear => clear(target, color),
-            _ => unimplemented!(),
-        }
-    }
 
     pub(crate) fn strip_solid(
         scratch: &mut ScratchBuf,
@@ -446,66 +426,5 @@ pub(crate) mod neon {
         let added = vaddq_u16(added, val_shifted);
 
         vshrq_n_u16::<8>(added)
-    }
-}
-
-#[cfg(all(target_arch = "x86_64", feature = "simd"))]
-pub(crate) mod avx2 {
-    use crate::fine::{ScratchBuf, COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
-    use crate::wide_tile::STRIP_HEIGHT;
-    use std::arch::x86_64::*;
-
-    #[target_feature(enable = "avx2")]
-    unsafe fn div_255(val: __m256i) -> __m256i {
-        _mm256_srli_epi16::<8>(_mm256_add_epi16(
-            _mm256_add_epi16(val, _mm256_set1_epi16(1)),
-            _mm256_srli_epi16::<8>(val),
-        ))
-    }
-
-    /// SAFETY: Caller must ensure target feature `avx2` is available.
-    #[target_feature(enable = "avx2")]
-    pub(crate) unsafe fn fill_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-    ) {
-        let (color_buf, alpha) = {
-            let mut buf = [0; TOTAL_STRIP_HEIGHT];
-
-            for i in 0..STRIP_HEIGHT {
-                buf[i * COLOR_COMPONENTS..((i + 1) * COLOR_COMPONENTS)].copy_from_slice(color);
-            }
-
-            (buf, buf[3])
-        };
-
-        let mut strip_cols = scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width]
-            .chunks_exact_mut(TOTAL_STRIP_HEIGHT);
-
-        if alpha == 255 {
-            for col in strip_cols {
-                col.copy_from_slice(&color_buf);
-            }
-        } else {
-            // TODO: This code can be probably improved by processing TOTAL_STRIP_HEIGHT * 2
-            // elements at the time
-            let color_buf =
-                _mm256_cvtepu8_epi16(_mm_loadu_si128(color_buf.as_ptr() as *const __m128i));
-            let inv_alpha = _mm256_set1_epi16(255 - alpha as i16);
-
-            for z in strip_cols {
-                let z_vals = _mm256_cvtepu8_epi16(_mm_loadu_si128(z.as_ptr() as *const __m128i));
-                let mulled = _mm256_mullo_epi16(z_vals, inv_alpha);
-                let dived = div_255(mulled);
-                let added = _mm256_add_epi16(color_buf, dived);
-                let casted = _mm_packus_epi16(
-                    _mm256_extracti128_si256::<0>(added),
-                    _mm256_extracti128_si256::<1>(added),
-                );
-                _mm_storeu_si128(z.as_mut_ptr() as *mut __m128i, casted);
-            }
-        }
     }
 }
