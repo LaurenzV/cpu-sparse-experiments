@@ -128,11 +128,13 @@ fn pack(out_buf: &mut [u8], scratch: &ScratchBuf, width: usize, height: usize, x
 }
 
 pub(crate) mod scalar {
+    use crate::fine::compose::scalar::{
+        clear, dest, dest_out, dest_over, plus, src_atop, src_copy, src_over, xor,
+    };
     use crate::fine::{ScratchBuf, COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
-    use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
-    use peniko::Compose;
-    use crate::fine::compose::scalar::src_over;
     use crate::util::scalar::div_255;
+    use crate::wide_tile::STRIP_HEIGHT;
+    use peniko::Compose;
 
     pub(crate) fn fill_solid(
         scratch: &mut ScratchBuf,
@@ -146,117 +148,19 @@ pub(crate) mod scalar {
             compose = Compose::Copy
         }
 
-        let (cs, alpha) = {
-            let mut buf = [0; TOTAL_STRIP_HEIGHT];
-
-            for i in 0..STRIP_HEIGHT {
-                buf[i * COLOR_COMPONENTS..((i + 1) * COLOR_COMPONENTS)].copy_from_slice(color);
-            }
-
-            (buf, buf[3] as u16)
-        };
-
-        let mut target = &mut scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width];
+        let target = &mut scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width];
 
         // All the formulas in the comments are with premultiplied alpha for Cs and Cb.
         match compose {
-            // Cs
-            Compose::Copy => {
-                // Destination buffer has already been cleared in `RenderContext::ignore`, so
-                // we can just copy the pixels.
-                let dest = target.chunks_exact_mut(TOTAL_STRIP_HEIGHT);
-
-                for cb in dest {
-                    cb.copy_from_slice(&cs);
-                }
-            }
-            // Cs + Cb * (1 – αs)
+            Compose::Copy => src_copy(target, color),
             Compose::SrcOver => src_over(target, color),
-            // Cs * (1 – αb) + Cb
-            Compose::DestOver => {
-                let dest = target.chunks_exact_mut(4);
-                for cb in dest {
-                    let inv_ab = (255 - cb[3]) as u16;
-
-                    for i in 0..COLOR_COMPONENTS {
-                        cb[i] = div_255(cs[i] as u16 * inv_ab) as u8 + cb[i];
-                    }
-                }
-            }
-            // Cs * αb + Cb * (1 – αs)
-            Compose::SrcAtop => {
-                let dest = target.chunks_exact_mut(4);
-
-                for cb in dest {
-                    let inv_as = (255 - cs[3]) as u16;
-
-                    for i in 0..COLOR_COMPONENTS {
-                        let ab = cb[3] as u16;
-                        let im1 = div_255(cs[i] as u16 * ab) as u8;
-                        let im2 = div_255(cb[i] as u16 * inv_as) as u8;
-
-                        cb[i] = im1 + im2;
-                    }
-                }
-            }
-            // // Cs * (1 - αb) + Cb * αs
-            // Compose::DestAtop => {
-            //     let dest = target.chunks_exact_mut(4);
-            //
-            //     for cb in dest {
-            //         let inv_ab = (255 - cb[3]) as u16;
-            //
-            //         for i in 0..4 {
-            //             let im1 = div_255(cs[i] as u16 * inv_ab) as u8;
-            //             let im2 = div_255(cb[i] as u16 * cs[3] as u16) as u8;
-            //             cb[i] = im1 + im2;
-            //         }
-            //     }
-            // }
-            // Cb * (1 - as)
-            Compose::DestOut => {
-                let dest = target.chunks_exact_mut(4);
-                let inv_as = 255 - cs[3] as u16;
-
-                for cb in dest {
-                    for i in 0..COLOR_COMPONENTS {
-                        cb[i] = div_255(cb[i] as u16 * inv_as) as u8;
-                    }
-                }
-            }
-            // Cs * (1 - αb) + Cb * (1 - αs)
-            Compose::Xor => {
-                let dest = target.chunks_exact_mut(4);
-
-                for cb in dest {
-                    let inv_as = 255 - cs[3] as u16;
-
-                    for i in 0..COLOR_COMPONENTS {
-                        let inv_ab = 255 - cb[3] as u16;
-                        let im1 = div_255(cs[i] as u16 * inv_ab) as u8;
-                        let im2 = div_255(cb[i] as u16 * inv_as) as u8;
-
-                        cb[i] = im1 + im2;
-                    }
-                }
-            }
-            // Cs + Cb
-            Compose::Plus => {
-                let dest = target.chunks_exact_mut(TOTAL_STRIP_HEIGHT);
-
-                for cb in dest {
-                    for i in 0..TOTAL_STRIP_HEIGHT {
-                        cb[i] = cs[i].saturating_add(cb[i]);
-                    }
-                }
-            }
-            // Cb
-            Compose::Dest => {}
-            // Has already been handled.
-            // 0
-            Compose::Clear => {
-                scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width].fill(0);
-            }
+            Compose::DestOver => dest_over(target, color),
+            Compose::SrcAtop => src_atop(target, color),
+            Compose::DestOut => dest_out(target, color),
+            Compose::Xor => xor(target, color),
+            Compose::Plus => plus(target, color),
+            Compose::Dest => dest(target, color),
+            Compose::Clear => clear(target, color),
             _ => unimplemented!(),
         }
     }
