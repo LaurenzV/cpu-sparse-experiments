@@ -595,6 +595,8 @@ pub(crate) mod avx2 {
                 col.copy_from_slice(&color_buf);
             }
         } else {
+            // TODO: This code can be probably improved by processing TOTAL_STRIP_HEIGHT * 2
+            // elements at the time
             let color_buf =
                 _mm256_cvtepu8_epi16(_mm_loadu_si128(color_buf.as_ptr() as *const __m128i));
             let inv_alpha = _mm256_set1_epi16(255 - alpha as i16);
