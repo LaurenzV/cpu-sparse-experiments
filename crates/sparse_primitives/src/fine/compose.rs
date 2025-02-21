@@ -1,8 +1,32 @@
+use crate::execute::Scalar;
 use crate::fine::COLOR_COMPONENTS;
 
+pub(crate) trait Compose {
+    fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose);
+}
+
 pub(crate) mod scalar {
+    use crate::execute::Scalar;
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
+    use crate::fine::compose::Compose;
     use crate::util::scalar::{div_255, splat_x4};
+
+    impl Compose for Scalar {
+        fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
+            match compose {
+                peniko::Compose::Copy => src_copy(target, cs),
+                peniko::Compose::SrcOver => src_over(target, cs),
+                peniko::Compose::DestOver => dest_over(target, cs),
+                peniko::Compose::SrcAtop => src_atop(target, cs),
+                peniko::Compose::DestOut => dest_out(target, cs),
+                peniko::Compose::Xor => xor(target, cs),
+                peniko::Compose::Plus => plus(target, cs),
+                peniko::Compose::Dest => dest(target, cs),
+                peniko::Compose::Clear => clear(target, cs),
+                _ => unimplemented!(),
+            }
+        }
+    }
 
     // All the formulas in the comments are with premultiplied alpha for Cs and Cb.
 
@@ -107,5 +131,31 @@ pub(crate) mod scalar {
     /// Composite using `Clear` (0).
     pub(crate) fn clear(target: &mut [u8], _: &[u8; COLOR_COMPONENTS]) {
         target.fill(0);
+    }
+}
+
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+pub(crate) mod neon {
+    use crate::execute::{Neon, Scalar};
+    use crate::fine::COLOR_COMPONENTS;
+    use crate::fine::compose::Compose;
+
+    impl Compose for Neon {
+        fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
+            Scalar::compose(target, cs, compose);
+        }
+    }
+}
+
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+pub(crate) mod avx2 {
+    use crate::execute::{Avx2, Scalar};
+    use crate::fine::COLOR_COMPONENTS;
+    use crate::fine::compose::Compose;
+
+    impl Compose for Avx2 {
+        fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
+            Scalar::compose(target, cs, compose);
+        }
     }
 }

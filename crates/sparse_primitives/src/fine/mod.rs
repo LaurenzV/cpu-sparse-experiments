@@ -3,7 +3,7 @@
 
 //! Fine rasterization
 
-mod compose;
+pub(crate) mod compose;
 
 use crate::execute::KernelExecutor;
 use crate::paint::Paint;
