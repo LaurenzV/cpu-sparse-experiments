@@ -16,3 +16,24 @@ impl ColorExt for PremulColor<Srgb> {
         ]
     }
 }
+
+pub(crate) mod scalar {
+    use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
+    use crate::wide_tile::STRIP_HEIGHT;
+
+    #[inline(always)]
+    pub(crate) fn div_255(val: u16) -> u16 {
+        (val + 1 + (val >> 8)) >> 8
+    }
+
+    #[inline(always)]
+    pub(crate) fn splat_x4(val: &[u8; COLOR_COMPONENTS]) -> [u8; 4 * COLOR_COMPONENTS] {
+        let mut buf = [0; 4 * COLOR_COMPONENTS];
+
+        for i in 0..4 {
+            buf[i * COLOR_COMPONENTS..((i + 1) * COLOR_COMPONENTS)].copy_from_slice(val);
+        }
+
+        buf
+    }
+}

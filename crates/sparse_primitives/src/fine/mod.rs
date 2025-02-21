@@ -3,6 +3,8 @@
 
 //! Fine rasterization
 
+mod compose;
+
 use crate::execute::KernelExecutor;
 use crate::paint::Paint;
 use crate::util::ColorExt;
@@ -129,11 +131,8 @@ pub(crate) mod scalar {
     use crate::fine::{ScratchBuf, COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
     use peniko::Compose;
-
-    #[inline(always)]
-    fn div_255(val: u16) -> u16 {
-        (val + 1 + (val >> 8)) >> 8
-    }
+    use crate::fine::compose::scalar::src_over;
+    use crate::util::scalar::div_255;
 
     pub(crate) fn fill_solid(
         scratch: &mut ScratchBuf,
@@ -172,16 +171,7 @@ pub(crate) mod scalar {
                 }
             }
             // Cs + Cb * (1 – αs)
-            Compose::SrcOver => {
-                let inv_as = 255 - alpha;
-                let dest = target.chunks_exact_mut(TOTAL_STRIP_HEIGHT);
-
-                for cb in dest {
-                    for i in 0..TOTAL_STRIP_HEIGHT {
-                        cb[i] = cs[i] + div_255(cb[i] as u16 * inv_as) as u8;
-                    }
-                }
-            }
+            Compose::SrcOver => src_over(target, color),
             // Cs * (1 – αb) + Cb
             Compose::DestOver => {
                 let dest = target.chunks_exact_mut(4);
