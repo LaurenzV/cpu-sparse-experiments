@@ -47,15 +47,6 @@ pub(crate) trait KernelExecutor: compose::Compose {
         alpha_buf: &mut Vec<u32>,
         fill_rule: FillRule,
     );
-
-    fn strip_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-        alphas: &[u32],
-        compose: Compose,
-    );
 }
 
 pub(crate) struct Scalar;
@@ -72,17 +63,6 @@ impl KernelExecutor for Scalar {
     ) {
         strip::scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
     }
-
-    fn strip_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-        alphas: &[u32],
-        compose: Compose,
-    ) {
-        fine::scalar::strip_solid(scratch, color, x, width, alphas, compose);
-    }
 }
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
@@ -98,17 +78,6 @@ impl KernelExecutor for Avx2 {
     ) {
         strip::scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
     }
-
-    fn strip_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-        alphas: &[u32],
-        compose: Compose,
-    ) {
-        fine::scalar::strip_solid(scratch, color, x, width, alphas, compose);
-    }
 }
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
@@ -121,19 +90,6 @@ impl KernelExecutor for Neon {
     ) {
         unsafe {
             strip::neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
-        }
-    }
-
-    fn strip_solid(
-        scratch: &mut ScratchBuf,
-        color: &[u8; COLOR_COMPONENTS],
-        x: usize,
-        width: usize,
-        alphas: &[u32],
-        compose: Compose,
-    ) {
-        unsafe {
-            fine::neon::strip_solid(scratch, color, x, width, alphas);
         }
     }
 }
