@@ -12,7 +12,7 @@ use crate::render::{InnerContext, DEFAULT_TOLERANCE};
 use crate::strip::Strip;
 use crate::tiling::FlatLine;
 use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
-use crate::{FillRule, RenderContext};
+use crate::FillRule;
 use peniko::kurbo;
 use peniko::kurbo::{Affine, Join, Rect, Shape};
 

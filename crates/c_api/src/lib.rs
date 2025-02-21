@@ -7,7 +7,6 @@ use sparse_primitives::kurbo::{
 };
 use sparse_primitives::paint::Paint;
 use sparse_primitives::{FillRule, Pixmap, RenderContext};
-use std::f64::consts::PI;
 
 #[repr(C)]
 #[derive(Copy, Clone)]

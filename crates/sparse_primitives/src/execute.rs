@@ -1,9 +1,6 @@
-use crate::paint::Paint;
 use crate::strip::Strip;
 use crate::tiling::Tiles;
-use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use crate::{fine, strip, FillRule};
-use peniko::Compose;
 
 #[derive(Copy, Clone, Debug)]
 /// The execution mode used for the rendering process.
@@ -41,7 +38,7 @@ impl Default for ExecutionMode {
     }
 }
 
-pub(crate) trait KernelExecutor: fine::Compose {
+pub trait KernelExecutor: fine::Compose {
     fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,

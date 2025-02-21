@@ -17,11 +17,7 @@ use crate::{
     FillRule, Pixmap,
 };
 use peniko::kurbo::BezPath;
-use peniko::{
-    color::{palette, AlphaColor, Srgb},
-    kurbo::Affine,
-    BlendMode, BrushRef, Compose, Mix,
-};
+use peniko::{color::AlphaColor, kurbo::Affine, BlendMode, Compose, Mix};
 use std::marker::PhantomData;
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
@@ -104,10 +100,6 @@ impl<KE: KernelExecutor> InnerContext<KE> {
 
     pub(crate) fn set_blend_mode(&mut self, blend_mode: BlendMode) {
         self.blend_mode = blend_mode;
-    }
-
-    pub(crate) fn blend_mode(&self) -> BlendMode {
-        self.blend_mode
     }
 
     pub(crate) fn set_stroke(&mut self, stroke: Stroke) {
@@ -304,12 +296,5 @@ impl<KE: KernelExecutor> InnerContext<KE> {
                 }
             }
         }
-    }
-}
-
-fn brush_to_color(brush: BrushRef) -> AlphaColor<Srgb> {
-    match brush {
-        BrushRef::Solid(c) => c,
-        _ => palette::css::MAGENTA,
     }
 }

@@ -1,6 +1,6 @@
 use crate::execute::{Avx2, Scalar};
 use crate::fine;
-use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
+use crate::fine::COLOR_COMPONENTS;
 
 impl fine::Compose for Avx2 {
     fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {

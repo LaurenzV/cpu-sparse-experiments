@@ -1,4 +1,3 @@
-use peniko::color::palette;
 use peniko::kurbo::{Affine, BezPath};
 use sparse_primitives::color::palette::css::LIME;
 use sparse_primitives::paint::Paint;
