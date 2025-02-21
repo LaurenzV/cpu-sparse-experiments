@@ -15,6 +15,7 @@ impl fine::Compose for Scalar {
             peniko::Compose::Dest => fill::dest(target, cs),
             peniko::Compose::Clear => fill::clear(target, cs),
             peniko::Compose::SrcIn => fill::src_in(target, cs),
+            peniko::Compose::DestIn => fill::dest_in(target, cs),
             _ => unimplemented!(),
         }
     }
@@ -36,6 +37,7 @@ impl fine::Compose for Scalar {
             peniko::Compose::Dest => strip::dest(target, cs, alphas),
             peniko::Compose::Clear => strip::clear(target, cs, alphas),
             peniko::Compose::SrcIn => strip::src_in(target, cs, alphas),
+            peniko::Compose::DestIn => {},
             _ => unimplemented!(),
         }
     }
@@ -72,7 +74,7 @@ mod fill {
 
     /// Composite using `DestOver` (Cs * (1 – αb) + Cb).
     pub(crate) fn dest_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        for cb in target.chunks_exact_mut(4) {
+        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
             let inv_ab = (255 - cb[3]) as u16;
 
             for i in 0..COLOR_COMPONENTS {
@@ -83,7 +85,7 @@ mod fill {
 
     /// Composite using `SrcIn` (Cs * ab).
     pub(crate) fn src_in(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        for cb in target.chunks_exact_mut(4) {
+        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
             let ab = cb[3] as u16;
 
             for i in 0..COLOR_COMPONENTS {
@@ -92,9 +94,20 @@ mod fill {
         }
     }
 
+    /// Composite using `DestIn` (Cb * as).
+    pub(crate) fn dest_in(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+        let _as = cs[3] as u16;
+
+        for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
+            for i in 0..TOTAL_STRIP_HEIGHT {
+                cb[i] = div_255(cb[i] as u16 * _as) as u8;
+            }
+        }
+    }
+
     /// Composite using `SrcAtop` (Cs * αb + Cb * (1 – αs)).
     pub(crate) fn src_atop(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        for cb in target.chunks_exact_mut(4) {
+        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
             let inv_as = (255 - cs[3]) as u16;
 
             for i in 0..COLOR_COMPONENTS {
@@ -111,7 +124,7 @@ mod fill {
     pub(crate) fn dest_out(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
         let inv_as = 255 - cs[3] as u16;
 
-        for cb in target.chunks_exact_mut(4) {
+        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
             for i in 0..COLOR_COMPONENTS {
                 cb[i] = div_255(cb[i] as u16 * inv_as) as u8;
             }
@@ -122,7 +135,7 @@ mod fill {
     pub(crate) fn xor(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
         let inv_as = 255 - cs[3] as u16;
 
-        for cb in target.chunks_exact_mut(4) {
+        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
             for i in 0..COLOR_COMPONENTS {
                 let inv_ab = 255 - cb[3] as u16;
                 let im1 = div_255(cs[i] as u16 * inv_ab) as u8;

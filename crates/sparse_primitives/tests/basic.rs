@@ -521,10 +521,10 @@ fn compose_solid_src_in() {
     compose_impl!(Compose::SrcIn, "compose_solid_src_in");
 }
 
-// #[test]
-// fn compose_solid_dest_in() {
-//     compose_impl!(Compose::DestIn, "compose_solid_dest_in");
-// }
+#[test]
+fn compose_solid_dest_in() {
+    compose_impl!(Compose::DestIn, "compose_solid_dest_in");
+}
 //
 // #[test]
 // fn compose_solid_src_out() {
