@@ -330,7 +330,6 @@ pub(crate) mod neon {
     use crate::fine::{ScratchBuf, COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
-    /// SAFETY: Caller must ensure target feature `neon` is available.
     pub(crate) unsafe fn fill_solid(
         scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],
@@ -373,7 +372,6 @@ pub(crate) mod neon {
         }
     }
 
-    /// SAFETY: Caller must ensure target feature `neon` is available.
     pub(crate) unsafe fn strip_solid(
         scratch: &mut ScratchBuf,
         color: &[u8; COLOR_COMPONENTS],

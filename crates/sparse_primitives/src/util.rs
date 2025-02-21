@@ -48,7 +48,6 @@ pub(crate) mod avx2 {
         _mm256_set1_epi8, _mm256_srli_epi16, _mm_loadu_si128,
     };
 
-    /// SAFETY: Caller must ensure target feature `avx2` is available.
     #[target_feature(enable = "avx2")]
     pub(crate) unsafe fn div_255(val: __m256i) -> __m256i {
         _mm256_srli_epi16::<8>(_mm256_add_epi16(
@@ -59,7 +58,6 @@ pub(crate) mod avx2 {
 
     /// Splat from 4x u8 to 16x u16.
     ///
-    /// SAFETY: Caller must ensure target feature `avx2` is available.
     #[target_feature(enable = "avx2")]
     pub(crate) unsafe fn splat_x8(val: &[u8; COLOR_COMPONENTS]) -> __m256i {
         // TODO: Do this using only SIMD?

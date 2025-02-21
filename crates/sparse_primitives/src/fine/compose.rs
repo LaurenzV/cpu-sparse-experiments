@@ -148,7 +148,6 @@ pub(crate) mod avx2 {
 
     impl Compose for Avx2 {
         fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
-            // SAFETY: We are guaranteed to be running on a CPU that supports `avx2`.
             unsafe {
                 match compose {
                     peniko::Compose::SrcOver => src_over(target, cs),
@@ -158,7 +157,6 @@ pub(crate) mod avx2 {
         }
     }
 
-    /// SAFETY: Caller must ensure target feature `avx2` is available.
     #[target_feature(enable = "avx2")]
     pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
         // TODO: This code can be improved by processing TOTAL_STRIP_HEIGHT * 2

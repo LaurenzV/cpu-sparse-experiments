@@ -119,7 +119,6 @@ impl KernelExecutor for Neon {
         alpha_buf: &mut Vec<u32>,
         fill_rule: FillRule,
     ) {
-        // SAFETY: We are guaranteed to be running on a CPU that supports `neon`.
         unsafe {
             strip::neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
         }
@@ -133,7 +132,6 @@ impl KernelExecutor for Neon {
         alphas: &[u32],
         compose: Compose,
     ) {
-        // SAFETY: We are guaranteed to be running on a CPU that supports `neon`.
         unsafe {
             fine::neon::strip_solid(scratch, color, x, width, alphas);
         }
