@@ -36,7 +36,9 @@ impl FillRule {
 enum InnerContextType {
     Scalar(InnerContext<Scalar>),
     #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-    Neon(InnerContext<Neon>),
+    Neon(InnerContext<execute::Neon>),
+    #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+    Avx2(InnerContext<execute::Avx2>),
 }
 
 macro_rules! dispatch_mut {
@@ -46,8 +48,10 @@ macro_rules! dispatch_mut {
     ) => {
         match &mut $self.0 {
             InnerContextType::Scalar(s) => s.$scalar($($args)*),
-             #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+            #[cfg(all(feature = "simd", target_arch = "aarch64"))]
             InnerContextType::Neon(n) => n.$scalar($($args)*),
+            #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+            InnerContextType::Avx2(n) => n.$scalar($($args)*)
         }
     };
 }
@@ -61,6 +65,8 @@ macro_rules! dispatch {
             InnerContextType::Scalar(s) => s.$scalar($($args)*),
              #[cfg(all(feature = "simd", target_arch = "aarch64"))]
             InnerContextType::Neon(n) => n.$scalar($($args)*),
+            #[cfg(all(feature = "simd", target_arch = "x86_64"))]
+            InnerContextType::Avx2(n) => n.$scalar($($args)*),
         }
     };
 }
@@ -199,6 +205,27 @@ impl RenderContext {
     }
 }
 
+macro_rules! avx2 {
+    ($e:expr) => {
+        // We also require FMA for AVX2 support, but from what I can tell in practice AVX2 support seems
+        // to imply FMA support?
+        #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+        if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
+        {
+            return $e;
+        }
+    };
+}
+
+macro_rules! neon {
+    ($e:expr) => {
+        #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            return $e;
+        }
+    };
+}
+
 /// NOTE: BE CAREFUL WHEN CHANGING THIS METHOD! We need to make sure to only choose an inner type
 /// when the target CPU actually supports it. Unsafe code relies on the correctness of this method!
 fn select_inner_context(
@@ -210,28 +237,32 @@ fn select_inner_context(
         ExecutionMode::Scalar => InnerContextType::Scalar(InnerContext::new(width, height)),
         #[cfg(feature = "simd")]
         ExecutionMode::Auto => {
-            #[cfg(target_arch = "aarch64")]
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                return InnerContextType::Neon(InnerContext::new(width, height));
-            }
+            neon!(InnerContextType::Neon(InnerContext::new(width, height)));
+            avx2!(InnerContextType::Avx2(InnerContext::new(width, height)));
 
             // Fallback.
             InnerContextType::Scalar(InnerContext::new(width, height))
         }
         #[cfg(all(target_arch = "aarch64", feature = "simd"))]
         ExecutionMode::Neon => {
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                return InnerContextType::Neon(InnerContext::new(width, height));
-            }
+            neon!(InnerContextType::Neon(InnerContext::new(width, height)));
 
             panic!(
                 "attempted to force execution mode NEON, but CPU doesn't support NEON instructions"
             );
         }
+        #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+        ExecutionMode::Avx2 => {
+            avx2!(InnerContextType::Avx2(InnerContext::new(width, height)));
+
+            panic!(
+                "attempted to force execution mode AVX2, but CPU doesn't support AVX2 instructions"
+            );
+        }
     }
 }
 
-use crate::execute::{ExecutionMode, Neon, Scalar};
+use crate::execute::{ExecutionMode, Scalar};
 use crate::kurbo::{Affine, BezPath, Rect, Stroke};
 use crate::paint::Paint;
 use crate::render::InnerContext;
