@@ -33,6 +33,7 @@ mod fill {
 
     use std::arch::aarch64::*;
 
+    /// SAFETY: The CPU needs to support the target feature `neon`.
     pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
         let inv_as = vdupq_n_u8(255 - cs[3]);
         let cs = vld1q_u8(splat_x4(cs).as_ptr());
@@ -62,6 +63,7 @@ mod strip {
     use crate::util::neon::div_255;
     use std::arch::aarch64::*;
 
+    /// SAFETY: The CPU needs to support the target feature `neon`.
     pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
         let _as = vdupq_n_u16(cs[3] as u16);
 

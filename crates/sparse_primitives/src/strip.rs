@@ -225,6 +225,7 @@ pub(crate) mod neon {
     use crate::FillRule;
     use std::arch::aarch64::*;
 
+    /// SAFETY: The CPU needs to support the target feature `neon`.
     pub(crate) unsafe fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,

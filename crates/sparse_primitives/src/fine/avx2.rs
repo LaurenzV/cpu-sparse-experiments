@@ -30,6 +30,7 @@ mod fill {
         _mm256_mullo_epi16, _mm256_set1_epi16, _mm_loadu_si128, _mm_packus_epi16, _mm_storeu_si128,
     };
 
+    /// SAFETY: The CPU needs to support the target feature `avx2`.
     #[target_feature(enable = "avx2")]
     pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
         // TODO: This code can be improved by processing TOTAL_STRIP_HEIGHT * 2
