@@ -14,6 +14,7 @@ impl fine::Compose for Scalar {
             peniko::Compose::Plus => fill::plus(target, cs),
             peniko::Compose::Dest => fill::dest(target, cs),
             peniko::Compose::Clear => fill::clear(target, cs),
+            peniko::Compose::SrcIn => fill::src_in(target, cs),
             _ => unimplemented!(),
         }
     }
@@ -34,6 +35,7 @@ impl fine::Compose for Scalar {
             peniko::Compose::Plus => strip::plus(target, cs, alphas),
             peniko::Compose::Dest => strip::dest(target, cs, alphas),
             peniko::Compose::Clear => strip::clear(target, cs, alphas),
+            peniko::Compose::SrcIn => strip::src_in(target, cs, alphas),
             _ => unimplemented!(),
         }
     }
@@ -75,6 +77,17 @@ mod fill {
 
             for i in 0..COLOR_COMPONENTS {
                 cb[i] = div_255(cs[i] as u16 * inv_ab) as u8 + cb[i];
+            }
+        }
+    }
+
+    /// Composite using `SrcIn` (Cs * ab).
+    pub(crate) fn src_in(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+        for cb in target.chunks_exact_mut(4) {
+            let ab = cb[3] as u16;
+
+            for i in 0..COLOR_COMPONENTS {
+                cb[i] = div_255(cs[i] as u16 * ab) as u8;
             }
         }
     }
@@ -203,6 +216,38 @@ mod strip {
                     let im1 = div_255(am * inv_ab);
                     let im2 = div_255(cs[i] as u16 * im1) as u8;
                     cb[idx + i] += im2;
+                }
+            }
+        }
+    }
+
+    /// Composite using `SrcIn` (Cs * ab * am).
+    pub(crate) fn src_in(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
+        for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
+            for j in 0..STRIP_HEIGHT {
+                let am = ((*masks >> (j * 8)) & 0xff) as u16;
+
+                let do_src_in = (am == 255) as u8;
+                let inv_as_am = 255 - div_255(am * cs[3] as u16);
+
+                for i in 0..COLOR_COMPONENTS {
+                    let idx = j * COLOR_COMPONENTS;
+                    let ab = cb[idx + 3] as u16;
+
+                    let do_src_over = (1 - do_src_in) * (ab > 0) as u8;
+
+                    let src_over = {
+                        let im1 = cb[idx + i] as u16 * inv_as_am;
+                        let im2 = cs[i] as u16 * am;
+                        div_255(im1 + im2) as u8
+                    };
+
+                    let src_in = {
+                        let im1 = div_255(am * ab);
+                        div_255(cs[i] as u16 * im1) as u8
+                    };
+
+                    cb[idx + i] = do_src_over * src_over + do_src_in * src_in;
                 }
             }
         }
