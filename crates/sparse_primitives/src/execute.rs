@@ -1,4 +1,3 @@
-use crate::fine::{compose, ScratchBuf, COLOR_COMPONENTS};
 use crate::paint::Paint;
 use crate::strip::Strip;
 use crate::tiling::Tiles;
@@ -42,7 +41,7 @@ impl Default for ExecutionMode {
     }
 }
 
-pub(crate) trait KernelExecutor: compose::Compose {
+pub(crate) trait KernelExecutor: fine::Compose {
     fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,

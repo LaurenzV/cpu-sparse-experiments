@@ -3,13 +3,16 @@
 
 //! Fine rasterization
 
-pub(crate) mod compose;
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+pub(crate) mod avx2;
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+pub(crate) mod neon;
+pub(crate) mod scalar;
 
 use crate::execute::KernelExecutor;
 use crate::paint::Paint;
 use crate::util::ColorExt;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
-use peniko::Compose;
 use std::marker::PhantomData;
 
 pub(crate) const COLOR_COMPONENTS: usize = 4;
@@ -17,6 +20,16 @@ pub(crate) const TOTAL_STRIP_HEIGHT: usize = STRIP_HEIGHT * COLOR_COMPONENTS;
 pub(crate) const SCRATCH_BUF_SIZE: usize = WIDE_TILE_WIDTH * STRIP_HEIGHT * COLOR_COMPONENTS;
 
 pub(crate) type ScratchBuf = [u8; SCRATCH_BUF_SIZE];
+
+pub(crate) trait Compose {
+    fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose);
+    fn compose_strip(
+        target: &mut [u8],
+        cs: &[u8; COLOR_COMPONENTS],
+        alphas: &[u32],
+        compose: peniko::Compose,
+    );
+}
 
 pub struct Fine<'a, T: KernelExecutor> {
     pub(crate) width: usize,
@@ -59,7 +72,7 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
         pack(self.out_buf, &self.scratch, self.width, self.height, x, y);
     }
 
-    pub(crate) fn run_cmd(&mut self, cmd: &Cmd, alphas: &[u32], compose: Compose) {
+    pub(crate) fn run_cmd(&mut self, cmd: &Cmd, alphas: &[u32], compose: peniko::Compose) {
         match cmd {
             Cmd::Fill(f) => {
                 self.fill(f.x as usize, f.width as usize, &f.paint, compose);
@@ -72,14 +85,14 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
     }
 
     #[inline(never)]
-    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint, mut compose: Compose) {
+    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint, mut compose: peniko::Compose) {
         match paint {
             Paint::Solid(c) => {
                 let color = c.premultiply().to_rgba8_fast();
 
                 // If color is completely opaque with SrcOver, it's the same as filling using Copy.
-                if compose == Compose::SrcOver && color[3] == 255 {
-                    compose = Compose::Copy
+                if compose == peniko::Compose::SrcOver && color[3] == 255 {
+                    compose = peniko::Compose::Copy
                 }
 
                 let target =
@@ -98,7 +111,7 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
         width: usize,
         alphas: &[u32],
         paint: &Paint,
-        compose: Compose,
+        compose: peniko::Compose,
     ) {
         debug_assert!(alphas.len() >= width);
 
