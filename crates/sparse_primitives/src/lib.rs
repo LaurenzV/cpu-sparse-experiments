@@ -14,6 +14,7 @@ pub mod render;
 pub mod strip;
 pub mod svg;
 pub mod tiling;
+mod util;
 pub mod wide_tile;
 
 pub use peniko::*;
