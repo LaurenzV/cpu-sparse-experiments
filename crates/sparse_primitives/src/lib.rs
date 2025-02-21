@@ -205,6 +205,26 @@ impl RenderContext {
     }
 }
 
+macro_rules! avx2 {
+    ($e:expr) => {
+        #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+        if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
+        {
+            return $e;
+        }
+    };
+}
+
+macro_rules! neon {
+    ($e:expr) => {
+        #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+        if std::arch::is_aarch64_feature_detected!("neon")
+        {
+            return $e;
+        }
+    };
+}
+
 /// NOTE: BE CAREFUL WHEN CHANGING THIS METHOD! We need to make sure to only choose an inner type
 /// when the target CPU actually supports it. Unsafe code relies on the correctness of this method!
 fn select_inner_context(
@@ -216,24 +236,15 @@ fn select_inner_context(
         ExecutionMode::Scalar => InnerContextType::Scalar(InnerContext::new(width, height)),
         #[cfg(feature = "simd")]
         ExecutionMode::Auto => {
-            #[cfg(target_arch = "aarch64")]
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                return InnerContextType::Neon(InnerContext::new(width, height));
-            }
-
-            #[cfg(target_arch = "x86_64")]
-            if std::arch::is_x86_feature_detected!("avx2") {
-                return InnerContextType::Avx2(InnerContext::new(width, height));
-            }
+            neon!(InnerContextType::Neon(InnerContext::new(width, height)));
+            avx2!(InnerContextType::Avx2(InnerContext::new(width, height)));
 
             // Fallback.
             InnerContextType::Scalar(InnerContext::new(width, height))
         }
         #[cfg(all(target_arch = "aarch64", feature = "simd"))]
         ExecutionMode::Neon => {
-            if std::arch::is_aarch64_feature_detected!("neon") {
-                return InnerContextType::Neon(InnerContext::new(width, height));
-            }
+            neon!(InnerContextType::Neon(InnerContext::new(width, height)));
 
             panic!(
                 "attempted to force execution mode NEON, but CPU doesn't support NEON instructions"
@@ -241,9 +252,7 @@ fn select_inner_context(
         }
         #[cfg(all(target_arch = "x86_64", feature = "simd"))]
         ExecutionMode::Avx2 => {
-            if std::arch::is_x86_feature_detected!("avx2") {
-                return InnerContextType::Avx2(InnerContext::new(width, height));
-            }
+            avx2!(InnerContextType::Avx2(InnerContext::new(width, height)));
 
             panic!(
                 "attempted to force execution mode AVX2, but CPU doesn't support AVX2 instructions"
