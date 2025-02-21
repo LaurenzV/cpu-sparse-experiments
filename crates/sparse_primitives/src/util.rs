@@ -40,7 +40,6 @@ pub(crate) mod scalar {
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 pub(crate) mod avx2 {
-    use crate::fine::compose::scalar;
     use crate::fine::COLOR_COMPONENTS;
     use crate::util::scalar::splat_x4;
     use std::arch::x86_64::{

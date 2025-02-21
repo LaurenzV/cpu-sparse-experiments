@@ -1,4 +1,5 @@
 use crate::execute::{Avx2, Scalar};
+use crate::fine;
 use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
 
 impl fine::Compose for Avx2 {
