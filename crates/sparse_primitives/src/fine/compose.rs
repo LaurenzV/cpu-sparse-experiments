@@ -2,7 +2,7 @@ use crate::execute::Scalar;
 use crate::fine::COLOR_COMPONENTS;
 
 pub(crate) trait Compose {
-    fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose);
+    fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose);
 }
 
 pub(crate) mod scalar {
@@ -12,7 +12,7 @@ pub(crate) mod scalar {
     use crate::util::scalar::{div_255, splat_x4};
 
     impl Compose for Scalar {
-        fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
+        fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
             match compose {
                 peniko::Compose::Copy => src_copy(target, cs),
                 peniko::Compose::SrcOver => src_over(target, cs),
@@ -132,8 +132,8 @@ pub(crate) mod neon {
     use crate::fine::COLOR_COMPONENTS;
 
     impl Compose for Neon {
-        fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
-            Scalar::compose(target, cs, compose);
+        fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
+            Scalar::compose_fill(target, cs, compose);
         }
     }
 }
@@ -147,11 +147,11 @@ pub(crate) mod avx2 {
     use std::arch::x86_64::*;
 
     impl Compose for Avx2 {
-        fn compose(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
+        fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
             unsafe {
                 match compose {
                     peniko::Compose::SrcOver => src_over(target, cs),
-                    _ => Scalar::compose(target, cs, compose),
+                    _ => Scalar::compose_fill(target, cs, compose),
                 }
             }
         }

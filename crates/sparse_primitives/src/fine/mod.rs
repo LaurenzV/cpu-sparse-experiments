@@ -85,7 +85,7 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
                 let target =
                     &mut self.scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width];
 
-                KE::compose(target, &color, compose);
+                KE::compose_fill(target, &color, compose);
             }
             Paint::Pattern(_) => unimplemented!(),
         }
