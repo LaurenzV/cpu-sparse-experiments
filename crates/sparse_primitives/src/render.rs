@@ -8,6 +8,7 @@ use crate::paint::Paint;
 use crate::rect::lines_to_rect;
 use crate::strip::render_strips;
 use crate::tiling::Tiles;
+use crate::util::ColorExt;
 use crate::{
     fine::Fine,
     strip::Strip,
@@ -160,7 +161,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         for y in 0..height_tiles {
             for x in 0..width_tiles {
                 let tile = &self.wide_tiles[y * width_tiles + x];
-                fine.clear(tile.bg.premultiply().to_rgba8().to_u8_array());
+                fine.clear(tile.bg.premultiply().to_rgba8_fast());
                 for cmd in &tile.cmds {
                     fine.run_cmd(cmd, &self.alphas, cmd.compose());
                 }

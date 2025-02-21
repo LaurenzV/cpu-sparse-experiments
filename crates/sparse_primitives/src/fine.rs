@@ -5,6 +5,7 @@
 
 use crate::execute::KernelExecutor;
 use crate::paint::Paint;
+use crate::util::ColorExt;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use peniko::Compose;
 use std::marker::PhantomData;
@@ -72,7 +73,7 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
     pub fn fill(&mut self, x: usize, width: usize, paint: &Paint, compose: Compose) {
         match paint {
             Paint::Solid(c) => {
-                let color = c.premultiply().to_rgba8().to_u8_array();
+                let color = c.premultiply().to_rgba8_fast();
                 KE::fill_solid(&mut self.scratch, &color, x, width, compose);
             }
             Paint::Pattern(_) => unimplemented!(),
@@ -92,7 +93,7 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
 
         match paint {
             Paint::Solid(s) => {
-                let color = s.premultiply().to_rgba8().to_u8_array();
+                let color = s.premultiply().to_rgba8_fast();
                 KE::strip_solid(&mut self.scratch, &color, x, width, alphas, compose);
             }
             Paint::Pattern(_) => unimplemented!(),
@@ -594,6 +595,8 @@ pub(crate) mod avx2 {
                 col.copy_from_slice(&color_buf);
             }
         } else {
+            // TODO: This code can be probably improved by processing TOTAL_STRIP_HEIGHT * 2
+            // elements at the time
             let color_buf =
                 _mm256_cvtepu8_epi16(_mm_loadu_si128(color_buf.as_ptr() as *const __m128i));
             let inv_alpha = _mm256_set1_epi16(255 - alpha as i16);
