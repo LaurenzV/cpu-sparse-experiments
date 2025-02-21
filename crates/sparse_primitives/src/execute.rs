@@ -19,9 +19,11 @@ pub enum ExecutionMode {
     #[cfg(feature = "simd")]
     Auto,
     /// Force the usage of neon SIMD instructions. This will lead to panics in case
-    /// the CPU doesn't support neon.
+    /// the CPU doesn't support the target feature `neon`.
     #[cfg(all(target_arch = "aarch64", feature = "simd"))]
     Neon,
+    /// Force the usage of AVX2 SIMD instructions. This will lead to panics in case
+    /// the CPU doesn't support the target features `avx2` and `fma`.
     #[cfg(all(target_arch = "x86_64", feature = "simd"))]
     Avx2,
 }
