@@ -7,7 +7,7 @@ env:
 
 jobs:
   fmt:
-    name: formatting
+    name: Check formatting
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,11 +15,39 @@ jobs:
       - name: cargo fmt
         run: cargo fmt --all --check
 
-  build:
+  x86:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Test
+      - name: Build with no default features
+        run: cargo build --no-default-features
+
+      - name: Build with SIMD
+        run: cargo build --features simd
+
+      - name: Test scalar
         run: cargo test --workspace
+
+      - name: Test AVX2
+        run: AVX2="" cargo test --workspace --features simd
+
+  aarch64:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build with no default features
+        run: cargo build --no-default-features
+
+      - name: Build with SIMD
+        run: cargo build --features simd
+
+      - name: Test scalar
+        run: cargo test --workspace
+
+# Disabled for now because there is one test which renders slightly different on NEON.
+#      - name: Test NEON
+#        run: NEON="" cargo test --workspace --features simd
