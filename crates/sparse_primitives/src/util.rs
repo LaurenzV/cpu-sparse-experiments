@@ -66,3 +66,18 @@ pub(crate) mod avx2 {
         _mm256_cvtepu8_epi16(_mm_loadu_si128(cs.as_ptr() as *const __m128i))
     }
 }
+
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+pub(crate) mod neon {
+    use std::arch::aarch64::*;
+
+    #[inline]
+    pub(crate) unsafe fn div_255(val: uint16x8_t) -> uint16x8_t {
+        let val_shifted = vshrq_n_u16::<8>(val);
+        let one = vdupq_n_u16(1);
+        let added = vaddq_u16(val, one);
+        let added = vaddq_u16(added, val_shifted);
+
+        vshrq_n_u16::<8>(added)
+    }
+}

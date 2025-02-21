@@ -208,7 +208,7 @@ impl RenderContext {
 
 macro_rules! avx2 {
     ($e:expr) => {
-        // We also require FMA for AVX2 support, but from what I can tell in practice AVX2 support seems
+        // We also require FMA for AVX2 support, but from what I can tell, in practice AVX2 support seems
         // to imply FMA support?
         #[cfg(all(target_arch = "x86_64", feature = "simd"))]
         if std::arch::is_x86_feature_detected!("avx2") && std::arch::is_x86_feature_detected!("fma")
