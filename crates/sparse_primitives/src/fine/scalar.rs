@@ -1,6 +1,6 @@
 use crate::execute::Scalar;
 use crate::fine;
-use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
+use crate::fine::COLOR_COMPONENTS;
 
 impl fine::Compose for Scalar {
     fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
@@ -141,10 +141,9 @@ mod fill {
 }
 
 mod strip {
-    use crate::fine::{ScratchBuf, COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
+    use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::util::scalar::div_255;
     use crate::wide_tile::STRIP_HEIGHT;
-    use peniko::Compose;
 
     // All the formulas in the comments are with premultiplied alpha for Cs and Cb.
     // `am` stands for `alpha mask` (i.e. opacity of the pixel due to anti-aliasing).

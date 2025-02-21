@@ -21,7 +21,7 @@ pub(crate) const SCRATCH_BUF_SIZE: usize = WIDE_TILE_WIDTH * STRIP_HEIGHT * COLO
 
 pub(crate) type ScratchBuf = [u8; SCRATCH_BUF_SIZE];
 
-pub(crate) trait Compose {
+pub trait Compose {
     fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose);
     fn compose_strip(
         target: &mut [u8],

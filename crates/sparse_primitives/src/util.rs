@@ -1,4 +1,4 @@
-use crate::color::{AlphaColor, PremulColor, Srgb};
+use crate::color::{PremulColor, Srgb};
 
 pub(crate) trait ColorExt {
     /// Using the already-existing `to_rgba8` is slow on x86 because it involves rounding, so
@@ -18,8 +18,7 @@ impl ColorExt for PremulColor<Srgb> {
 }
 
 pub(crate) mod scalar {
-    use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
-    use crate::wide_tile::STRIP_HEIGHT;
+    use crate::fine::COLOR_COMPONENTS;
 
     #[inline(always)]
     pub(crate) fn div_255(val: u16) -> u16 {
@@ -44,7 +43,7 @@ pub(crate) mod avx2 {
     use crate::util::scalar::splat_x4;
     use std::arch::x86_64::{
         __m128i, __m256i, _mm256_add_epi16, _mm256_cvtepu8_epi16, _mm256_set1_epi16,
-        _mm256_set1_epi8, _mm256_srli_epi16, _mm_loadu_si128,
+        _mm256_srli_epi16, _mm_loadu_si128,
     };
 
     /// SAFETY: The CPU needs to support the target feature `avx2`.
@@ -62,7 +61,7 @@ pub(crate) mod avx2 {
     #[target_feature(enable = "avx2")]
     pub(crate) unsafe fn splat_x8(val: &[u8; COLOR_COMPONENTS]) -> __m256i {
         // TODO: Do this using only SIMD?
-        let mut cs = splat_x4(val);
+        let cs = splat_x4(val);
 
         _mm256_cvtepu8_epi16(_mm_loadu_si128(cs.as_ptr() as *const __m128i))
     }

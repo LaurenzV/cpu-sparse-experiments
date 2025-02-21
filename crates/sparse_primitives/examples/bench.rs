@@ -1,4 +1,4 @@
-use bench_gen::{Command, Params, PolyIterator, RectIterator, RectType};
+use bench_gen::{Command, Params, RectIterator, RectType};
 use peniko::kurbo::{Cap, Join, Stroke};
 use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
@@ -43,6 +43,7 @@ fn main() {
     }
 }
 
+#[allow(dead_code)]
 fn write_pixmap(pixmap: &mut Pixmap, size: usize) {
     pixmap.unpremultiply();
     let file = std::fs::File::create(format!("out-{}x{}.png", size, size)).unwrap();
