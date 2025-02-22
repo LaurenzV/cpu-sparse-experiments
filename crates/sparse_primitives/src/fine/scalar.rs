@@ -77,17 +77,15 @@ mod fill {
         };
     }
 
-    compose_fill!(
-        name: clear,
-        fa: |_as, _ab| 0,
-        fb: |_as, _ab| 0
-    );
+    pub(crate) fn clear(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+        target.fill(0);
+    }
 
-    compose_fill!(
-        name: copy,
-        fa: |_as, _ab| 255,
-        fb: |_as, _ab| 0
-    );
+    pub(crate) fn copy(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
+            cb.copy_from_slice(cs);
+        }
+    }
 
     compose_fill!(
         name: dest,
@@ -149,7 +147,6 @@ mod fill {
         fb: |_as, _ab| 255 - _as
     );
 
-    /// Composite using `Plus` (Fa = 255, Fb = 255).
     // We can't use the macro here because the operation might overflow, and
     // using `saturating_add` in the macro comes at the expense of bad auto-vectorization.
     pub(crate) fn plus(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
