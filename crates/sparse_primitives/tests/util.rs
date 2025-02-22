@@ -8,7 +8,7 @@ use std::cmp::max;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
-const REPLACE: bool = true;
+const REPLACE: bool = false;
 
 static REFS_PATH: Lazy<PathBuf> =
     Lazy::new(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("refs"));

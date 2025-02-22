@@ -540,11 +540,11 @@ fn compose_solid_dest_out() {
 fn compose_solid_src_atop() {
     compose_impl!(Compose::SrcAtop, "compose_solid_src_atop");
 }
-//
-// #[test]
-// fn compose_solid_dest_atop() {
-//     compose_impl!(Compose::DestAtop, "compose_solid_dest_atop");
-// }
+
+#[test]
+fn compose_solid_dest_atop() {
+    compose_impl!(Compose::DestAtop, "compose_solid_dest_atop");
+}
 
 #[test]
 fn compose_solid_xor() {
