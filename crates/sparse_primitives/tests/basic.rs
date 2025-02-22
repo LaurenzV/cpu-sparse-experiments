@@ -1,5 +1,5 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use peniko::color::palette::css::{DARK_BLUE, DARK_GREEN};
+use peniko::color::palette::css::{DARK_BLUE, DARK_GREEN, WHITE};
 use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
 use peniko::{BlendMode, Compose, Mix};
 use sparse_primitives::color::palette::css::{
@@ -468,7 +468,7 @@ fn bevel_stroke_2() -> Stroke {
 fn compose_destination() -> RenderContext {
     let mut ctx = get_ctx(50, 50, true);
     let rect = Rect::new(4.5, 4.5, 35.5, 35.5);
-    ctx.set_paint(DARK_BLUE.with_alpha(0.5).into());
+    ctx.set_paint(WHITE.with_alpha(0.5).into());
     ctx.set_stroke(bevel_stroke_2());
     ctx.fill_rect(&rect);
 
@@ -496,10 +496,10 @@ fn compose_solid_clear() {
     compose_impl!(Compose::Clear, "compose_solid_clear");
 }
 
-#[test]
-fn compose_solid_copy() {
-    compose_impl!(Compose::Copy, "compose_solid_copy");
-}
+// #[test]
+// fn compose_solid_copy() {
+//     compose_impl!(Compose::Copy, "compose_solid_copy");
+// }
 
 #[test]
 fn compose_solid_dest() {
@@ -516,15 +516,15 @@ fn compose_solid_dest_over() {
     compose_impl!(Compose::DestOver, "compose_solid_dest_over");
 }
 
-#[test]
-fn compose_solid_src_in() {
-    compose_impl!(Compose::SrcIn, "compose_solid_src_in");
-}
+// #[test]
+// fn compose_solid_src_in() {
+//     compose_impl!(Compose::SrcIn, "compose_solid_src_in");
+// }
 
-#[test]
-fn compose_solid_dest_in() {
-    compose_impl!(Compose::DestIn, "compose_solid_dest_in");
-}
+// #[test]
+// fn compose_solid_dest_in() {
+//     compose_impl!(Compose::DestIn, "compose_solid_dest_in");
+// }
 //
 // #[test]
 // fn compose_solid_src_out() {

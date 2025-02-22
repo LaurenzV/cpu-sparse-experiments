@@ -241,19 +241,17 @@ mod strip {
                 let am = ((*masks >> (j * 8)) & 0xff) as u16;
 
                 let do_src_in = (am == 255) as u8;
-
+                let do_src_over = 1 - do_src_in;
+                let inv_as_am = 255 - div_255(am * cs[3] as u16);
 
                 for i in 0..COLOR_COMPONENTS {
                     let idx = j * COLOR_COMPONENTS;
                     let ab = cb[idx + 3] as u16;
-                    let inv_ab = 255 - ab;
 
-                    let do_dest_over = (1 - do_src_in) * (ab > 0) as u8;
-
-                    let dest_over = {
-                        let im1 = div_255(cs[i] as u16 * am);
-                        let im2 = div_255(im1 * inv_ab);
-                        cb[idx + i] +im2 as u8
+                    let src_over = {
+                        let im1 = cb[idx + i] as u16 * inv_as_am;
+                        let im2 = cs[i] as u16 * am;
+                        div_255(im1 + im2) as u8
                     };
 
                     let src_in = {
@@ -261,7 +259,7 @@ mod strip {
                         div_255(cs[i] as u16 * im1) as u8
                     };
 
-                    cb[idx + i] = do_dest_over * dest_over + do_src_in * src_in;
+                    cb[idx + i] = do_src_over * src_over + do_src_in * src_in;
                 }
             }
         }
