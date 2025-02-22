@@ -1,5 +1,5 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use peniko::color::palette::css::{DARK_BLUE, DARK_GREEN, WHITE};
+use peniko::color::palette::css::{DARK_BLUE, DARK_GREEN, WHITE, YELLOW};
 use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
 use peniko::{BlendMode, Compose, Mix};
 use sparse_primitives::color::palette::css::{
@@ -468,7 +468,7 @@ fn bevel_stroke_2() -> Stroke {
 fn compose_destination() -> RenderContext {
     let mut ctx = get_ctx(50, 50, true);
     let rect = Rect::new(4.5, 4.5, 35.5, 35.5);
-    ctx.set_paint(WHITE.with_alpha(0.35).into());
+    ctx.set_paint(YELLOW.with_alpha(0.35).into());
     ctx.set_stroke(bevel_stroke_2());
     ctx.fill_rect(&rect);
 
