@@ -105,81 +105,51 @@ mod fill {
         fb: |_as, _ab| 255
     );
 
-    /// Composite using `SrcIn` (Cs * ab).
-    pub(crate) fn src_in(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
-            let ab = cb[3] as u16;
+    compose_fill!(
+        name: src_in,
+        fa: |_as, _ab| _ab,
+        fb: |_as, _ab| 0
+    );
 
-            for i in 0..COLOR_COMPONENTS {
-                cb[i] = div_255(cs[i] as u16 * ab) as u8;
-            }
-        }
-    }
+    compose_fill!(
+        name: dest_in,
+        fa: |_as, _ab| 0,
+        fb: |_as, _ab| _as
+    );
 
-    /// Composite using `DestIn` (Cb * as).
-    pub(crate) fn dest_in(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let _as = cs[3] as u16;
+    compose_fill!(
+        name: src_out,
+        fa: |_as, _ab| 255 - _ab,
+        fb: |_as, _ab| 0
+    );
 
-        for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
-            for i in 0..TOTAL_STRIP_HEIGHT {
-                cb[i] = div_255(cb[i] as u16 * _as) as u8;
-            }
-        }
-    }
+    compose_fill!(
+        name: dest_out,
+        fa: |_as, _ab| 0,
+        fb: |_as, _ab| 255 - _as
+    );
 
-    /// Composite using `SrcAtop` (Cs * αb + Cb * (1 – αs)).
-    pub(crate) fn src_atop(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
-            let inv_as = (255 - cs[3]) as u16;
+    compose_fill!(
+        name: src_atop,
+        fa: |_as, _ab| _ab,
+        fb: |_as, _ab| 255 - _as
+    );
 
-            for i in 0..COLOR_COMPONENTS {
-                let ab = cb[3] as u16;
-                let im1 = div_255(cs[i] as u16 * ab) as u8;
-                let im2 = div_255(cb[i] as u16 * inv_as) as u8;
+    compose_fill!(
+        name: dest_atop,
+        fa: |_as, _ab| 255 - _ab,
+        fb: |_as, _ab|  _as
+    );
 
-                cb[i] = im1 + im2;
-            }
-        }
-    }
+    compose_fill!(
+        name: xor,
+        fa: |_as, _ab| 255 - _ab,
+        fb: |_as, _ab| 255 - _as
+    );
 
-    /// Composite using `SrcOut` Cs * (1 – αb)
-    pub(crate) fn src_out(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
-            let inv_ab = 255 - cb[3] as u16;
-
-            for i in 0..COLOR_COMPONENTS {
-                cb[i] = div_255(cs[i] as u16 * inv_ab) as u8;
-            }
-        }
-    }
-
-    /// Composite using `DestOut` (Cb * (1 - as)).
-    pub(crate) fn dest_out(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let inv_as = 255 - cs[3] as u16;
-
-        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
-            for i in 0..COLOR_COMPONENTS {
-                cb[i] = div_255(cb[i] as u16 * inv_as) as u8;
-            }
-        }
-    }
-
-    /// Composite using `Xor` (Cs * (1 - αb) + Cb * (1 - αs)).
-    pub(crate) fn xor(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let inv_as = 255 - cs[3] as u16;
-
-        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
-            for i in 0..COLOR_COMPONENTS {
-                let inv_ab = 255 - cb[3] as u16;
-                let im1 = div_255(cs[i] as u16 * inv_ab) as u8;
-                let im2 = div_255(cb[i] as u16 * inv_as) as u8;
-
-                cb[i] = im1 + im2;
-            }
-        }
-    }
-
-    /// Composite using `Plus` (Cs + Cb).
+    /// Composite using `Plus` (Fa = 255, Fb = 255).
+    // We can't use the macro here because the operation might overflow, and
+    // using `saturating_add` in the macro comes at the expense of bad auto-vectorization.
     pub(crate) fn plus(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
         let cs = splat_x4(cs);
 
