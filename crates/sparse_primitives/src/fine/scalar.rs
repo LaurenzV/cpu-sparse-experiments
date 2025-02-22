@@ -9,6 +9,7 @@ impl fine::Compose for Scalar {
             peniko::Compose::SrcOver => fill::src_over(target, cs),
             peniko::Compose::DestOver => fill::dest_over(target, cs),
             peniko::Compose::SrcAtop => fill::src_atop(target, cs),
+            peniko::Compose::SrcOut => fill::src_out(target, cs),
             peniko::Compose::DestOut => fill::dest_out(target, cs),
             peniko::Compose::Xor => fill::xor(target, cs),
             peniko::Compose::Plus => fill::plus(target, cs),
@@ -31,6 +32,7 @@ impl fine::Compose for Scalar {
             peniko::Compose::SrcOver => strip::src_over(target, cs, alphas),
             peniko::Compose::DestOver => strip::dest_over(target, cs, alphas),
             peniko::Compose::SrcAtop => strip::src_atop(target, cs, alphas),
+            peniko::Compose::SrcOut => strip::src_out(target, cs, alphas),
             peniko::Compose::DestOut => strip::dest_out(target, cs, alphas),
             peniko::Compose::Xor => strip::xor(target, cs, alphas),
             peniko::Compose::Plus => strip::plus(target, cs, alphas),
@@ -116,6 +118,17 @@ mod fill {
                 let im2 = div_255(cb[i] as u16 * inv_as) as u8;
 
                 cb[i] = im1 + im2;
+            }
+        }
+    }
+
+    /// Composite using `SrcOut` Cs * (1 – αb)
+    pub(crate) fn src_out(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
+            let inv_ab = 255 - cb[3] as u16;
+
+            for i in 0..COLOR_COMPONENTS {
+                cb[i] = div_255(cs[i] as u16 * inv_ab) as u8;
             }
         }
     }
@@ -303,6 +316,25 @@ mod strip {
                     let im1 = div_255(cs_am * inv_ab) as u8;
                     let im2 = div_255(cb[idx + i] as u16 * inv_as_am) as u8;
                     cb[idx + i] = im1 + im2;
+                }
+            }
+        }
+    }
+
+    /// Composite using `SrcOut` Cs * (1 – αb) * am + (1 - am) * Cb.
+    pub(crate) fn src_out(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
+        for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
+            for j in 0..STRIP_HEIGHT {
+                let base_idx = j * COLOR_COMPONENTS;
+                let am = ((*masks >> (j * 8)) & 0xff) as u8;
+                let inv_am = 255 - am as u16;
+
+                for i in 0..COLOR_COMPONENTS {
+                    let idx = base_idx + i;
+                    let inv_ab = 255 - cb[base_idx + 3] as u16;
+                    let src_out = div_255(cs[i] as u16 * div_255(inv_ab * am as u16)) as u8;
+
+                    cb[idx] = src_out + div_255(inv_am * cb[idx] as u16) as u8;
                 }
             }
         }
