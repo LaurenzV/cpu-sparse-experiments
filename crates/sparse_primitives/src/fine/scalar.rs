@@ -168,11 +168,38 @@ mod strip {
     use crate::util::scalar::div_255;
     use crate::wide_tile::STRIP_HEIGHT;
 
-    // All the formulas in the comments are with premultiplied alpha for Cs and Cb.
-    // `am` stands for `alpha mask` (i.e. opacity of the pixel due to anti-aliasing).
-    //
-    // I am not exactly sure how the `am` should be incorporated in some formulas, so it's
-    // possible there are mistakes. I used tiny-skia output as the main point of reference.
+    macro_rules! compose_strip {
+        (
+            name: $n:ident,
+            fa: $fa:expr,
+            fb: $fb:expr
+        ) => {
+            pub(crate) fn $n(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
+                let _as = cs[3] as u16;
+
+                for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
+                    for (j, cb) in cb.chunks_exact_mut(COLOR_COMPONENTS).enumerate() {
+                        let am = ((*masks >> (j * 8)) & 0xff) as u16;
+
+                        for i in 0..COLOR_COMPONENTS {
+                            let _ab = cb[3] as u16;
+
+                            let res = div_255(cs[i] as u16 * $fa(_as, _ab))
+                                + div_255(cb[i] as u16 * $fb(_as, _ab));
+                            cb[i] =
+                                div_255(res * am) as u8 + div_255(cb[i] as u16 * (255 - am)) as u8;
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    compose_strip!(
+        name: src_over,
+        fa: |_as, _ab| 255,
+        fb: |_as, _ab| 255 - _as
+    );
 
     /// Composite using `SrcCopy` (Cs * am) + (1 - am) * Cb.
     pub(crate) fn copy(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
@@ -187,23 +214,6 @@ mod strip {
                     let im1 = div_255(cs[i] as u16 * am) as u8;
                     let im2 = div_255(inv_am * cb[idx] as u16) as u8;
                     cb[idx] = im1 + im2;
-                }
-            }
-        }
-    }
-
-    /// Composite using `SrcOver` (Cs * am + Cb * (1 – αs * am)).
-    pub(crate) fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
-        for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
-            for j in 0..STRIP_HEIGHT {
-                let am = ((*masks >> (j * 8)) & 0xff) as u16;
-                let inv_as_am = 255 - div_255(am * cs[3] as u16);
-
-                for i in 0..COLOR_COMPONENTS {
-                    let im1 = cb[j * 4 + i] as u16 * inv_as_am;
-                    let im2 = cs[i] as u16 * am;
-                    let im3 = div_255(im1 + im2);
-                    cb[j * 4 + i] = im3 as u8;
                 }
             }
         }
