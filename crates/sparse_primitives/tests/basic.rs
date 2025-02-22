@@ -1,5 +1,5 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use peniko::color::palette::css::{DARK_BLUE, DARK_GREEN};
+use peniko::color::palette::css::{DARK_BLUE, DARK_GREEN, WHITE, YELLOW};
 use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
 use peniko::{BlendMode, Compose, Mix};
 use sparse_primitives::color::palette::css::{
@@ -468,7 +468,7 @@ fn bevel_stroke_2() -> Stroke {
 fn compose_destination() -> RenderContext {
     let mut ctx = get_ctx(50, 50, true);
     let rect = Rect::new(4.5, 4.5, 35.5, 35.5);
-    ctx.set_paint(DARK_BLUE.with_alpha(0.5).into());
+    ctx.set_paint(YELLOW.with_alpha(0.35).into());
     ctx.set_stroke(bevel_stroke_2());
     ctx.fill_rect(&rect);
 
@@ -477,7 +477,7 @@ fn compose_destination() -> RenderContext {
 
 fn compose_source(ctx: &mut RenderContext) {
     let rect = Rect::new(14.5, 14.5, 45.5, 45.5);
-    ctx.set_paint(DARK_GREEN.with_alpha(0.5).into());
+    ctx.set_paint(DARK_GREEN.with_alpha(0.8).into());
     ctx.fill_rect(&rect);
 }
 
@@ -516,20 +516,20 @@ fn compose_solid_dest_over() {
     compose_impl!(Compose::DestOver, "compose_solid_dest_over");
 }
 
-// #[test]
-// fn compose_solid_src_in() {
-//     compose_impl!(Compose::SrcIn, "compose_solid_src_in");
-// }
+#[test]
+fn compose_solid_src_in() {
+    compose_impl!(Compose::SrcIn, "compose_solid_src_in");
+}
 
-// #[test]
-// fn compose_solid_dest_in() {
-//     compose_impl!(Compose::DestIn, "compose_solid_dest_in");
-// }
-//
-// #[test]
-// fn compose_solid_src_out() {
-//     compose_impl!(Compose::SrcOut, "compose_solid_src_out");
-// }
+#[test]
+fn compose_solid_dest_in() {
+    compose_impl!(Compose::DestIn, "compose_solid_dest_in");
+}
+
+#[test]
+fn compose_solid_src_out() {
+    compose_impl!(Compose::SrcOut, "compose_solid_src_out");
+}
 
 #[test]
 fn compose_solid_dest_out() {
@@ -540,11 +540,11 @@ fn compose_solid_dest_out() {
 fn compose_solid_src_atop() {
     compose_impl!(Compose::SrcAtop, "compose_solid_src_atop");
 }
-//
-// #[test]
-// fn compose_solid_dest_atop() {
-//     compose_impl!(Compose::DestAtop, "compose_solid_dest_atop");
-// }
+
+#[test]
+fn compose_solid_dest_atop() {
+    compose_impl!(Compose::DestAtop, "compose_solid_dest_atop");
+}
 
 #[test]
 fn compose_solid_xor() {

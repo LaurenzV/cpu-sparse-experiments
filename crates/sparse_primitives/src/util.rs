@@ -21,7 +21,7 @@ pub(crate) mod scalar {
     use crate::fine::COLOR_COMPONENTS;
 
     #[inline(always)]
-    pub(crate) fn div_255(val: u16) -> u16 {
+    pub(crate) const fn div_255(val: u16) -> u16 {
         (val + 1 + (val >> 8)) >> 8
     }
 
