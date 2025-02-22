@@ -15,6 +15,7 @@ impl fine::Compose for Scalar {
             peniko::Compose::SrcOut => fill::src_out(target, cs),
             peniko::Compose::DestOut => fill::dest_out(target, cs),
             peniko::Compose::SrcAtop => fill::src_atop(target, cs),
+            peniko::Compose::DestAtop => fill::dest_atop(target, cs),
             peniko::Compose::Xor => fill::xor(target, cs),
             peniko::Compose::Plus => fill::plus(target, cs),
             _ => unimplemented!(),
@@ -28,18 +29,19 @@ impl fine::Compose for Scalar {
         compose: peniko::Compose,
     ) {
         match compose {
-            peniko::Compose::Copy => strip::src_copy(target, cs, alphas),
+            peniko::Compose::Clear => strip::clear(target, cs, alphas),
+            peniko::Compose::Copy => strip::copy(target, cs, alphas),
+            peniko::Compose::Dest => strip::dest(target, cs, alphas),
             peniko::Compose::SrcOver => strip::src_over(target, cs, alphas),
             peniko::Compose::DestOver => strip::dest_over(target, cs, alphas),
-            peniko::Compose::SrcAtop => strip::src_atop(target, cs, alphas),
-            peniko::Compose::SrcOut => strip::src_out(target, cs, alphas),
-            peniko::Compose::DestOut => strip::dest_out(target, cs, alphas),
-            peniko::Compose::Xor => strip::xor(target, cs, alphas),
-            peniko::Compose::Plus => strip::plus(target, cs, alphas),
-            peniko::Compose::Dest => strip::dest(target, cs, alphas),
-            peniko::Compose::Clear => strip::clear(target, cs, alphas),
             peniko::Compose::SrcIn => strip::src_in(target, cs, alphas),
             peniko::Compose::DestIn => strip::dest_in(target, cs, alphas),
+            peniko::Compose::SrcOut => strip::src_out(target, cs, alphas),
+            peniko::Compose::DestOut => strip::dest_out(target, cs, alphas),
+            peniko::Compose::SrcAtop => strip::src_atop(target, cs, alphas),
+            // peniko::Compose::DestAtop => strip::dest_atop(target, cs, alphas),
+            peniko::Compose::Xor => strip::xor(target, cs, alphas),
+            peniko::Compose::Plus => strip::plus(target, cs, alphas),
             _ => unimplemented!(),
         }
     }
@@ -173,7 +175,7 @@ mod strip {
     // possible there are mistakes. I used tiny-skia output as the main point of reference.
 
     /// Composite using `SrcCopy` (Cs * am) + (1 - am) * Cb.
-    pub(crate) fn src_copy(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
+    pub(crate) fn copy(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
         for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
             for j in 0..STRIP_HEIGHT {
                 let am = ((*masks >> (j * 8)) & 0xff) as u16;
