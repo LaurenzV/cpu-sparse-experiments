@@ -251,21 +251,20 @@ mod strip {
         }
     }
 
-    /// Composite using `DestIn` (Cb * as * am).
+    /// Composite using `DestIn` (Cb * as * am)  + (1 - am) * Cb.
     pub(crate) fn dest_in(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
         for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
             for j in 0..STRIP_HEIGHT {
                 let am = ((*masks >> (j * 8)) & 0xff) as u16;
-
-                let do_dest_in = (am == 255) as u8;
-                let do_dest_copy = 1 - do_dest_in;
+                let inv_am = 255 - am;
                 let as_am = div_255(am * cs[3] as u16);
+                let base_idx = j * COLOR_COMPONENTS;
 
                 for i in 0..COLOR_COMPONENTS {
-                    let idx = j * COLOR_COMPONENTS;
-                    let dest_in = div_255(cb[idx + i] as u16 * as_am) as u8;
+                    let idx = base_idx + i;
+                    let dest_in = div_255(cb[idx] as u16 * as_am) as u8;
 
-                    cb[idx + i] = do_dest_copy * cb[idx + i] + do_dest_in * dest_in;
+                    cb[idx] = dest_in + div_255(inv_am * cb[idx] as u16) as u8;
                 }
             }
         }
