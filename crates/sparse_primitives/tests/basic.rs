@@ -516,10 +516,10 @@ fn compose_solid_dest_over() {
     compose_impl!(Compose::DestOver, "compose_solid_dest_over");
 }
 
-// #[test]
-// fn compose_solid_src_in() {
-//     compose_impl!(Compose::SrcIn, "compose_solid_src_in");
-// }
+#[test]
+fn compose_solid_src_in() {
+    compose_impl!(Compose::SrcIn, "compose_solid_src_in");
+}
 
 // #[test]
 // fn compose_solid_dest_in() {
