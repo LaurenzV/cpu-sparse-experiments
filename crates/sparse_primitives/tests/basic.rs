@@ -496,10 +496,10 @@ fn compose_solid_clear() {
     compose_impl!(Compose::Clear, "compose_solid_clear");
 }
 
-// #[test]
-// fn compose_solid_copy() {
-//     compose_impl!(Compose::Copy, "compose_solid_copy");
-// }
+#[test]
+fn compose_solid_copy() {
+    compose_impl!(Compose::Copy, "compose_solid_copy");
+}
 
 #[test]
 fn compose_solid_dest() {

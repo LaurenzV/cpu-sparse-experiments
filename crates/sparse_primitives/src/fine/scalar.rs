@@ -173,29 +173,23 @@ mod strip {
 
     // All the formulas in the comments are with premultiplied alpha for Cs and Cb.
     // `am` stands for `alpha mask` (i.e. opacity of the pixel due to anti-aliasing).
+    //
+    // I am not exactly sure how the `am` should be incorporated in some formulas, so it's
+    // possible there are mistakes. I used tiny-skia output as the main point of reference.
 
-    /// Composite using `SrcCopy` (Cs * am).
+    /// Composite using `SrcCopy` (Cs * am) + (1 - am) * Cb.
     pub(crate) fn src_copy(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
         for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
             for j in 0..STRIP_HEIGHT {
-                // This one unfortunately needs a bit of a hacky solution. The problem
-                // is that strips are always of a size of 4, meaning that if we always
-                // copy Cs * am, we might override parts of the destination that are within
-                // the strip, but are actually not covered by the shape anymore. Because of
-                // this, we do source-over compositing for pixel with mask alpha < 255,
-                // while we do copy for all mask alphas = 255. It's a bit expensive, but not
-                // sure if there is a better way.
                 let am = ((*masks >> (j * 8)) & 0xff) as u16;
-                let do_src_copy = (am == 255) as u8;
-                let do_src_over = 1 - do_src_copy;
-                let inv_as_am = 255 - div_255(am * cs[3] as u16);
+                let inv_am = 255 - am;
+                let base_idx = j * COLOR_COMPONENTS;
 
                 for i in 0..COLOR_COMPONENTS {
-                    let im1 = cb[j * 4 + i] as u16 * inv_as_am;
-                    let im2 = cs[i] as u16 * am;
-                    let src_over = div_255(im1 + im2) as u8;
-                    let src_copy = div_255(cs[i] as u16 * am) as u8;
-                    cb[j * 4 + i] = do_src_over * src_over + do_src_copy * src_copy;
+                    let idx = base_idx + i;
+                    let im1 = div_255(cs[i] as u16 * am) as u8;
+                    let im2 = div_255(inv_am * cb[idx] as u16) as u8;
+                    cb[idx] = im1 + im2;
                 }
             }
         }
