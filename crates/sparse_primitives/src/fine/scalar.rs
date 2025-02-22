@@ -195,6 +195,24 @@ mod strip {
         };
     }
 
+    // Since this is the most common operation, we use a custom implementation which should
+    // be more efficient than the macro above.
+    pub(crate) fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
+        for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
+            for j in 0..STRIP_HEIGHT {
+                let am = ((*masks >> (j * 8)) & 0xff) as u16;
+                let inv_as_am = 255 - div_255(am * cs[3] as u16);
+
+                for i in 0..COLOR_COMPONENTS {
+                    let im1 = cb[j * 4 + i] as u16 * inv_as_am;
+                    let im2 = cs[i] as u16 * am;
+                    let im3 = div_255(im1 + im2);
+                    cb[j * 4 + i] = im3 as u8;
+                }
+            }
+        }
+    }
+
     compose_strip!(
         name: clear,
         fa: |_as, _ab| 0,
@@ -211,12 +229,6 @@ mod strip {
         name: dest,
         fa: |_as, _ab| 0,
         fb: |_as, _ab| 255
-    );
-
-    compose_strip!(
-        name: src_over,
-        fa: |_as, _ab| 255,
-        fb: |_as, _ab| 255 - _as
     );
 
     compose_strip!(
