@@ -5,18 +5,18 @@ use crate::fine::COLOR_COMPONENTS;
 impl fine::Compose for Scalar {
     fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
         match compose {
-            peniko::Compose::Copy => fill::src_copy(target, cs),
+            peniko::Compose::Clear => fill::clear(target, cs),
+            peniko::Compose::Copy => fill::copy(target, cs),
+            peniko::Compose::Dest => fill::dest(target, cs),
             peniko::Compose::SrcOver => fill::src_over(target, cs),
             peniko::Compose::DestOver => fill::dest_over(target, cs),
-            peniko::Compose::SrcAtop => fill::src_atop(target, cs),
-            peniko::Compose::SrcOut => fill::src_out(target, cs),
-            peniko::Compose::DestOut => fill::dest_out(target, cs),
-            peniko::Compose::Xor => fill::xor(target, cs),
-            peniko::Compose::Plus => fill::plus(target, cs),
-            peniko::Compose::Dest => fill::dest(target, cs),
-            peniko::Compose::Clear => fill::clear(target, cs),
             peniko::Compose::SrcIn => fill::src_in(target, cs),
             peniko::Compose::DestIn => fill::dest_in(target, cs),
+            peniko::Compose::SrcOut => fill::src_out(target, cs),
+            peniko::Compose::DestOut => fill::dest_out(target, cs),
+            peniko::Compose::SrcAtop => fill::src_atop(target, cs),
+            peniko::Compose::Xor => fill::xor(target, cs),
+            peniko::Compose::Plus => fill::plus(target, cs),
             _ => unimplemented!(),
         }
     }
@@ -46,44 +46,64 @@ impl fine::Compose for Scalar {
 }
 
 mod fill {
-    // All the formulas in the comments are with premultiplied alpha for Cs and Cb.
+    // See https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators for the
+    // formulas.
 
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::util::scalar::{div_255, splat_x4};
 
-    /// Composite using `SrcOver` (Cs + Cb * (1 – αs)).
-    pub(crate) fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let _as = cs[3];
-        let cs = splat_x4(cs);
+    macro_rules! compose_fill {
+        (
+            name: $n:ident,
+            fa: $fa:expr,
+            fb: $fb:expr
+        ) => {
+            pub(crate) fn $n(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+                let _as = cs[3] as u16;
 
-        let inv_as = (255 - _as) as u16;
+                for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
+                    for cb in cb.chunks_exact_mut(COLOR_COMPONENTS) {
+                        let _ab = cb[3] as u16;
 
-        for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
-            for i in 0..TOTAL_STRIP_HEIGHT {
-                cb[i] = cs[i] + div_255(cb[i] as u16 * inv_as) as u8;
+                        for i in 0..COLOR_COMPONENTS {
+                            cb[i] = div_255(cs[i] as u16 * $fa(_as, _ab)) as u8
+                                + div_255(cb[i] as u16 * $fb(_as, _ab)) as u8;
+                        }
+                    }
+                }
             }
-        }
+        };
     }
 
-    /// Composite using `SrcCopy` (Cs).
-    pub(crate) fn src_copy(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        let cs = splat_x4(cs);
+    compose_fill!(
+        name: clear,
+        fa: |_as, _ab| 0,
+        fb: |_as, _ab| 0
+    );
 
-        for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
-            cb.copy_from_slice(&cs);
-        }
-    }
+    compose_fill!(
+        name: copy,
+        fa: |_as, _ab| 255,
+        fb: |_as, _ab| 0
+    );
 
-    /// Composite using `DestOver` (Cs * (1 – αb) + Cb).
-    pub(crate) fn dest_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
-            let inv_ab = (255 - cb[3]) as u16;
+    compose_fill!(
+        name: dest,
+        fa: |_as, _ab| 0,
+        fb: |_as, _ab| 255
+    );
 
-            for i in 0..COLOR_COMPONENTS {
-                cb[i] = div_255(cs[i] as u16 * inv_ab) as u8 + cb[i];
-            }
-        }
-    }
+    compose_fill!(
+        name: src_over,
+        fa: |_as, _ab| 255,
+        fb: |_as, _ab| 255 - _as
+    );
+
+    compose_fill!(
+        name: dest_over,
+        fa: |_as, _ab| 255 - _ab,
+        fb: |_as, _ab| 255
+    );
 
     /// Composite using `SrcIn` (Cs * ab).
     pub(crate) fn src_in(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
@@ -168,14 +188,6 @@ mod fill {
                 cb[i] = cs[i].saturating_add(cb[i]);
             }
         }
-    }
-
-    /// Composite using `Dest` (Cb).
-    pub(crate) fn dest(_: &mut [u8], _: &[u8; COLOR_COMPONENTS]) {}
-
-    /// Composite using `Clear` (0).
-    pub(crate) fn clear(target: &mut [u8], _: &[u8; COLOR_COMPONENTS]) {
-        target.fill(0);
     }
 }
 
