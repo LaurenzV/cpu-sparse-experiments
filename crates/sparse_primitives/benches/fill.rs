@@ -10,7 +10,7 @@ use sparse_primitives::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 const FILL_ITERS: usize = 1000;
 
 pub fn fill(c: &mut Criterion) {
-    let mut g = c.benchmark_group("filling");
+    let mut g = c.benchmark_group("fill");
 
     macro_rules! fill {
         ($name:ident, $compose:path) => {
