@@ -3,6 +3,7 @@ use peniko::kurbo::{Cap, Join, Stroke};
 use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
 use std::time::Instant;
+use peniko::{BlendMode, Compose, Mix};
 
 const WIDTH: usize = 512;
 const HEIGHT: usize = 600;
@@ -12,7 +13,7 @@ const STROKE_WIDTH: f64 = 2.0;
 fn main() {
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
 
-    for size in [256].repeat(200) {
+    for size in [8, 16, 32, 64, 128, 256].repeat(200) {
         ctx.reset();
 
         let params = Params {
@@ -29,6 +30,7 @@ fn main() {
         let start = Instant::now();
         let mut pixmap = Pixmap::new(WIDTH, HEIGHT);
 
+        ctx.set_blend_mode(BlendMode::new(Mix::Normal, Compose::Dest));
         for cmd in &commands {
             run_cmd(&mut ctx, cmd);
         }

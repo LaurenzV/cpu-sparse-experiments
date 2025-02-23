@@ -22,7 +22,7 @@ image = { workspace = true }
 tiny-skia = { workspace = true }
 bench_gen = { workspace = true }
 svg = { workspace = true }
-rand.workspace = true
+rand = { workspace = true }
 criterion = { workspace = true }
 
 [features]
