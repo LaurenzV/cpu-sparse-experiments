@@ -4,6 +4,8 @@ use peniko::Compose;
 use rand::rngs::StdRng;
 use rand::RngCore;
 use rand::SeedableRng;
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+use sparse_primitives::execute::Avx2;
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
 use sparse_primitives::execute::Neon;
 use sparse_primitives::execute::Scalar;
@@ -53,6 +55,8 @@ pub fn strip(c: &mut Criterion) {
             strip_single!($name, $compose, Scalar);
             #[cfg(all(target_arch = "aarch64", feature = "simd"))]
             strip_single!($name, $compose, Neon);
+            #[cfg(all(target_arch = "x86_64", feature = "simd"))]
+            strip_single!($name, $compose, Avx2);
         };
     }
 
