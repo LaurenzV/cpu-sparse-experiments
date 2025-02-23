@@ -197,14 +197,14 @@ impl Iterator for PolyIterator {
 
 pub struct ColorIter {
     opaque: bool,
-    rng: StdRng
+    rng: StdRng,
 }
 
 impl ColorIter {
     pub fn new(opaque: bool) -> Self {
         Self {
             opaque,
-            rng: StdRng::from_seed(SEED)
+            rng: StdRng::from_seed(SEED),
         }
     }
 }
@@ -218,7 +218,7 @@ impl Iterator for ColorIter {
         let b = self.rng.random_range(0..=255);
         let a = if self.opaque {
             255
-        }   else {
+        } else {
             self.rng.random_range(0..255)
         };
 
