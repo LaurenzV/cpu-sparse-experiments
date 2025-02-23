@@ -50,17 +50,9 @@ mod fill {
                     for i in 0..2 {
                         let idx = i * 8;
                         let _ab = {
-                            let v = [
-                                cb[idx + 3],
-                                cb[idx + 3],
-                                cb[idx + 3],
-                                cb[idx + 3],
-                                cb[idx + 7],
-                                cb[idx + 7],
-                                cb[idx + 7],
-                                cb[idx + 7],
-                            ];
-                            vld1_u8(v.as_ptr())
+                            let v0 = vdup_n_u8(cb[idx + 3]);
+                            let v1 = vdup_n_u8(cb[idx + 7]);
+                            vext_u8::<4>(v0, v1)
                         };
                         let _cb = vld1_u8(cb.as_ptr().add(idx));
 
