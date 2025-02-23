@@ -7,7 +7,7 @@ impl fine::Compose for Scalar {
         match compose {
             peniko::Compose::Clear => fill::clear(target, cs),
             peniko::Compose::Copy => fill::copy(target, cs),
-            peniko::Compose::Dest => fill::dest(target, cs),
+            peniko::Compose::Dest => unreachable!(),
             peniko::Compose::SrcOver => fill::src_over(target, cs),
             peniko::Compose::DestOver => fill::dest_over(target, cs),
             peniko::Compose::SrcIn => fill::src_in(target, cs),
@@ -86,12 +86,6 @@ pub(crate) mod fill {
             cb.copy_from_slice(cs);
         }
     }
-
-    compose_fill!(
-        name: dest,
-        fa: |_as, _ab| 0,
-        fb: |_as, _ab| 255
-    );
 
     compose_fill!(
         name: src_over,

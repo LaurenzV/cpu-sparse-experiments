@@ -7,6 +7,7 @@ impl fine::Compose for Neon {
         unsafe {
             match compose {
                 peniko::Compose::SrcOver => fill::src_over(target, cs),
+                peniko::Compose::Dest => unreachable!(),
                 _ => Scalar::compose_fill(target, cs, compose),
             }
         }
