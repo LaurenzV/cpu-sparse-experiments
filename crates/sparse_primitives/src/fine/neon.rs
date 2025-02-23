@@ -8,8 +8,22 @@ impl fine::Compose for Neon {
             match compose {
                 peniko::Compose::SrcOver => fill::src_over(target, cs),
                 peniko::Compose::SrcOut => fill::src_out(target, cs),
-                peniko::Compose::Dest => unreachable!(),
-                _ => Scalar::compose_fill(target, cs, compose),
+                peniko::Compose::SrcOver => fill::src_over(target, cs),
+                peniko::Compose::DestOver => fill::dest_over(target, cs),
+                peniko::Compose::SrcIn => fill::src_in(target, cs),
+                peniko::Compose::DestIn => fill::dest_in(target, cs),
+                peniko::Compose::DestOut => fill::dest_out(target, cs),
+                peniko::Compose::SrcAtop => fill::src_atop(target, cs),
+                peniko::Compose::DestAtop => fill::dest_atop(target, cs),
+                peniko::Compose::Xor => fill::xor(target, cs),
+
+                // For those, we just fall back to scalar, either because no improvement is possible
+                // or we just haven't implemented it yet.
+                peniko::Compose::Clear => scalar::fill::clear(target, cs),
+                peniko::Compose::Copy => scalar::fill::copy(target, cs),
+                peniko::Compose::Plus => scalar::fill::plus(target, cs),
+                peniko::Compose::Dest => scalar::fill::dest(target, cs),
+                peniko::Compose::PlusLighter => scalar::fill::plus_lighter(target, cs),
             }
         }
     }
@@ -52,6 +66,7 @@ mod fill {
                         let _ab = {
                             let v0 = vdup_n_u8(cb[idx + 3]);
                             let v1 = vdup_n_u8(cb[idx + 7]);
+
                             vext_u8::<4>(v0, v1)
                         };
                         let _cb = vld1_u8(cb.as_ptr().add(idx));
@@ -70,12 +85,6 @@ mod fill {
     unsafe fn inv(val: uint8x8_t) -> uint8x8_t {
         vsub_u8(vdup_n_u8(255), val)
     }
-
-    compose_fill!(
-        name: src_out,
-        fa: |_as, _ab| inv(_ab) ,
-        fb: |_as, _ab| vdup_n_u8(0)
-    );
 
     /// SAFETY: The CPU needs to support the target feature `neon`.
     pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
@@ -102,6 +111,54 @@ mod fill {
             vst1q_u8(cb.as_mut_ptr(), res);
         }
     }
+
+    compose_fill!(
+        name: src_out,
+        fa: |_as, _ab| inv(_ab),
+        fb: |_as, _ab| vdup_n_u8(0)
+    );
+
+    compose_fill!(
+        name: dest_over,
+        fa: |_as, _ab| inv(_ab),
+        fb: |_as, _ab| vdup_n_u8(255)
+    );
+
+    compose_fill!(
+        name: src_in,
+        fa: |_as, _ab| _ab,
+        fb: |_as, _ab| vdup_n_u8(0)
+    );
+
+    compose_fill!(
+        name: dest_in,
+        fa: |_as, _ab| vdup_n_u8(0),
+        fb: |_as, _ab| _as
+    );
+
+    compose_fill!(
+        name: dest_out,
+        fa: |_as, _ab| vdup_n_u8(0),
+        fb: |_as, _ab| inv(_as)
+    );
+
+    compose_fill!(
+        name: src_atop,
+        fa: |_as, _ab| _ab,
+        fb: |_as, _ab| inv(_as)
+    );
+
+    compose_fill!(
+        name: dest_atop,
+        fa: |_as, _ab| inv(_ab),
+        fb: |_as, _ab| _as
+    );
+
+    compose_fill!(
+        name: xor,
+        fa: |_as, _ab| inv(_ab),
+        fb: |_as, _ab| inv(_as)
+    );
 }
 
 mod strip {
