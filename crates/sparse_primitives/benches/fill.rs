@@ -9,7 +9,7 @@ use sparse_primitives::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 
 const FILL_ITERS: usize = 1000;
 
-pub fn filling(c: &mut Criterion) {
+pub fn fill(c: &mut Criterion) {
     let mut g = c.benchmark_group("filling");
 
     macro_rules! fill {
