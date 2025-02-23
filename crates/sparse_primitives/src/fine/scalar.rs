@@ -18,7 +18,7 @@ impl fine::Compose for Scalar {
             peniko::Compose::DestAtop => fill::dest_atop(target, cs),
             peniko::Compose::Xor => fill::xor(target, cs),
             peniko::Compose::Plus => fill::plus(target, cs),
-            _ => unimplemented!(),
+            peniko::Compose::PlusLighter => fill::plus_lighter(target, cs),
         }
     }
 
@@ -42,12 +42,12 @@ impl fine::Compose for Scalar {
             peniko::Compose::DestAtop => strip::dest_atop(target, cs, alphas),
             peniko::Compose::Xor => strip::xor(target, cs, alphas),
             peniko::Compose::Plus => strip::plus(target, cs, alphas),
-            _ => unimplemented!(),
+            peniko::Compose::PlusLighter => strip::plus_lighter(target, cs, alphas),
         }
     }
 }
 
-mod fill {
+pub(crate) mod fill {
     // See https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators for the
     // formulas.
 
@@ -77,21 +77,17 @@ mod fill {
         };
     }
 
-    pub(crate) fn clear(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+    pub(crate) fn clear(target: &mut [u8], _: &[u8; COLOR_COMPONENTS]) {
         target.fill(0);
     }
+
+    pub(crate) fn dest(_: &mut [u8], _: &[u8; COLOR_COMPONENTS]) {}
 
     pub(crate) fn copy(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
         for cb in target.chunks_exact_mut(COLOR_COMPONENTS) {
             cb.copy_from_slice(cs);
         }
     }
-
-    compose_fill!(
-        name: dest,
-        fa: |_as, _ab| 0,
-        fb: |_as, _ab| 255
-    );
 
     compose_fill!(
         name: src_over,
@@ -158,6 +154,10 @@ mod fill {
             }
         }
     }
+
+    pub(crate) fn plus_lighter(_: &mut [u8], _: &[u8; COLOR_COMPONENTS]) {
+        unimplemented!()
+    }
 }
 
 mod strip {
@@ -210,6 +210,8 @@ mod strip {
         }
     }
 
+    pub(crate) fn dest(_: &mut [u8], _: &[u8; COLOR_COMPONENTS], _: &[u32]) {}
+
     compose_strip!(
         name: clear,
         fa: |_as, _ab| 0,
@@ -220,12 +222,6 @@ mod strip {
         name: copy,
         fa: |_as, _ab| 255,
         fb: |_as, _ab| 0
-    );
-
-    compose_strip!(
-        name: dest,
-        fa: |_as, _ab| 0,
-        fb: |_as, _ab| 255
     );
 
     compose_strip!(
@@ -276,7 +272,6 @@ mod strip {
         fb: |_as, _ab| 255 - _as
     );
 
-    /// Composite using `Plus` (Cs * am + Cb).
     pub(crate) fn plus(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
         for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
             for j in 0..STRIP_HEIGHT {
@@ -289,5 +284,9 @@ mod strip {
                 }
             }
         }
+    }
+
+    pub(crate) fn plus_lighter(_: &mut [u8], _: &[u8; COLOR_COMPONENTS], _: &[u32]) {
+        unimplemented!()
     }
 }

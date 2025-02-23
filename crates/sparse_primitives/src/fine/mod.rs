@@ -95,6 +95,10 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
                     compose = peniko::Compose::Copy
                 }
 
+                if compose == peniko::Compose::Dest {
+                    return;
+                }
+
                 let target =
                     &mut self.scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width];
 

@@ -1,13 +1,28 @@
 use crate::execute::{Neon, Scalar};
 use crate::fine;
-use crate::fine::COLOR_COMPONENTS;
+use crate::fine::{scalar, COLOR_COMPONENTS};
 
 impl fine::Compose for Neon {
     fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
         unsafe {
             match compose {
                 peniko::Compose::SrcOver => fill::src_over(target, cs),
-                _ => Scalar::compose_fill(target, cs, compose),
+                peniko::Compose::SrcOut => fill::src_out(target, cs),
+                peniko::Compose::DestOver => fill::dest_over(target, cs),
+                peniko::Compose::SrcIn => fill::src_in(target, cs),
+                peniko::Compose::DestIn => fill::dest_in(target, cs),
+                peniko::Compose::DestOut => fill::dest_out(target, cs),
+                peniko::Compose::SrcAtop => fill::src_atop(target, cs),
+                peniko::Compose::DestAtop => fill::dest_atop(target, cs),
+                peniko::Compose::Xor => fill::xor(target, cs),
+
+                // For those, we just fall back to scalar, either because no improvement is possible
+                // or we just haven't implemented it yet.
+                peniko::Compose::Clear => scalar::fill::clear(target, cs),
+                peniko::Compose::Copy => scalar::fill::copy(target, cs),
+                peniko::Compose::Plus => scalar::fill::plus(target, cs),
+                peniko::Compose::Dest => scalar::fill::dest(target, cs),
+                peniko::Compose::PlusLighter => scalar::fill::plus_lighter(target, cs),
             }
         }
     }
@@ -29,33 +44,122 @@ impl fine::Compose for Neon {
 
 mod fill {
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
-    use crate::util::scalar::splat_x4;
+    use crate::util::scalar::{splat_x2, splat_x4};
 
+    use crate::util::neon::div_255;
     use std::arch::aarch64::*;
+
+    macro_rules! compose_fill {
+        (
+            name: $n:ident,
+            fa: $fa:expr,
+            fb: $fb:expr
+        ) => {
+            /// SAFETY: The CPU needs to support the target feature `neon`.
+            pub(crate) unsafe fn $n(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+                let _cs = vld1_u8(splat_x2(cs).as_ptr());
+                let _as = vdup_n_u8(cs[3]);
+
+                for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
+                    for i in 0..2 {
+                        let idx = i * 8;
+                        let _ab = {
+                            let v0 = vdup_n_u8(cb[idx + 3]);
+                            let v1 = vdup_n_u8(cb[idx + 7]);
+
+                            vext_u8::<4>(v0, v1)
+                        };
+                        let _cb = vld1_u8(cb.as_ptr().add(idx));
+
+                        let im_1 = div_255(vmull_u8(_cs, $fa(_as, _ab)));
+                        let im_2 = div_255(vmull_u8(_cb, $fb(_as, _ab)));
+                        let res = vmovn_u16(vaddq_u16(im_1, im_2));
+
+                        vst1_u8(cb.as_mut_ptr().add(idx), res);
+                    }
+                }
+            }
+        };
+    }
+
+    /// SAFETY: The CPU needs to support the target feature `neon`.
+    unsafe fn inv(val: uint8x8_t) -> uint8x8_t {
+        vsub_u8(vdup_n_u8(255), val)
+    }
 
     /// SAFETY: The CPU needs to support the target feature `neon`.
     pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
         let inv_as = vdupq_n_u8(255 - cs[3]);
         let cs = vld1q_u8(splat_x4(cs).as_ptr());
 
+        let ones = vdupq_n_u16(1);
+
         for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
             let cb_vals = vld1q_u8(cb.as_ptr());
-            let res_low = {
-                let im1 = vmull_u8(vget_low_u8(cb_vals), vget_low_u8(inv_as));
-                let im2 = vsraq_n_u16::<8>(im1, im1);
-                vaddhn_u16(im2, vdupq_n_u16(1))
-            };
 
-            let res_high = {
-                let im1 = vmull_high_u8(cb_vals, inv_as);
-                let im2 = vshrq_n_u16::<8>(im1);
-                vmlal_high_u8(im2, cb_vals, inv_as)
-            };
+            let high_im1 = vmull_high_u8(cb_vals, inv_as);
+            let low_1 = vget_low_u8(cb_vals);
+            let low_2 = vget_low_u8(inv_as);
+            let low_im1 = vmull_u8(low_1, low_2);
+            let high_im2 = vshrq_n_u16::<8>(high_im1);
+            let low_im2 = vsraq_n_u16::<8>(low_im1, low_im1);
+            let res_high = vmlal_high_u8(high_im2, cb_vals, inv_as);
+            let res_low = vaddhn_u16(low_im2, ones);
 
-            let res = vaddq_u8(vaddhn_high_u16(res_low, res_high, vdupq_n_u16(1)), cs);
+            let im4 = vaddhn_high_u16(res_low, res_high, ones);
+            let res = vaddq_u8(im4, cs);
+
             vst1q_u8(cb.as_mut_ptr(), res);
         }
     }
+
+    compose_fill!(
+        name: src_out,
+        fa: |_as, _ab| inv(_ab),
+        fb: |_as, _ab| vdup_n_u8(0)
+    );
+
+    compose_fill!(
+        name: dest_over,
+        fa: |_as, _ab| inv(_ab),
+        fb: |_as, _ab| vdup_n_u8(255)
+    );
+
+    compose_fill!(
+        name: src_in,
+        fa: |_as, _ab| _ab,
+        fb: |_as, _ab| vdup_n_u8(0)
+    );
+
+    compose_fill!(
+        name: dest_in,
+        fa: |_as, _ab| vdup_n_u8(0),
+        fb: |_as, _ab| _as
+    );
+
+    compose_fill!(
+        name: dest_out,
+        fa: |_as, _ab| vdup_n_u8(0),
+        fb: |_as, _ab| inv(_as)
+    );
+
+    compose_fill!(
+        name: src_atop,
+        fa: |_as, _ab| _ab,
+        fb: |_as, _ab| inv(_as)
+    );
+
+    compose_fill!(
+        name: dest_atop,
+        fa: |_as, _ab| inv(_ab),
+        fb: |_as, _ab| _as
+    );
+
+    compose_fill!(
+        name: xor,
+        fa: |_as, _ab| inv(_ab),
+        fb: |_as, _ab| inv(_as)
+    );
 }
 
 mod strip {

@@ -48,6 +48,5 @@ jobs:
       - name: Test scalar
         run: cargo test --workspace
 
-# Disabled for now because there is one test which renders slightly different on NEON.
-#      - name: Test NEON
-#        run: NEON="" cargo test --workspace --features simd
+      - name: Test NEON
+        run: NEON="" cargo test --workspace --features simd

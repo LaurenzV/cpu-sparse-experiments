@@ -1,6 +1,5 @@
 use bench_gen::{Command, Params, RectIterator, RectType};
 use peniko::kurbo::{Cap, Join, Stroke};
-use peniko::{BlendMode, Compose, Mix};
 use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
 use std::time::Instant;
@@ -19,7 +18,6 @@ fn main() {
         let params = Params {
             width: WIDTH,
             height: HEIGHT,
-            alpha: 127,
             stroke: false,
             size,
         };
