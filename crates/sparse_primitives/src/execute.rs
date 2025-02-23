@@ -47,10 +47,10 @@ pub trait KernelExecutor: fine::Compose {
     );
 }
 
-pub(crate) struct Scalar;
+pub struct Scalar;
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-pub(crate) struct Neon;
+pub struct Neon;
 
 impl KernelExecutor for Scalar {
     fn render_strips(
@@ -64,7 +64,7 @@ impl KernelExecutor for Scalar {
 }
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
-pub(crate) struct Avx2;
+pub struct Avx2;
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 impl KernelExecutor for Avx2 {

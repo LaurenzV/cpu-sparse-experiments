@@ -47,7 +47,7 @@ impl fine::Compose for Scalar {
     }
 }
 
-mod fill {
+pub(crate) mod fill {
     // See https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators for the
     // formulas.
 
@@ -77,7 +77,7 @@ mod fill {
         };
     }
 
-    pub(crate) fn clear(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+    pub(crate) fn clear(target: &mut [u8], _: &[u8; COLOR_COMPONENTS]) {
         target.fill(0);
     }
 

@@ -206,6 +206,7 @@ impl RenderContext {
     }
 }
 
+#[cfg(feature = "simd")]
 macro_rules! avx2 {
     ($e:expr) => {
         // We also require FMA for AVX2 support, but from what I can tell, in practice AVX2 support seems
@@ -218,6 +219,7 @@ macro_rules! avx2 {
     };
 }
 
+#[cfg(feature = "simd")]
 macro_rules! neon {
     ($e:expr) => {
         #[cfg(all(target_arch = "aarch64", feature = "simd"))]

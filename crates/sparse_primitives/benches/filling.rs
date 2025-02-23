@@ -1,11 +1,12 @@
-use criterion::measurement::WallTime;
-use criterion::{BatchSize, BenchmarkGroup, Criterion};
+use bench_gen::ColorIter;
+use criterion::Criterion;
 use peniko::color::palette::css::LIME_GREEN;
-use peniko::color::AlphaColor;
+use peniko::Compose;
+use sparse_primitives::execute::{Neon, Scalar};
 use sparse_primitives::fine::Fine;
-use sparse_primitives::tiling::Tiles;
 use sparse_primitives::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
-use sparse_primitives::ExecutionMode;
+
+const FILL_ITERS: usize = 1000;
 
 pub fn filling(c: &mut Criterion) {
     let mut g = c.benchmark_group("filling");
@@ -13,29 +14,30 @@ pub fn filling(c: &mut Criterion) {
     g.bench_function("scalar", |b| {
         b.iter(|| {
             let mut out = vec![];
-            let mut fine = Fine::new(
-                WIDE_TILE_WIDTH,
-                STRIP_HEIGHT,
-                &mut out,
-                ExecutionMode::Scalar,
-            );
+            let mut fine = Fine::<Scalar>::new(WIDE_TILE_WIDTH, STRIP_HEIGHT, &mut out);
+            let mut color = ColorIter::new(false);
 
-            for i in 0..1000 {
-                fine.fill(0, WIDE_TILE_WIDTH, &LIME_GREEN.into());
+            for _ in 0..FILL_ITERS {
+                fine.fill(0, 254, &color.next().unwrap().into(), Compose::SrcOver);
             }
         })
     });
 
-    #[cfg(feature = "simd")]
+    #[cfg(all(target_arch = "aarch64", feature = "simd"))]
     {
-        g.bench_function("simd", |b| {
+        g.bench_function("neon", |b| {
             b.iter(|| {
                 let mut out = vec![];
-                let mut fine =
-                    Fine::new(WIDE_TILE_WIDTH, STRIP_HEIGHT, &mut out, ExecutionMode::Auto);
+                let mut fine = Fine::<Neon>::new(WIDE_TILE_WIDTH, STRIP_HEIGHT, &mut out);
+                let mut color = ColorIter::new(false);
 
-                for i in 0..1000 {
-                    fine.fill(0, WIDE_TILE_WIDTH, &LIME_GREEN.with_alpha(0.5).into());
+                for _ in 0..FILL_ITERS {
+                    fine.fill(
+                        0,
+                        WIDE_TILE_WIDTH,
+                        &color.next().unwrap().into(),
+                        Compose::SrcOver,
+                    );
                 }
             })
         });

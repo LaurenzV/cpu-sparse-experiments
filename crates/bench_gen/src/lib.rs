@@ -33,7 +33,6 @@ impl RectType {
 pub struct Params {
     pub width: usize,
     pub height: usize,
-    pub alpha: u8,
     pub stroke: bool,
     pub size: usize,
 }
@@ -50,6 +49,7 @@ pub struct RectIterator {
     params: Params,
     angle: f64,
     rect_type: RectType,
+    color_iter: ColorIter,
     rng: StdRng,
 }
 
@@ -59,6 +59,7 @@ impl RectIterator {
             params,
             angle: 0.0,
             rect_type,
+            color_iter: ColorIter::new(false),
             rng: StdRng::from_seed(SEED),
         }
     }
@@ -82,7 +83,7 @@ impl Iterator for RectIterator {
             y += y_adjustment;
         }
 
-        let color = gen_color(&mut self.rng, self.params.alpha);
+        let color = self.color_iter.next().unwrap();
         let rect = Rect::new(x, y, x + (size as f64), y + (size as f64));
 
         if self.rect_type.is_rotated() {
@@ -142,6 +143,7 @@ pub struct PolyIterator {
     params: Params,
     nz: bool,
     num_vertices: usize,
+    color_iter: ColorIter,
     rng: StdRng,
 }
 
@@ -151,6 +153,7 @@ impl PolyIterator {
             params,
             nz,
             num_vertices,
+            color_iter: ColorIter::new(false),
             rng: StdRng::from_seed(SEED),
         }
     }
@@ -182,7 +185,7 @@ impl Iterator for PolyIterator {
             }
         }
 
-        let color = gen_color(&mut self.rng, self.params.alpha);
+        let color = self.color_iter.next().unwrap();
 
         if self.params.stroke {
             Some(Command::StrokePath(path.into(), color))
@@ -192,11 +195,33 @@ impl Iterator for PolyIterator {
     }
 }
 
-fn gen_color(rng: &mut StdRng, alpha: u8) -> AlphaColor<Srgb> {
-    // Generate random color
-    let r = rng.random_range(0..=255);
-    let g = rng.random_range(0..=255);
-    let b = rng.random_range(0..=255);
+pub struct ColorIter {
+    opaque: bool,
+    rng: StdRng
+}
 
-    AlphaColor::from_rgba8(r, g, b, alpha)
+impl ColorIter {
+    pub fn new(opaque: bool) -> Self {
+        Self {
+            opaque,
+            rng: StdRng::from_seed(SEED)
+        }
+    }
+}
+
+impl Iterator for ColorIter {
+    type Item = AlphaColor<Srgb>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let r = self.rng.random_range(0..=255);
+        let g = self.rng.random_range(0..=255);
+        let b = self.rng.random_range(0..=255);
+        let a = if self.opaque {
+            255
+        }   else {
+            self.rng.random_range(0..255)
+        };
+
+        Some(AlphaColor::from_rgba8(r, g, b, a))
+    }
 }
