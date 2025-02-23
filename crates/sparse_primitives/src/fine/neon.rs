@@ -1,6 +1,6 @@
 use crate::execute::{Neon, Scalar};
 use crate::fine;
-use crate::fine::COLOR_COMPONENTS;
+use crate::fine::{scalar, COLOR_COMPONENTS};
 
 impl fine::Compose for Neon {
     fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
@@ -38,21 +38,23 @@ mod fill {
         let inv_as = vdupq_n_u8(255 - cs[3]);
         let cs = vld1q_u8(splat_x4(cs).as_ptr());
 
+        let ones = vdupq_n_u16(1);
+
         for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
             let cb_vals = vld1q_u8(cb.as_ptr());
-            let res_low = {
-                let im1 = vmull_u8(vget_low_u8(cb_vals), vget_low_u8(inv_as));
-                let im2 = vsraq_n_u16::<8>(im1, im1);
-                vaddhn_u16(im2, vdupq_n_u16(1))
-            };
 
-            let res_high = {
-                let im1 = vmull_high_u8(cb_vals, inv_as);
-                let im2 = vshrq_n_u16::<8>(im1);
-                vmlal_high_u8(im2, cb_vals, inv_as)
-            };
+            let high_im1 = vmull_high_u8(cb_vals, inv_as);
+            let low_1 = vget_low_u8(cb_vals);
+            let low_2 = vget_low_u8(inv_as);
+            let low_im1 = vmull_u8(low_1, low_2);
+            let high_im2 = vshrq_n_u16::<8>(high_im1);
+            let low_im2 = vsraq_n_u16::<8>(low_im1, low_im1);
+            let res_high = vmlal_high_u8(high_im2, cb_vals, inv_as);
+            let res_low = vaddhn_u16(low_im2, ones);
 
-            let res = vaddq_u8(vaddhn_high_u16(res_low, res_high, vdupq_n_u16(1)), cs);
+            let im4 = vaddhn_high_u16(res_low, res_high, ones);
+            let res = vaddq_u8(im4, cs);
+
             vst1q_u8(cb.as_mut_ptr(), res);
         }
     }
