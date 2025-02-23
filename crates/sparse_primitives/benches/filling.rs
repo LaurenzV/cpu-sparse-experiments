@@ -1,9 +1,9 @@
 use bench_gen::ColorIter;
 use criterion::Criterion;
 use peniko::Compose;
-use sparse_primitives::execute::{Scalar};
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-use sparse_primitives::execute::{Neon};
+use sparse_primitives::execute::Neon;
+use sparse_primitives::execute::Scalar;
 use sparse_primitives::fine::Fine;
 use sparse_primitives::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 

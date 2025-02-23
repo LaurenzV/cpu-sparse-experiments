@@ -7,6 +7,7 @@ impl fine::Compose for Neon {
         unsafe {
             match compose {
                 peniko::Compose::SrcOver => fill::src_over(target, cs),
+                peniko::Compose::SrcOut => fill::src_out(target, cs),
                 peniko::Compose::Dest => unreachable!(),
                 _ => Scalar::compose_fill(target, cs, compose),
             }
@@ -30,9 +31,59 @@ impl fine::Compose for Neon {
 
 mod fill {
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
-    use crate::util::scalar::splat_x4;
+    use crate::util::scalar::{splat_x2, splat_x4};
 
+    use crate::util::neon::div_255;
     use std::arch::aarch64::*;
+
+    macro_rules! compose_fill {
+        (
+            name: $n:ident,
+            fa: $fa:expr,
+            fb: $fb:expr
+        ) => {
+            pub(crate) unsafe fn $n(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
+                let _cs = vld1_u8(splat_x2(cs).as_ptr());
+                let _as = vdup_n_u8(cs[3]);
+
+                for cb in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT) {
+                    for i in 0..2 {
+                        let idx = i * 8;
+                        let _ab = {
+                            let v = [
+                                cb[idx + 3],
+                                cb[idx + 3],
+                                cb[idx + 3],
+                                cb[idx + 3],
+                                cb[idx + 7],
+                                cb[idx + 7],
+                                cb[idx + 7],
+                                cb[idx + 7],
+                            ];
+                            vld1_u8(v.as_ptr())
+                        };
+                        let _cb = vld1_u8(cb.as_ptr().add(idx));
+
+                        let im_1 = div_255(vmull_u8(_cs, $fa(_as, _ab)));
+                        let im_2 = div_255(vmull_u8(_cb, $fb(_as, _ab)));
+                        let res = vmovn_u16(vaddq_u16(im_1, im_2));
+
+                        vst1_u8(cb.as_mut_ptr().add(idx), res);
+                    }
+                }
+            }
+        };
+    }
+
+    unsafe fn inv(val: uint8x8_t) -> uint8x8_t {
+        vsub_u8(vdup_n_u8(255), val)
+    }
+
+    compose_fill!(
+        name: src_out,
+        fa: |_as, _ab| inv(_ab) ,
+        fb: |_as, _ab| vdup_n_u8(0)
+    );
 
     /// SAFETY: The CPU needs to support the target feature `neon`.
     pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {

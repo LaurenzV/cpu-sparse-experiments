@@ -26,6 +26,17 @@ pub(crate) mod scalar {
     }
 
     #[inline(always)]
+    pub(crate) fn splat_x2(val: &[u8; COLOR_COMPONENTS]) -> [u8; 2 * COLOR_COMPONENTS] {
+        let mut buf = [0; 2 * COLOR_COMPONENTS];
+
+        for i in 0..2 {
+            buf[i * COLOR_COMPONENTS..((i + 1) * COLOR_COMPONENTS)].copy_from_slice(val);
+        }
+
+        buf
+    }
+
+    #[inline(always)]
     pub(crate) fn splat_x4(val: &[u8; COLOR_COMPONENTS]) -> [u8; 4 * COLOR_COMPONENTS] {
         let mut buf = [0; 4 * COLOR_COMPONENTS];
 
