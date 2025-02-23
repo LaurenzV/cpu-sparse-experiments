@@ -56,6 +56,7 @@ mod fill {
             fa: $fa:expr,
             fb: $fb:expr
         ) => {
+            /// SAFETY: The CPU needs to support the target feature `neon`.
             pub(crate) unsafe fn $n(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
                 let _cs = vld1_u8(splat_x2(cs).as_ptr());
                 let _as = vdup_n_u8(cs[3]);
@@ -82,6 +83,7 @@ mod fill {
         };
     }
 
+    /// SAFETY: The CPU needs to support the target feature `neon`.
     unsafe fn inv(val: uint8x8_t) -> uint8x8_t {
         vsub_u8(vdup_n_u8(255), val)
     }
