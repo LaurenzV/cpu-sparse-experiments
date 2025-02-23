@@ -1,9 +1,9 @@
 use bench_gen::{Command, Params, RectIterator, RectType};
 use peniko::kurbo::{Cap, Join, Stroke};
+use peniko::{BlendMode, Compose, Mix};
 use sparse_primitives::{FillRule, Pixmap, RenderContext};
 use std::io::BufWriter;
 use std::time::Instant;
-use peniko::{BlendMode, Compose, Mix};
 
 const WIDTH: usize = 512;
 const HEIGHT: usize = 600;
