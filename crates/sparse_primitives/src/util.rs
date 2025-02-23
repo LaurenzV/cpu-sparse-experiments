@@ -92,4 +92,9 @@ pub(crate) mod neon {
 
         vshrq_n_u16::<8>(added)
     }
+
+    /// SAFETY: The CPU needs to support the target feature `neon`.
+    pub(crate) unsafe fn inv(val: uint8x8_t) -> uint8x8_t {
+        vsub_u8(vdup_n_u8(255), val)
+    }
 }

@@ -109,7 +109,7 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
     }
 
     #[inline(never)]
-    pub(crate) fn strip(
+    pub fn strip(
         &mut self,
         x: usize,
         width: usize,

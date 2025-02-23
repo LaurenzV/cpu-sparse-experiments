@@ -10,36 +10,32 @@ use sparse_primitives::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
 const FILL_ITERS: usize = 1000;
 
 pub fn fill(c: &mut Criterion) {
-    let mut g = c.benchmark_group("filling");
+    let mut g = c.benchmark_group("fill");
 
-    macro_rules! fill {
-        ($name:ident, $compose:path) => {
-            g.bench_function(format!("{} - scalar", stringify!($name)), |b| {
-                b.iter(|| {
-                    let mut out = vec![];
-                    let mut fine = Fine::<Scalar>::new(WIDE_TILE_WIDTH, STRIP_HEIGHT, &mut out);
-                    let mut color = ColorIter::new(false);
-
-                    for _ in 0..FILL_ITERS {
-                        fine.fill(0, 254, &color.next().unwrap().into(), $compose);
-                    }
-                })
-            });
-
-            #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-            {
-                g.bench_function(format!("{} - neon", stringify!($name)), |b| {
+    macro_rules! fill_single {
+        ($name:ident, $compose:path, $exec:ident) => {
+            g.bench_function(
+                format!("{} - {}", stringify!($name), stringify!($exec)),
+                |b| {
                     b.iter(|| {
                         let mut out = vec![];
-                        let mut fine = Fine::<Neon>::new(WIDE_TILE_WIDTH, STRIP_HEIGHT, &mut out);
+                        let mut fine = Fine::<$exec>::new(WIDE_TILE_WIDTH, STRIP_HEIGHT, &mut out);
                         let mut color = ColorIter::new(false);
 
                         for _ in 0..FILL_ITERS {
-                            fine.fill(0, WIDE_TILE_WIDTH, &color.next().unwrap().into(), $compose);
+                            fine.fill(0, 254, &color.next().unwrap().into(), $compose);
                         }
                     })
-                });
-            }
+                },
+            );
+        };
+    }
+
+    macro_rules! fill {
+        ($name:ident, $compose:path) => {
+            fill_single!($name, $compose, Scalar);
+            #[cfg(all(target_arch = "aarch64", feature = "simd"))]
+            fill_single!($name, $compose, Neon);
         };
     }
 
