@@ -8,7 +8,6 @@ impl fine::Compose for Neon {
             match compose {
                 peniko::Compose::SrcOver => fill::src_over(target, cs),
                 peniko::Compose::SrcOut => fill::src_out(target, cs),
-                peniko::Compose::SrcOver => fill::src_over(target, cs),
                 peniko::Compose::DestOver => fill::dest_over(target, cs),
                 peniko::Compose::SrcIn => fill::src_in(target, cs),
                 peniko::Compose::DestIn => fill::dest_in(target, cs),
