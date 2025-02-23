@@ -160,7 +160,7 @@ pub(crate) mod fill {
     }
 }
 
-mod strip {
+pub(crate) mod strip {
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::util::scalar::div_255;
     use crate::wide_tile::STRIP_HEIGHT;
