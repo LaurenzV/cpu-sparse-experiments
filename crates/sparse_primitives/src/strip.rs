@@ -422,13 +422,13 @@ pub(crate) mod avx2 {
 
                     let p0 = tile.p0();
                     let p1 = tile.p1();
-
                     let inv_slope = _mm256_set1_ps((p1.x - p0.x) / (p1.y - p0.y));
+
                     let p0_y = _mm256_set1_ps(p0.y);
                     let p0_x = _mm256_set1_ps(p0.x);
                     let p1_y = _mm256_set1_ps(p1.y);
 
-                    for x in x0 / 2..x1 / 2 {
+                    for x in 0..2 {
                         let x__ = x * 2;
                         let x_ = x__ as f32;
                         let x = _mm256_set_ps(x_ + 1.0, x_ + 1.0, x_ + 1.0, x_ + 1.0, x_, x_, x_, x_);
@@ -439,6 +439,7 @@ pub(crate) mod avx2 {
                         let y0 = clamp(rel_y, 0.0, 1.0);
                         let y1 = clamp(_mm256_sub_ps(p1_y, y), 0.0, 1.0);
                         let dy = _mm256_sub_ps(y0, y1);
+
                         let xx0 = _mm256_add_ps(rel_x, _mm256_mul_ps(_mm256_sub_ps(y0, rel_y), inv_slope));
                         let xx1 = _mm256_add_ps(rel_x, _mm256_mul_ps(_mm256_sub_ps(y1, rel_y), inv_slope));
                         let xmin0 = _mm256_min_ps(xx0, xx1);
@@ -467,7 +468,7 @@ pub(crate) mod avx2 {
                             area = _mm256_add_ps(area, im1);
                         } else if p1.x == 0.0 {
                             let im1 = clamp(_mm256_sub_ps(y, _mm256_add_ps(p1_y, ones)), 0.0, 1.0);
-                            area = _mm256_add_ps(area, im1);
+                            area = _mm256_sub_ps(area, im1);
                         }
 
                         _mm256_storeu_ps(areas.as_ptr().add((4 * x__) as usize) as *mut f32, area);
