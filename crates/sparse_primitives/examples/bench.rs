@@ -13,7 +13,7 @@ const STROKE_WIDTH: f64 = 2.0;
 fn main() {
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
 
-    for size in [8, 16, 32, 64, 128, 256].repeat(200) {
+    for size in [256].repeat(200) {
         ctx.reset();
 
         let params = Params {
@@ -23,14 +23,13 @@ fn main() {
             size,
         };
 
-        let commands = RectIterator::new(params, RectType::Aligned)
+        let commands = RectIterator::new(params, RectType::Unaligned)
             .take(RENDER_CALLS as usize)
             .collect::<Vec<_>>();
 
         let start = Instant::now();
         let mut pixmap = Pixmap::new(WIDTH, HEIGHT);
 
-        ctx.set_blend_mode(BlendMode::new(Mix::Normal, Compose::Dest));
         for cmd in &commands {
             run_cmd(&mut ctx, cmd);
         }
