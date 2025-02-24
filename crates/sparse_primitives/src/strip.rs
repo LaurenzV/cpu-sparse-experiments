@@ -98,7 +98,7 @@ pub(crate) mod scalar {
                     // Note: We are iterating in column-major order because the inner loop always
                     // has a constant number of iterations, which makes it more SIMD-friendly. Worth
                     // running some tests whether a different order allows for better performance.
-                    for x in x0..x1 {
+                    for x in 0..4 {
                         // Relative x offset of the start point from the
                         // current column.
                         let rel_x = p0.x - x as f32;
@@ -377,8 +377,18 @@ pub(crate) mod avx2 {
     use crate::tiling::{Footprint, Tiles};
     use crate::FillRule;
 
+    #[target_feature(enable = "avx2")]
     unsafe fn clamp(val: __m256, min: f32, max: f32) -> __m256 {
         _mm256_max_ps(_mm256_min_ps(val, _mm256_set1_ps(max)), _mm256_set1_ps(min))
+    }
+
+    #[target_feature(enable = "avx2")]
+    unsafe fn remove_nan(val: __m256) -> __m256 {
+        let sign_bit = _mm256_set1_ps(-0.0);
+        let abs =  _mm256_andnot_ps(sign_bit, val);
+        let im2 = _mm256_max_ps(abs, _mm256_set1_ps(0.0));
+        let res = _mm256_or_ps(im2, _mm256_and_ps(sign_bit, val));
+        res
     }
 
     #[target_feature(enable = "avx2")]
@@ -410,7 +420,7 @@ pub(crate) mod avx2 {
 
                 let x0 = fp.x0();
                 let x1 = fp.x1();
-                let mut areas = [[start_delta as f32; 4]; 4];
+                let mut areas = [start_delta as f32; 16];
 
                 let ones = _mm256_set1_ps(1.0);
                 let zeroes = _mm256_set1_ps(0.0);
@@ -456,18 +466,19 @@ pub(crate) mod avx2 {
                             let im4 = _mm256_mul_ps(_mm256_set1_ps(0.5), im3);
                             let im5 = _mm256_add_ps(b, im4);
                             let im6 = _mm256_sub_ps(im5, xmin);
-                            _mm256_div_ps(im6, _mm256_sub_ps(xmax, xmin))
+                            let im7 = _mm256_div_ps(im6, _mm256_sub_ps(xmax, xmin));
+                            remove_nan(im7)
                         };
 
                         let mulled = _mm256_mul_ps(a, dy);
-                        let mut area = _mm256_loadu_ps(areas.as_ptr().add((4 * x__) as usize) as *const f32);
+                        let mut area = _mm256_loadu_ps(areas.as_ptr().add((4 * x__) as usize));
                         area = _mm256_add_ps(mulled, area);
 
                         if p0.x == 0.0 {
-                            let im1 = clamp(_mm256_sub_ps(y, _mm256_add_ps(p0_y, ones)), 0.0, 1.0);
+                            let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p0_y)), 0.0, 1.0);
                             area = _mm256_add_ps(area, im1);
                         } else if p1.x == 0.0 {
-                            let im1 = clamp(_mm256_sub_ps(y, _mm256_add_ps(p1_y, ones)), 0.0, 1.0);
+                            let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p1_y)), 0.0, 1.0);
                             area = _mm256_sub_ps(area, im1);
                         }
 
@@ -479,7 +490,7 @@ pub(crate) mod avx2 {
                     let mut alphas = 0u32;
 
                     for y in 0..4 {
-                        let area = areas[x as usize][y];
+                        let area = areas[(x * 4 + y) as usize];
 
                         let area_u8 = match fill_rule {
                             FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
