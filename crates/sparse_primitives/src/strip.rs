@@ -412,6 +412,9 @@ pub(crate) mod avx2 {
                 let x1 = fp.x1();
                 let mut areas = [[start_delta as f32; 4]; 4];
 
+                let ones = _mm256_set1_ps(1.0);
+                let zeroes = _mm256_set1_ps(0.0);
+
                 for j in seg_start..i {
                     let tile = tiles.get_tile(j);
 
@@ -419,61 +422,59 @@ pub(crate) mod avx2 {
 
                     let p0 = tile.p0();
                     let p1 = tile.p1();
-                    let inv_slope = (p1.x - p0.x) / (p1.y - p0.y);
 
-                    // Note: We are iterating in column-major order because the inner loop always
-                    // has a constant number of iterations, which makes it more SIMD-friendly. Worth
-                    // running some tests whether a different order allows for better performance.
-                    for x in x0..x1 {
-                        // Relative x offset of the start point from the
-                        // current column.
-                        let rel_x = p0.x - x as f32;
+                    let inv_slope = _mm256_set1_ps((p1.x - p0.x) / (p1.y - p0.y));
+                    let p0_y = _mm256_set1_ps(p0.y);
+                    let p0_x = _mm256_set1_ps(p0.x);
+                    let p1_y = _mm256_set1_ps(p1.y);
 
-                        for y in 0..4 {
-                            // Relative y offset of the start
-                            // point from the current row.
-                            let rel_y = p0.y - y as f32;
-                            // y values will be 1 if the point is below the current row,
-                            // 0 if the point is above the current row, and between 0-1
-                            // if it is on the same row.
-                            let y0 = rel_y.clamp(0.0, 1.0);
-                            let y1 = (p1.y - y as f32).clamp(0.0, 1.0);
-                            // If != 0, then the line intersects the current row
-                            // in the current tile.
-                            let dy = y0 - y1;
+                    for x in x0 / 2..x1 / 2 {
+                        let x__ = x * 2;
+                        let x_ = x__ as f32;
+                        let x = _mm256_set_ps(x_ + 1.0, x_ + 1.0, x_ + 1.0, x_ + 1.0, x_, x_, x_, x_);
+                        let rel_x = _mm256_sub_ps(p0_x, x);
 
-                            // x intersection points in the current tile.
-                            let xx0 = rel_x + (y0 - rel_y) * inv_slope;
-                            let xx1 = rel_x + (y1 - rel_y) * inv_slope;
-                            let xmin0 = xx0.min(xx1);
-                            let xmax = xx0.max(xx1);
-                            // Subtract a small delta to prevent a division by zero below.
-                            let xmin = xmin0.min(1.0) - 1e-6;
-                            // Clip x_max to the right side of the pixel.
-                            let b = xmax.min(1.0);
-                            // Clip x_max to the left side of the pixel.
-                            let c = b.max(0.0);
-                            // Clip x_min to the left side of the pixel.
-                            let d = xmin.max(0.0);
-                            // Calculate the covered area.
-                            // TODO: How is this formula derived?
-                            let mut a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
-                            // a can be NaN if dy == 0 (and this xmax - xmin = 0, and we have
-                            // a division by 0 above). This code changes those NaNs to 0.
-                            a = a.abs().max(0.).copysign(a);
+                        let y = _mm256_set_ps(3.0, 2.0, 1.0, 0.0, 3.0, 2.0, 1.0, 0.0);
+                        let rel_y = _mm256_sub_ps(p0_y, y);
+                        let y0 = clamp(rel_y, 0.0, 1.0);
+                        let y1 = clamp(_mm256_sub_ps(p1_y, y), 0.0, 1.0);
+                        let dy = _mm256_sub_ps(y0, y1);
+                        let xx0 = _mm256_add_ps(rel_x, _mm256_mul_ps(_mm256_sub_ps(y0, rel_y), inv_slope));
+                        let xx1 = _mm256_add_ps(rel_x, _mm256_mul_ps(_mm256_sub_ps(y1, rel_y), inv_slope));
+                        let xmin0 = _mm256_min_ps(xx0, xx1);
+                        let xmax = _mm256_max_ps(xx0, xx1);
+                        let xmin = _mm256_sub_ps(_mm256_min_ps(xmin0, ones), _mm256_set1_ps(1e-6));
 
-                            areas[x as usize][y] += a * dy;
+                        let b = _mm256_min_ps(xmax, ones);
+                        let c = _mm256_max_ps(b, zeroes);
+                        let d = _mm256_max_ps(xmin, zeroes);
+                        let a = {
+                            let im1 = _mm256_mul_ps(d, d);
+                            let im2 = _mm256_mul_ps(c, c);
+                            let im3 = _mm256_sub_ps(im1, im2);
+                            let im4 = _mm256_mul_ps(_mm256_set1_ps(0.5), im3);
+                            let im5 = _mm256_add_ps(b, im4);
+                            let im6 = _mm256_sub_ps(im5, xmin);
+                            _mm256_div_ps(im6, _mm256_sub_ps(xmax, xmin))
+                        };
 
-                            if p0.x == 0.0 {
-                                areas[x as usize][y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
-                            } else if p1.x == 0.0 {
-                                areas[x as usize][y] -= (y as f32 - p1.y + 1.0).clamp(0.0, 1.0);
-                            }
+                        let mulled = _mm256_mul_ps(a, dy);
+                        let mut area = _mm256_loadu_ps(areas.as_ptr().add((4 * x__) as usize) as *const f32);
+                        area = _mm256_add_ps(mulled, area);
+
+                        if p0.x == 0.0 {
+                            let im1 = clamp(_mm256_sub_ps(y, _mm256_add_ps(p0_y, ones)), 0.0, 1.0);
+                            area = _mm256_add_ps(area, im1);
+                        } else if p1.x == 0.0 {
+                            let im1 = clamp(_mm256_sub_ps(y, _mm256_add_ps(p1_y, ones)), 0.0, 1.0);
+                            area = _mm256_add_ps(area, im1);
                         }
+
+                        _mm256_storeu_ps(areas.as_ptr().add((4 * x__) as usize) as *mut f32, area);
                     }
                 }
 
-                for x in 0..4 {
+                for x in x0..x1 {
                     let mut alphas = 0u32;
 
                     for y in 0..4 {
