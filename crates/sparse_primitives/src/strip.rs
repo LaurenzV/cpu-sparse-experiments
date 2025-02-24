@@ -482,7 +482,7 @@ pub(crate) mod avx2 {
                             area = _mm256_sub_ps(area, im1);
                         }
 
-                        _mm256_storeu_ps(areas.as_ptr().add((4 * x__) as usize) as *mut f32, area);
+                        _mm256_storeu_ps(areas.as_mut_ptr().add((4 * x__) as usize), area);
                     }
                 }
 
