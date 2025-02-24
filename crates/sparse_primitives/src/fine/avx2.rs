@@ -30,9 +30,6 @@ mod fill {
     /// SAFETY: The CPU needs to support the target feature `avx2`.
     #[target_feature(enable = "avx2")]
     pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS]) {
-        // TODO: This code can be improved by processing TOTAL_STRIP_HEIGHT * 2
-        // elements at the time according to preliminary benchmarks
-
         let stride = TOTAL_STRIP_HEIGHT * 2;
         let remainder = target.len() % stride;
         let (head, tail) = target.split_at_mut(target.len() - remainder);
