@@ -75,27 +75,26 @@ mod fill {
 }
 
 mod strip {
-    use std::arch::x86_64::*;
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::util::avx2::div_255;
     use crate::util::scalar::splat_x4;
     use crate::wide_tile::STRIP_HEIGHT;
+    use std::arch::x86_64::*;
 
     #[target_feature(enable = "avx2")]
     pub(crate) unsafe fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
-        let shuffle_mask = _mm_set_epi8(
-            3, 3, 3, 3,
-            2, 2, 2, 2,
-            1, 1, 1, 1,
-            0, 0, 0, 0
-        );
+        let shuffle_mask = _mm_set_epi8(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
         let _as = _mm256_set1_epi16(cs[3] as i16);
         let cs = _mm256_cvtepu8_epi16(_mm_loadu_si128(splat_x4(cs).as_ptr() as *const __m128i));
 
         for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {
             let cb_ = _mm256_cvtepu8_epi16(_mm_loadu_si128(cb.as_ptr() as *const __m128i));
-            let am = _mm256_cvtepu8_epi16(_mm_shuffle_epi8(_mm_set1_epi32(*masks as i32), shuffle_mask));
-            let inv_as_am = _mm256_sub_epi16(_mm256_set1_epi16(255), div_255(_mm256_mullo_epi16(am, _as)));
+            let am = _mm256_cvtepu8_epi16(_mm_shuffle_epi8(
+                _mm_set1_epi32(*masks as i32),
+                shuffle_mask,
+            ));
+            let inv_as_am =
+                _mm256_sub_epi16(_mm256_set1_epi16(255), div_255(_mm256_mullo_epi16(am, _as)));
             let im1 = _mm256_mullo_epi16(cb_, inv_as_am);
             let im2 = _mm256_mullo_epi16(cs, am);
             let im3 = div_255(_mm256_add_epi16(im1, im2));
