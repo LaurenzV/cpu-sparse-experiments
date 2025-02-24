@@ -116,32 +116,30 @@ pub(crate) mod scalar {
                             // in the current tile.
                             let dy = y0 - y1;
 
-                            // Note: getting rid of this predicate might help with
-                            // auto-vectorization. That said, just getting rid of
-                            // it causes artifacts (which may be divide by zero).
-                            if dy != 0.0 {
-                                // x intersection points in the current tile.
-                                let xx0 = rel_x + (y0 - rel_y) * inv_slope;
-                                let xx1 = rel_x + (y1 - rel_y) * inv_slope;
-                                let xmin0 = xx0.min(xx1);
-                                let xmax = xx0.max(xx1);
-                                // Subtract a small delta to prevent a division by zero below.
-                                let xmin = xmin0.min(1.0) - 1e-6;
-                                // Clip x_max to the right side of the pixel.
-                                let b = xmax.min(1.0);
-                                // Clip x_max to the left side of the pixel.
-                                let c = b.max(0.0);
-                                // Clip x_min to the left side of the pixel.
-                                let d = xmin.max(0.0);
-                                // Calculate the covered area.
-                                // TODO: How is this formula derived?
-                                let a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
+                            // x intersection points in the current tile.
+                            let xx0 = rel_x + (y0 - rel_y) * inv_slope;
+                            let xx1 = rel_x + (y1 - rel_y) * inv_slope;
+                            let xmin0 = xx0.min(xx1);
+                            let xmax = xx0.max(xx1);
+                            // Subtract a small delta to prevent a division by zero below.
+                            let xmin = xmin0.min(1.0) - 1e-6;
+                            // Clip x_max to the right side of the pixel.
+                            let b = xmax.min(1.0);
+                            // Clip x_max to the left side of the pixel.
+                            let c = b.max(0.0);
+                            // Clip x_min to the left side of the pixel.
+                            let d = xmin.max(0.0);
+                            // Calculate the covered area.
+                            // TODO: How is this formula derived?
+                            let mut a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
+                            // a can be NaN if dy == 0 (and this xmax - xmin = 0, and we have
+                            // a division by 0 above). This code changes those NaNs to 0.
+                            a = a.abs().max(0.).copysign(a);
 
-                                // Above area calculation is under the assumption that the line
-                                // covers the whole row, here we account for the fact that only a
-                                // a fraction of the height could be covered.
-                                areas[x as usize][y] += a * dy;
-                            }
+                            // Above area calculation is under the assumption that the line
+                            // covers the whole row, here we account for the fact that only a
+                            // a fraction of the height could be covered.
+                            areas[x as usize][y] += a * dy;
 
                             if p0.x == 0.0 {
                                 areas[x as usize][y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
