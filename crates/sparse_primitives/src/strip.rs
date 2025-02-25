@@ -403,12 +403,6 @@ pub(crate) mod avx2 {
     }
 
     #[target_feature(enable = "avx2")]
-    unsafe fn abs(val: __m256) -> __m256 {
-        let sign_bit = _mm256_set1_ps(-0.0);
-        _mm256_andnot_ps(sign_bit, val)
-    }
-
-    #[target_feature(enable = "avx2")]
     unsafe fn abs_128(val: __m128) -> __m128 {
         let sign_bit = _mm_set1_ps(-0.0);
         _mm_andnot_ps(sign_bit, val)
