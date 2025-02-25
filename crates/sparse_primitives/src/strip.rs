@@ -426,10 +426,145 @@ pub(crate) mod neon {
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 pub(crate) mod avx2 {
-    use crate::strip::Strip;
+    use crate::execute::Avx2;
+    use crate::strip::{RenderStrip, Strip};
     use crate::tiling::{Footprint, Tiles};
     use crate::FillRule;
     use std::arch::x86_64::*;
+
+    impl RenderStrip for Avx2 {
+        fn calculate_areas(
+            tiles: &Tiles,
+            tile_start: u32,
+            tile_end: u32,
+            _: u32,
+            _: u32,
+            areas: &mut [f32; 16],
+            delta: &mut i32,
+        ) {
+            unsafe {
+                let ones = _mm256_set1_ps(1.0);
+                let zeroes = _mm256_set1_ps(0.0);
+
+                for j in tile_start..tile_end {
+                    let tile = tiles.get_tile(j);
+
+                    *delta += tile.delta();
+
+                    let p0 = tile.p0();
+                    let p1 = tile.p1();
+                    let inv_slope = _mm256_set1_ps((p1.x - p0.x) / (p1.y - p0.y));
+
+                    let p0_y = _mm256_set1_ps(p0.y);
+                    let p0_x = _mm256_set1_ps(p0.x);
+                    let p1_y = _mm256_set1_ps(p1.y);
+
+                    for x in 0..2 {
+                        let x__ = x * 2;
+                        let x_ = x__ as f32;
+                        let x =
+                            _mm256_set_ps(x_ + 1.0, x_ + 1.0, x_ + 1.0, x_ + 1.0, x_, x_, x_, x_);
+                        let rel_x = _mm256_sub_ps(p0_x, x);
+
+                        let y = _mm256_set_ps(3.0, 2.0, 1.0, 0.0, 3.0, 2.0, 1.0, 0.0);
+                        let rel_y = _mm256_sub_ps(p0_y, y);
+                        let y0 = clamp(rel_y, 0.0, 1.0);
+                        let y1 = clamp(_mm256_sub_ps(p1_y, y), 0.0, 1.0);
+                        let dy = _mm256_sub_ps(y0, y1);
+
+                        let xx0 = _mm256_fmadd_ps(_mm256_sub_ps(y0, rel_y), inv_slope, rel_x);
+                        let xx1 = _mm256_fmadd_ps(_mm256_sub_ps(y1, rel_y), inv_slope, rel_x);
+                        let xmin0 = _mm256_min_ps(xx0, xx1);
+                        let xmax = _mm256_max_ps(xx0, xx1);
+                        let xmin = _mm256_sub_ps(_mm256_min_ps(xmin0, ones), _mm256_set1_ps(1e-6));
+
+                        let b = _mm256_min_ps(xmax, ones);
+                        let c = _mm256_max_ps(b, zeroes);
+                        let d = _mm256_max_ps(xmin, zeroes);
+                        let a = {
+                            let im1 = _mm256_mul_ps(d, d);
+                            let im2 = _mm256_mul_ps(c, c);
+                            let im3 = _mm256_sub_ps(im1, im2);
+                            let im4 = _mm256_fmadd_ps(_mm256_set1_ps(0.5), im3, b);
+                            let im5 = _mm256_sub_ps(im4, xmin);
+                            let im6 = _mm256_div_ps(im5, _mm256_sub_ps(xmax, xmin));
+                            remove_nan(im6)
+                        };
+
+                        let mut area = _mm256_loadu_ps(areas.as_ptr().add((4 * x__) as usize));
+                        area = _mm256_fmadd_ps(a, dy, area);
+
+                        if p0.x == 0.0 {
+                            let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p0_y)), 0.0, 1.0);
+                            area = _mm256_add_ps(area, im1);
+                        } else if p1.x == 0.0 {
+                            let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p1_y)), 0.0, 1.0);
+                            area = _mm256_sub_ps(area, im1);
+                        }
+
+                        _mm256_storeu_ps(areas.as_mut_ptr().add((4 * x__) as usize), area);
+                    }
+                }
+            }
+        }
+
+        fn fill_alphas(
+            areas: &[f32; 16],
+            alpha_buf: &mut Vec<u32>,
+            x0: u32,
+            x1: u32,
+            fill_rule: FillRule,
+        ) {
+            unsafe {
+                macro_rules! fill {
+                    ($rule:expr) => {
+                        for x in x0..x1 {
+                            let area_u32 = $rule((x * 4) as usize);
+
+                            alpha_buf.push(area_u32);
+                        }
+                    };
+                }
+
+                match fill_rule {
+                    FillRule::NonZero => {
+                        fill!(|idx: usize| {
+                            let area = _mm_loadu_ps(areas.as_ptr().add(idx));
+                            let abs = abs_128(area);
+                            let minned = _mm_min_ps(abs, _mm_set1_ps(1.0));
+                            let mulled = _mm_mul_ps(minned, _mm_set1_ps(255.0));
+                            let added = _mm_round_ps::<0b1000>(mulled);
+                            let converted = _mm_cvtps_epi32(added);
+
+                            let shifted = _mm_packus_epi16(converted, converted);
+                            let shifted = _mm_packus_epi16(shifted, shifted);
+                            _mm_extract_epi32::<0>(shifted) as u32
+                        })
+                    }
+
+                    FillRule::EvenOdd => {
+                        fill!(|idx: usize| {
+                            let area = _mm_loadu_ps(areas.as_ptr().add(idx));
+                            let area_abs = abs_128(area);
+                            let floored = _mm_floor_ps(area_abs);
+                            let area_fract = _mm_sub_ps(area_abs, floored);
+                            let odd = _mm_and_si128(_mm_set1_epi32(1), _mm_cvtps_epi32(floored));
+                            let add_val = _mm_cvtepi32_ps(odd);
+                            let sign = _mm_fmadd_ps(_mm_set1_ps(-2.0), add_val, _mm_set1_ps(1.0));
+                            let factor = _mm_fmadd_ps(sign, area_fract, add_val);
+                            let rounded =
+                                _mm_round_ps::<0b1000>(_mm_mul_ps(factor, _mm_set1_ps(255.0)));
+                            let converted = _mm_cvtps_epi32(rounded);
+
+                            let shifted = _mm_packus_epi16(converted, converted);
+                            let shifted = _mm_packus_epi16(shifted, shifted);
+                            _mm_extract_epi32::<0>(shifted) as u32
+                        })
+                    }
+                }
+            }
+        }
+    }
 
     /// SAFETY: The CPU needs to support the target feature `avx2`.
     #[target_feature(enable = "avx2")]
@@ -486,115 +621,8 @@ pub(crate) mod avx2 {
                 let x1 = fp.x1();
                 let mut areas = [start_delta as f32; 16];
 
-                let ones = _mm256_set1_ps(1.0);
-                let zeroes = _mm256_set1_ps(0.0);
-
-                for j in seg_start..i {
-                    let tile = tiles.get_tile(j);
-
-                    delta += tile.delta();
-
-                    let p0 = tile.p0();
-                    let p1 = tile.p1();
-                    let inv_slope = _mm256_set1_ps((p1.x - p0.x) / (p1.y - p0.y));
-
-                    let p0_y = _mm256_set1_ps(p0.y);
-                    let p0_x = _mm256_set1_ps(p0.x);
-                    let p1_y = _mm256_set1_ps(p1.y);
-
-                    for x in 0..2 {
-                        let x__ = x * 2;
-                        let x_ = x__ as f32;
-                        let x =
-                            _mm256_set_ps(x_ + 1.0, x_ + 1.0, x_ + 1.0, x_ + 1.0, x_, x_, x_, x_);
-                        let rel_x = _mm256_sub_ps(p0_x, x);
-
-                        let y = _mm256_set_ps(3.0, 2.0, 1.0, 0.0, 3.0, 2.0, 1.0, 0.0);
-                        let rel_y = _mm256_sub_ps(p0_y, y);
-                        let y0 = clamp(rel_y, 0.0, 1.0);
-                        let y1 = clamp(_mm256_sub_ps(p1_y, y), 0.0, 1.0);
-                        let dy = _mm256_sub_ps(y0, y1);
-
-                        let xx0 = _mm256_fmadd_ps(_mm256_sub_ps(y0, rel_y), inv_slope, rel_x);
-                        let xx1 = _mm256_fmadd_ps(_mm256_sub_ps(y1, rel_y), inv_slope, rel_x);
-                        let xmin0 = _mm256_min_ps(xx0, xx1);
-                        let xmax = _mm256_max_ps(xx0, xx1);
-                        let xmin = _mm256_sub_ps(_mm256_min_ps(xmin0, ones), _mm256_set1_ps(1e-6));
-
-                        let b = _mm256_min_ps(xmax, ones);
-                        let c = _mm256_max_ps(b, zeroes);
-                        let d = _mm256_max_ps(xmin, zeroes);
-                        let a = {
-                            let im1 = _mm256_mul_ps(d, d);
-                            let im2 = _mm256_mul_ps(c, c);
-                            let im3 = _mm256_sub_ps(im1, im2);
-                            let im4 = _mm256_fmadd_ps(_mm256_set1_ps(0.5), im3, b);
-                            let im5 = _mm256_sub_ps(im4, xmin);
-                            let im6 = _mm256_div_ps(im5, _mm256_sub_ps(xmax, xmin));
-                            remove_nan(im6)
-                        };
-
-                        let mut area = _mm256_loadu_ps(areas.as_ptr().add((4 * x__) as usize));
-                        area = _mm256_fmadd_ps(a, dy, area);
-
-                        if p0.x == 0.0 {
-                            let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p0_y)), 0.0, 1.0);
-                            area = _mm256_add_ps(area, im1);
-                        } else if p1.x == 0.0 {
-                            let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p1_y)), 0.0, 1.0);
-                            area = _mm256_sub_ps(area, im1);
-                        }
-
-                        _mm256_storeu_ps(areas.as_mut_ptr().add((4 * x__) as usize), area);
-                    }
-                }
-
-                macro_rules! fill {
-                    ($rule:expr) => {
-                        for x in x0..x1 {
-                            let area_u32 = $rule((x * 4) as usize);
-
-                            alpha_buf.push(area_u32);
-                        }
-                    };
-                }
-
-                match fill_rule {
-                    FillRule::NonZero => {
-                        fill!(|idx: usize| {
-                            let area = _mm_loadu_ps(areas.as_ptr().add(idx));
-                            let abs = abs_128(area);
-                            let minned = _mm_min_ps(abs, _mm_set1_ps(1.0));
-                            let mulled = _mm_mul_ps(minned, _mm_set1_ps(255.0));
-                            let added = _mm_round_ps::<0b1000>(mulled);
-                            let converted = _mm_cvtps_epi32(added);
-
-                            let shifted = _mm_packus_epi16(converted, converted);
-                            let shifted = _mm_packus_epi16(shifted, shifted);
-                            _mm_extract_epi32::<0>(shifted) as u32
-                        })
-                    }
-
-                    FillRule::EvenOdd => {
-                        fill!(|idx: usize| {
-                            let area = _mm_loadu_ps(areas.as_ptr().add(idx));
-                            let area_abs = abs_128(area);
-                            let floored = _mm_floor_ps(area_abs);
-                            let area_fract = _mm_sub_ps(area_abs, floored);
-                            let odd = _mm_and_si128(_mm_set1_epi32(1), _mm_cvtps_epi32(floored));
-                            let add_val = _mm_cvtepi32_ps(odd);
-                            let sign = _mm_fmadd_ps(_mm_set1_ps(-2.0), add_val, _mm_set1_ps(1.0));
-                            let factor = _mm_fmadd_ps(sign, area_fract, add_val);
-                            let rounded =
-                                _mm_round_ps::<0b1000>(_mm_mul_ps(factor, _mm_set1_ps(255.0)));
-                            let converted = _mm_cvtps_epi32(rounded);
-
-                            let shifted = _mm_packus_epi16(converted, converted);
-                            let shifted = _mm_packus_epi16(shifted, shifted);
-                            _mm_extract_epi32::<0>(shifted) as u32
-                        })
-                    }
-                }
+                Avx2::calculate_areas(tiles, seg_start, i, x0, x1, &mut areas, &mut delta);
+                Avx2::fill_alphas(&areas, alpha_buf, x0, x1, fill_rule);
 
                 if strip_start {
                     let strip = Strip {
