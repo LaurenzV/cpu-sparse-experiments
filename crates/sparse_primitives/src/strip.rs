@@ -11,8 +11,8 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::execute::KernelExecutor;
-use crate::tiling::Tiles;
+use crate::execute::{KernelExecutor, Scalar};
+use crate::tiling::{Footprint, Tiles};
 use crate::wide_tile::STRIP_HEIGHT;
 use crate::FillRule;
 
@@ -52,7 +52,63 @@ pub fn render_strips<KE: KernelExecutor>(
 ) {
     strip_buf.clear();
 
-    KE::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
+    let mut strip_start = true;
+    let mut cols = alpha_buf.len() as u32;
+    let mut prev_tile = tiles.get_tile(0);
+    let mut fp = prev_tile.footprint();
+    let mut seg_start = 0;
+    let mut delta = 0;
+
+    // Note: the input should contain a sentinel tile, to avoid having
+    // logic here to process the final strip.
+    for i in 1..tiles.len() {
+        let tile = tiles.get_tile(i);
+
+        if prev_tile.loc() != tile.loc() {
+            let start_delta = delta;
+            let same_strip = prev_tile.loc().same_strip(&tile.loc());
+
+            if same_strip {
+                fp.extend(3);
+            }
+
+            let x0 = fp.x0();
+            let x1 = fp.x1();
+            let mut areas = [start_delta as f32; 16];
+
+            KE::calculate_areas(tiles, seg_start, i, x0, x1, &mut areas, &mut delta);
+            KE::fill_alphas(&areas, alpha_buf, x0, x1, fill_rule);
+
+            if strip_start {
+                let strip = Strip {
+                    x: 4 * prev_tile.x() + x0 as i32,
+                    y: 4 * prev_tile.y() as u32,
+                    col: cols,
+                    winding: start_delta,
+                };
+
+                strip_buf.push(strip);
+            }
+
+            cols += x1 - x0;
+            fp = if same_strip {
+                Footprint::from_index(0)
+            } else {
+                Footprint::empty()
+            };
+
+            strip_start = !same_strip;
+            seg_start = i;
+
+            if !prev_tile.loc().same_row(&tile.loc()) {
+                delta = 0;
+            }
+        }
+
+        fp.merge(&tile.footprint());
+
+        prev_tile = tile;
+    }
 }
 
 impl Strip {
@@ -198,71 +254,6 @@ pub(crate) mod scalar {
                     })
                 }
             }
-        }
-    }
-
-    pub(crate) fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
-    ) {
-        let mut strip_start = true;
-        let mut cols = alpha_buf.len() as u32;
-        let mut prev_tile = tiles.get_tile(0);
-        let mut fp = prev_tile.footprint();
-        let mut seg_start = 0;
-        let mut delta = 0;
-
-        // Note: the input should contain a sentinel tile, to avoid having
-        // logic here to process the final strip.
-        for i in 1..tiles.len() {
-            let tile = tiles.get_tile(i);
-
-            if prev_tile.loc() != tile.loc() {
-                let start_delta = delta;
-                let same_strip = prev_tile.loc().same_strip(&tile.loc());
-
-                if same_strip {
-                    fp.extend(3);
-                }
-
-                let x0 = fp.x0();
-                let x1 = fp.x1();
-                let mut areas = [start_delta as f32; 16];
-
-                Scalar::calculate_areas(tiles, seg_start, i, x0, x1, &mut areas, &mut delta);
-                Scalar::fill_alphas(&areas, alpha_buf, x0, x1, fill_rule);
-
-                if strip_start {
-                    let strip = Strip {
-                        x: 4 * prev_tile.x() + x0 as i32,
-                        y: 4 * prev_tile.y() as u32,
-                        col: cols,
-                        winding: start_delta,
-                    };
-
-                    strip_buf.push(strip);
-                }
-
-                cols += x1 - x0;
-                fp = if same_strip {
-                    Footprint::from_index(0)
-                } else {
-                    Footprint::empty()
-                };
-
-                strip_start = !same_strip;
-                seg_start = i;
-
-                if !prev_tile.loc().same_row(&tile.loc()) {
-                    delta = 0;
-                }
-            }
-
-            fp.merge(&tile.footprint());
-
-            prev_tile = tile;
         }
     }
 }
@@ -433,6 +424,7 @@ pub(crate) mod avx2 {
     use std::arch::x86_64::*;
 
     impl RenderStrip for Avx2 {
+        /// SAFETY: The CPU needs to support the target feature `avx2` and `fma`.
         fn calculate_areas(
             tiles: &Tiles,
             tile_start: u32,
@@ -508,6 +500,7 @@ pub(crate) mod avx2 {
             }
         }
 
+        /// SAFETY: The CPU needs to support the target feature `avx2` and `fma`.
         fn fill_alphas(
             areas: &[f32; 16],
             alpha_buf: &mut Vec<u32>,
@@ -587,72 +580,5 @@ pub(crate) mod avx2 {
     unsafe fn abs_128(val: __m128) -> __m128 {
         let sign_bit = _mm_set1_ps(-0.0);
         _mm_andnot_ps(sign_bit, val)
-    }
-
-    /// SAFETY: The CPU needs to support the target feature `avx2` and `fma`.
-    #[target_feature(enable = "avx2,fma")]
-    pub(crate) unsafe fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
-    ) {
-        let mut strip_start = true;
-        let mut cols = alpha_buf.len() as u32;
-        let mut prev_tile = tiles.get_tile(0);
-        let mut fp = prev_tile.footprint();
-        let mut seg_start = 0;
-        let mut delta = 0;
-
-        // Note: the input should contain a sentinel tile, to avoid having
-        // logic here to process the final strip.
-        for i in 1..tiles.len() {
-            let tile = tiles.get_tile(i);
-
-            if prev_tile.loc() != tile.loc() {
-                let start_delta = delta;
-                let same_strip = prev_tile.loc().same_strip(&tile.loc());
-
-                if same_strip {
-                    fp.extend(3);
-                }
-
-                let x0 = fp.x0();
-                let x1 = fp.x1();
-                let mut areas = [start_delta as f32; 16];
-
-                Avx2::calculate_areas(tiles, seg_start, i, x0, x1, &mut areas, &mut delta);
-                Avx2::fill_alphas(&areas, alpha_buf, x0, x1, fill_rule);
-
-                if strip_start {
-                    let strip = Strip {
-                        x: 4 * prev_tile.x() + x0 as i32,
-                        y: 4 * prev_tile.y() as u32,
-                        col: cols,
-                        winding: start_delta,
-                    };
-
-                    strip_buf.push(strip);
-                }
-
-                cols += x1 - x0;
-                fp = if same_strip {
-                    Footprint::from_index(0)
-                } else {
-                    Footprint::empty()
-                };
-
-                strip_start = !same_strip;
-                seg_start = i;
-
-                if !prev_tile.loc().same_row(&tile.loc()) {
-                    delta = 0;
-                }
-            }
-
-            fp.merge(&tile.footprint());
-
-            prev_tile = tile;
-        }
     }
 }

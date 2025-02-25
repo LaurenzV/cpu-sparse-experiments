@@ -1,4 +1,4 @@
-use crate::strip::Strip;
+use crate::strip::{RenderStrip, Strip};
 use crate::tiling::Tiles;
 use crate::{fine, strip, FillRule};
 
@@ -38,47 +38,20 @@ impl Default for ExecutionMode {
     }
 }
 
-pub trait KernelExecutor: fine::Compose {
-    fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
-    );
-}
+pub trait KernelExecutor: fine::Compose + RenderStrip {}
 
 pub struct Scalar;
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
 pub struct Neon;
 
-impl KernelExecutor for Scalar {
-    fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
-    ) {
-        strip::scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
-    }
-}
+impl KernelExecutor for Scalar {}
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 pub struct Avx2;
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
-impl KernelExecutor for Avx2 {
-    fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
-    ) {
-        unsafe {
-            strip::avx2::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
-        }
-    }
-}
+impl KernelExecutor for Avx2 {}
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
 impl KernelExecutor for Neon {
