@@ -84,7 +84,7 @@ pub(crate) mod scalar {
 
                 let x0 = fp.x0();
                 let x1 = fp.x1();
-                let mut areas = [[start_delta as f32; 4]; 4];
+                let mut areas = [start_delta as f32; 16];
 
                 for j in seg_start..i {
                     let tile = tiles.get_tile(j);
@@ -132,18 +132,20 @@ pub(crate) mod scalar {
                             // Calculate the covered area.
                             // TODO: How is this formula derived?
                             let mut a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
-                            // a can be NaN if dy == 0 (and thus xmax - xmin = 0, resulting in
-                            // a division by 0 above). This code changes those NaNs to 0.
+                            // a can be NaN if dy == 0 (since inv_slope will be NaN).
+                            // This code changes those NaNs to 0.
                             a = a.abs().max(0.).copysign(a);
 
-                            areas[x as usize][y] += a * dy;
+                            areas[(x * 4) as usize + y] += a * dy;
 
                             // Making this branchless doesn't lead to any performance improvements
                             // according to my measurements.
                             if p0.x == 0.0 {
-                                areas[x as usize][y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
+                                areas[(x * 4) as usize + y] +=
+                                    (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
                             } else if p1.x == 0.0 {
-                                areas[x as usize][y] -= (y as f32 - p1.y + 1.0).clamp(0.0, 1.0);
+                                areas[(x * 4) as usize + y] -=
+                                    (y as f32 - p1.y + 1.0).clamp(0.0, 1.0);
                             }
                         }
                     }
@@ -155,7 +157,7 @@ pub(crate) mod scalar {
                             let mut alphas = 0u32;
 
                             for y in 0..4 {
-                                let area = areas[x as usize][y];
+                                let area = areas[(x * 4) as usize + y];
                                 let area_u8 = $rule(area);
 
                                 alphas += area_u8 << (y * 8);
@@ -584,4 +586,6 @@ pub(crate) mod avx2 {
             prev_tile = tile;
         }
     }
+
+    // fn calculate_areas(tiles: &Tiles, areas: [f32; 16], )
 }
