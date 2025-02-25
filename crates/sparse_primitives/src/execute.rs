@@ -54,15 +54,4 @@ pub struct Avx2;
 impl KernelExecutor for Avx2 {}
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-impl KernelExecutor for Neon {
-    fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
-    ) {
-        unsafe {
-            strip::neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
-        }
-    }
-}
+impl KernelExecutor for Neon {}

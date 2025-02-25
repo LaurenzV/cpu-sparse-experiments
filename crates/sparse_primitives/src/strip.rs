@@ -260,157 +260,34 @@ pub(crate) mod scalar {
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
 pub(crate) mod neon {
-    use crate::strip::Strip;
-    use crate::tiling::{Footprint, Tile, Tiles};
+    use crate::execute::{Neon, Scalar};
+    use crate::strip::RenderStrip;
+    use crate::tiling::Tiles;
     use crate::FillRule;
-    use std::arch::aarch64::*;
 
-    /// SAFETY: The CPU needs to support the target feature `neon`.
-    pub(crate) unsafe fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
-    ) {
-        // TODO: Clean up and improve this impementation
-        let mut strip_start = true;
-        let mut cols = alpha_buf.len() as u32;
-        let mut prev_tile = tiles.get_tile(0);
-        let mut fp = prev_tile.footprint();
-        let mut seg_start = 0;
-        let mut delta = 0;
+    impl RenderStrip for Neon {
+        /// SAFETY: The CPU needs to support the target feature `neon`.
+        fn calculate_areas(
+            tiles: &Tiles,
+            tile_start: u32,
+            tile_end: u32,
+            x0: u32,
+            x1: u32,
+            areas: &mut [f32; 16],
+            delta: &mut i32,
+        ) {
+            Scalar::calculate_areas(tiles, tile_start, tile_end, x0, x1, areas, delta);
+        }
 
-        // Note: the input should contain a sentinel tile, to avoid having
-        // logic here to process the final strip.
-        const IOTA: [f32; 4] = [0.0, 1.0, 2.0, 3.0];
-        let iota = vld1q_f32(IOTA.as_ptr());
-        for i in 1..tiles.len() {
-            let tile = tiles.get_tile(i);
-            if prev_tile.loc() != tile.loc() {
-                let start_delta = delta;
-                let same_strip = prev_tile.loc().same_strip(&tile.loc());
-
-                if same_strip {
-                    fp.extend(3);
-                }
-
-                let x0 = fp.x0();
-                let x1 = fp.x1();
-                let mut areas = [[start_delta as f32; 4]; 4];
-
-                for j in seg_start..i {
-                    let tile = tiles.get_tile(j);
-                    // small gain possible here to unpack in simd, but llvm goes halfway
-                    delta += tile.delta();
-                    let p0 = tile.p0();
-                    let p1 = tile.p1();
-                    let slope = (p1.x - p0.x) / (p1.y - p0.y);
-                    let vstarty = vsubq_f32(vdupq_n_f32(p0.y), iota);
-                    let vy0 = vminq_f32(vmaxq_f32(vstarty, vdupq_n_f32(0.0)), vdupq_n_f32(1.0));
-                    let vy1a = vsubq_f32(vdupq_n_f32(p1.y), iota);
-                    let vy1 = vminq_f32(vmaxq_f32(vy1a, vdupq_n_f32(0.0)), vdupq_n_f32(1.0));
-                    let vdy = vsubq_f32(vy0, vy1);
-                    let mask = vceqzq_f32(vdy);
-                    let vslope = vbslq_f32(mask, vdupq_n_f32(0.0), vdupq_n_f32(slope));
-                    let vdy0 = vsubq_f32(vy0, vstarty);
-                    let vdy1 = vsubq_f32(vy1, vstarty);
-                    let mut vyedge = vdupq_n_f32(0.0);
-                    if p0.x == 0.0 {
-                        let ye = vsubq_f32(vdupq_n_f32(1.0), vstarty);
-                        vyedge = vminq_f32(vmaxq_f32(ye, vdupq_n_f32(0.0)), vdupq_n_f32(1.0));
-                    } else if p1.x == 0.0 {
-                        let ye = vsubq_f32(vy1a, vdupq_n_f32(1.0));
-                        vyedge = vminq_f32(vmaxq_f32(ye, vdupq_n_f32(-1.0)), vdupq_n_f32(0.0));
-                    }
-                    for x in x0..x1 {
-                        let mut varea = vld1q_f32(areas.as_ptr().add(x as usize) as *const f32);
-                        varea = vaddq_f32(varea, vyedge);
-                        let vstartx = vdupq_n_f32(p0.x - x as f32);
-                        let vxx0 = vfmaq_f32(vstartx, vdy0, vslope);
-                        let vxx1 = vfmaq_f32(vstartx, vdy1, vslope);
-                        let vxmin0 = vminq_f32(vxx0, vxx1);
-                        let vxmax = vmaxq_f32(vxx0, vxx1);
-                        let vxmin =
-                            vsubq_f32(vminq_f32(vxmin0, vdupq_n_f32(1.0)), vdupq_n_f32(1e-6));
-                        let vb = vminq_f32(vxmax, vdupq_n_f32(1.0));
-                        let vc = vmaxq_f32(vb, vdupq_n_f32(0.0));
-                        let vd = vmaxq_f32(vxmin, vdupq_n_f32(0.0));
-                        let vd2 = vmulq_f32(vd, vd);
-                        let vd2c2 = vfmsq_f32(vd2, vc, vc);
-                        let vax = vfmaq_f32(vb, vd2c2, vdupq_n_f32(0.5));
-                        let va = vdivq_f32(vsubq_f32(vax, vxmin), vsubq_f32(vxmax, vxmin));
-                        varea = vfmaq_f32(varea, va, vdy);
-                        vst1q_f32(areas.as_mut_ptr().add(x as usize) as *mut f32, varea);
-                    }
-                }
-
-                for x in x0..x1 {
-                    let mut alphas = 0u32;
-                    match fill_rule {
-                        FillRule::NonZero => {
-                            let varea = vld1q_f32(areas.as_ptr().add(x as usize) as *const f32);
-                            let vnzw = vminq_f32(vabsq_f32(varea), vdupq_n_f32(1.0));
-                            let vscaled = vmulq_f32(vnzw, vdupq_n_f32(255.0));
-                            let vbits = vreinterpretq_u8_u32(vcvtnq_u32_f32(vscaled));
-                            let vbits2 = vuzp1q_u8(vbits, vbits);
-                            let vbits3 = vreinterpretq_u32_u8(vuzp1q_u8(vbits2, vbits2));
-                            vst1q_lane_u32::<0>(&mut alphas, vbits3);
-                        }
-                        FillRule::EvenOdd => {
-                            let area_abs =
-                                vabsq_f32(vld1q_f32(areas.as_ptr().add(x as usize) as *const f32));
-                            let area_fract = vsubq_f32(area_abs, vrndmq_f32(area_abs));
-                            let odd = {
-                                let im1 = vdupq_n_s32(1);
-                                let im2 = vcvtq_s32_f32(area_abs);
-                                vandq_s32(im1, im2)
-                            };
-                            let add_val = vcvtq_f32_s32(odd);
-                            let sign = vfmaq_f32(vdupq_n_f32(1.0), vdupq_n_f32(-2.0), add_val);
-                            let factor = vfmaq_f32(add_val, sign, area_fract);
-                            let res = vreinterpretq_u8_u32(vcvtnq_u32_f32(vmulq_f32(
-                                factor,
-                                vdupq_n_f32(255.0),
-                            )));
-
-                            // Pack into a single u32.
-                            let packed1 = vuzp1q_u8(res, res);
-                            let packed2 = vreinterpretq_u32_u8(vuzp1q_u8(packed1, packed1));
-                            vst1q_lane_u32::<0>(&mut alphas, packed2);
-                        }
-                    }
-                    alpha_buf.push(alphas);
-                }
-
-                if strip_start {
-                    let strip = Strip {
-                        x: 4 * prev_tile.x() + x0 as i32,
-                        y: 4 * prev_tile.y() as u32,
-                        col: cols,
-                        winding: start_delta,
-                    };
-
-                    strip_buf.push(strip);
-                }
-
-                cols += x1 - x0;
-                fp = if same_strip {
-                    Footprint::from_index(0)
-                } else {
-                    Footprint::empty()
-                };
-
-                strip_start = !same_strip;
-                seg_start = i;
-
-                if !prev_tile.loc().same_row(&tile.loc()) {
-                    delta = 0;
-                }
-            }
-
-            fp.merge(&tile.footprint());
-
-            prev_tile = tile;
+        /// SAFETY: The CPU needs to support the target feature `neon`.
+        fn fill_alphas(
+            areas: &[f32; 16],
+            alpha_buf: &mut Vec<u32>,
+            x0: u32,
+            x1: u32,
+            fill_rule: FillRule,
+        ) {
+            Scalar::fill_alphas(areas, alpha_buf, x0, x1, fill_rule);
         }
     }
 }
