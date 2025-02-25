@@ -403,6 +403,18 @@ pub(crate) mod avx2 {
     }
 
     #[target_feature(enable = "avx2")]
+    unsafe fn abs(val: __m256) -> __m256 {
+        let sign_bit = _mm256_set1_ps(-0.0);
+        _mm256_andnot_ps(sign_bit, val)
+    }
+
+    #[target_feature(enable = "avx2")]
+    unsafe fn abs_128(val: __m128) -> __m128 {
+        let sign_bit = _mm_set1_ps(-0.0);
+        _mm_andnot_ps(sign_bit, val)
+    }
+
+    #[target_feature(enable = "avx2")]
     pub(crate) unsafe fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
@@ -507,42 +519,30 @@ pub(crate) mod avx2 {
                 macro_rules! fill {
                     ($rule:expr) => {
                         for x in x0..x1 {
-                            let mut alphas = 0u32;
+                            let area_u32 = $rule((x * 4) as usize);
 
-                            for y in 0..4 {
-                                let area = areas[(x * 4 + y) as usize];
-                                let area_u8 = $rule(area);
-
-                                alphas += area_u8 << (y * 8);
-                            }
-
-                            alpha_buf.push(alphas);
+                            alpha_buf.push(area_u32);
                         }
                     };
                 }
 
                 match fill_rule {
                     FillRule::NonZero => {
-                        fill!(|area: f32| (area.abs().min(1.0) * 255.0 + 0.5) as u32)
+                        fill!(|idx: usize| {
+                            let area = _mm_loadu_ps(areas.as_ptr().add(idx));
+                            let abs = abs_128(area);
+                            let minned = _mm_min_ps(abs, _mm_set1_ps(1.0));
+                            let mulled = _mm_mul_ps(minned, _mm_set1_ps(255.0));
+                            let added = _mm_round_ps::<0b1000>(mulled);
+                            let converted = _mm_cvtps_epi32(added);
+
+                            let shifted = _mm_packus_epi16(converted, converted);
+                            let shifted = _mm_packus_epi16(shifted, shifted);
+                            _mm_extract_epi32::<0>(shifted) as u32
+                        })
                     }
                     FillRule::EvenOdd => {
-                        fill!(|area: f32| {
-                            let area_abs = area.abs();
-                            let area_fract = area_abs.fract();
-                            let odd = area_abs as i32 & 1;
-                            // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
-                            // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
-                            // `add_val` represents the 1, sign represents the minus.
-                            // If we have for example 2.68, then opacity is 68%, while for
-                            // 1.68 it would be (1 - 0.68) = 32%.
-                            // So for odd, add_val should be 1, while for even it should be 0.
-                            let add_val = odd as f32;
-                            // 1 for even, -1 for odd.
-                            let sign = (-2 * odd + 1) as f32;
-                            let factor = add_val + sign * area_fract;
-
-                            (factor * 255.0 + 0.5) as u32
-                        })
+                        unimplemented!()
                     }
                 }
 
