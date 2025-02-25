@@ -277,7 +277,68 @@ pub(crate) mod neon {
             areas: &mut [f32; 16],
             delta: &mut i32,
         ) {
-            Scalar::calculate_areas(tiles, tile_start, tile_end, x0, x1, areas, delta);
+            unsafe {
+                let ones = vdupq_n_f32(1.0);
+                let zeroes = vdupq_n_f32(0.0);
+
+                for j in tile_start..tile_end {
+                    let tile = tiles.get_tile(j);
+
+                    *delta += tile.delta();
+
+                    let p0 = tile.p0();
+                    let p1 = tile.p1();
+                    let inv_slope = vdupq_n_f32((p1.x - p0.x) / (p1.y - p0.y));
+
+                    let p0_y = vdupq_n_f32(p0.y);
+                    let p0_x = vdupq_n_f32(p0.x);
+                    let p1_y = vdupq_n_f32(p1.y);
+
+                    for x in x0..x1 {
+                        let x_ = vdupq_n_f32(x as f32);
+                        let rel_x = vsubq_f32(p0_x, x_);
+
+                        let y = vld1q_f32([0.0, 1.0, 2.0, 3.0].as_ptr());
+                        let rel_y = vsubq_f32(p0_y, y);
+                        let y0 = clamp(rel_y, 0.0, 1.0);
+                        let y1 = clamp(vsubq_f32(p1_y, y), 0.0, 1.0);
+                        let dy = vsubq_f32(y0, y1);
+
+                        let xx0 = vfmaq_f32(vsubq_f32(y0, rel_y), inv_slope, rel_x);
+                        let xx1 = vfmaq_f32(vsubq_f32(y1, rel_y), inv_slope, rel_x);
+                        let xmin0 = vminq_f32(xx0, xx1);
+                        let xmax = vmaxq_f32(xx0, xx1);
+                        let xmin = vsubq_f32(vminq_f32(xmin0, ones), vdupq_n_f32(1e-6));
+
+                        let b = vminq_f32(xmax, ones);
+                        let c = vmaxq_f32(b, zeroes);
+                        let d = vmaxq_f32(xmin, zeroes);
+                        let a = {
+                            let im1 = vmulq_f32(d, d);
+                            let im2 = vmulq_f32(c, c);
+                            let im3 = vsubq_f32(im1, im2);
+                            let im4 = vfmaq_f32(vdupq_n_f32(0.5), im3, b);
+                            let im5 = vsubq_f32(im4, xmin);
+                            let im6 = vdivq_f32(im5, vsubq_f32(xmax, xmin));
+                            // remove_nan(im6)
+                            im6
+                        };
+
+                        let mut area = vld1q_f32(areas.as_ptr().add((4 * x) as usize));
+                        area = vfmaq_f32(a, dy, area);
+
+                        if p0.x == 0.0 {
+                            let im1 = clamp(vaddq_f32(ones, vsubq_f32(y, p0_y)), 0.0, 1.0);
+                            area = vaddq_f32(area, im1);
+                        } else if p1.x == 0.0 {
+                            let im1 = clamp(vaddq_f32(ones, vsubq_f32(y, p1_y)), 0.0, 1.0);
+                            area = vsubq_f32(area, im1);
+                        }
+
+                        vst1q_f32(areas.as_mut_ptr().add((4 * x) as usize), area);
+                    }
+                }
+            }
         }
 
         /// SAFETY: The CPU needs to support the target feature `neon`.
@@ -336,6 +397,18 @@ pub(crate) mod neon {
                 }
             }
         }
+    }
+
+    // unsafe fn remove_nan(val: float32x4_t) -> float32x4_t {
+    //     let sign_bit = vdupq_n_f32(-0.0);
+    //     let abs = vabsq_f32(val);
+    //     let im2 = vmaxq_f32(abs, vdupq_n_f32(0.0));
+    //     let res = _mm256_or_ps(im2, _mm256_and_ps(sign_bit, val));
+    //     res
+    // }
+
+    unsafe fn clamp(val: float32x4_t, min: f32, max: f32) -> float32x4_t {
+        vmaxq_f32(vminq_f32(val, vdupq_n_f32(max)), vdupq_n_f32(min))
     }
 }
 
