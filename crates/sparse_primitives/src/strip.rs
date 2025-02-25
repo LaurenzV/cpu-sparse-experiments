@@ -98,7 +98,7 @@ pub(crate) mod scalar {
                     // Note: We are iterating in column-major order because the inner loop always
                     // has a constant number of iterations, which makes it more SIMD-friendly. Worth
                     // running some tests whether a different order allows for better performance.
-                    for x in x0..x1 {
+                    for x in 0..4 {
                         // Relative x offset of the start point from the
                         // current column.
                         let rel_x = p0.x - x as f32;
@@ -136,9 +136,6 @@ pub(crate) mod scalar {
                             // a division by 0 above). This code changes those NaNs to 0.
                             a = a.abs().max(0.).copysign(a);
 
-                            // Above area calculation is under the assumption that the line
-                            // covers the whole row, here we account for the fact that only a
-                            // a fraction of the height could be covered.
                             areas[x as usize][y] += a * dy;
 
                             if p0.x == 0.0 {
@@ -337,6 +334,195 @@ pub(crate) mod neon {
                             vst1q_lane_u32::<0>(&mut alphas, packed2);
                         }
                     }
+                    alpha_buf.push(alphas);
+                }
+
+                if strip_start {
+                    let strip = Strip {
+                        x: 4 * prev_tile.x() + x0 as i32,
+                        y: 4 * prev_tile.y() as u32,
+                        col: cols,
+                        winding: start_delta,
+                    };
+
+                    strip_buf.push(strip);
+                }
+
+                cols += x1 - x0;
+                fp = if same_strip {
+                    Footprint::from_index(0)
+                } else {
+                    Footprint::empty()
+                };
+
+                strip_start = !same_strip;
+                seg_start = i;
+
+                if !prev_tile.loc().same_row(&tile.loc()) {
+                    delta = 0;
+                }
+            }
+
+            fp.merge(&tile.footprint());
+
+            prev_tile = tile;
+        }
+    }
+}
+
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+pub(crate) mod avx2 {
+    use crate::strip::Strip;
+    use crate::tiling::{Footprint, Tiles};
+    use crate::FillRule;
+    use std::arch::x86_64::*;
+
+    #[target_feature(enable = "avx2")]
+    unsafe fn clamp(val: __m256, min: f32, max: f32) -> __m256 {
+        _mm256_max_ps(_mm256_min_ps(val, _mm256_set1_ps(max)), _mm256_set1_ps(min))
+    }
+
+    #[target_feature(enable = "avx2")]
+    unsafe fn remove_nan(val: __m256) -> __m256 {
+        let sign_bit = _mm256_set1_ps(-0.0);
+        let abs = _mm256_andnot_ps(sign_bit, val);
+        let im2 = _mm256_max_ps(abs, _mm256_set1_ps(0.0));
+        let res = _mm256_or_ps(im2, _mm256_and_ps(sign_bit, val));
+        res
+    }
+
+    #[target_feature(enable = "avx2")]
+    pub(crate) unsafe fn render_strips(
+        tiles: &Tiles,
+        strip_buf: &mut Vec<Strip>,
+        alpha_buf: &mut Vec<u32>,
+        fill_rule: FillRule,
+    ) {
+        let mut strip_start = true;
+        let mut cols = alpha_buf.len() as u32;
+        let mut prev_tile = tiles.get_tile(0);
+        let mut fp = prev_tile.footprint();
+        let mut seg_start = 0;
+        let mut delta = 0;
+
+        // Note: the input should contain a sentinel tile, to avoid having
+        // logic here to process the final strip.
+        for i in 1..tiles.len() {
+            let tile = tiles.get_tile(i);
+
+            if prev_tile.loc() != tile.loc() {
+                let start_delta = delta;
+                let same_strip = prev_tile.loc().same_strip(&tile.loc());
+
+                if same_strip {
+                    fp.extend(3);
+                }
+
+                let x0 = fp.x0();
+                let x1 = fp.x1();
+                let mut areas = [start_delta as f32; 16];
+
+                let ones = _mm256_set1_ps(1.0);
+                let zeroes = _mm256_set1_ps(0.0);
+
+                for j in seg_start..i {
+                    let tile = tiles.get_tile(j);
+
+                    delta += tile.delta();
+
+                    let p0 = tile.p0();
+                    let p1 = tile.p1();
+                    let inv_slope = _mm256_set1_ps((p1.x - p0.x) / (p1.y - p0.y));
+
+                    let p0_y = _mm256_set1_ps(p0.y);
+                    let p0_x = _mm256_set1_ps(p0.x);
+                    let p1_y = _mm256_set1_ps(p1.y);
+
+                    for x in 0..2 {
+                        let x__ = x * 2;
+                        let x_ = x__ as f32;
+                        let x =
+                            _mm256_set_ps(x_ + 1.0, x_ + 1.0, x_ + 1.0, x_ + 1.0, x_, x_, x_, x_);
+                        let rel_x = _mm256_sub_ps(p0_x, x);
+
+                        let y = _mm256_set_ps(3.0, 2.0, 1.0, 0.0, 3.0, 2.0, 1.0, 0.0);
+                        let rel_y = _mm256_sub_ps(p0_y, y);
+                        let y0 = clamp(rel_y, 0.0, 1.0);
+                        let y1 = clamp(_mm256_sub_ps(p1_y, y), 0.0, 1.0);
+                        let dy = _mm256_sub_ps(y0, y1);
+
+                        let xx0 = _mm256_add_ps(
+                            rel_x,
+                            _mm256_mul_ps(_mm256_sub_ps(y0, rel_y), inv_slope),
+                        );
+                        let xx1 = _mm256_add_ps(
+                            rel_x,
+                            _mm256_mul_ps(_mm256_sub_ps(y1, rel_y), inv_slope),
+                        );
+                        let xmin0 = _mm256_min_ps(xx0, xx1);
+                        let xmax = _mm256_max_ps(xx0, xx1);
+                        let xmin = _mm256_sub_ps(_mm256_min_ps(xmin0, ones), _mm256_set1_ps(1e-6));
+
+                        let b = _mm256_min_ps(xmax, ones);
+                        let c = _mm256_max_ps(b, zeroes);
+                        let d = _mm256_max_ps(xmin, zeroes);
+                        let a = {
+                            let im1 = _mm256_mul_ps(d, d);
+                            let im2 = _mm256_mul_ps(c, c);
+                            let im3 = _mm256_sub_ps(im1, im2);
+                            let im4 = _mm256_mul_ps(_mm256_set1_ps(0.5), im3);
+                            let im5 = _mm256_add_ps(b, im4);
+                            let im6 = _mm256_sub_ps(im5, xmin);
+                            let im7 = _mm256_div_ps(im6, _mm256_sub_ps(xmax, xmin));
+                            remove_nan(im7)
+                        };
+
+                        let mulled = _mm256_mul_ps(a, dy);
+                        let mut area = _mm256_loadu_ps(areas.as_ptr().add((4 * x__) as usize));
+                        area = _mm256_add_ps(mulled, area);
+
+                        if p0.x == 0.0 {
+                            let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p0_y)), 0.0, 1.0);
+                            area = _mm256_add_ps(area, im1);
+                        } else if p1.x == 0.0 {
+                            let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p1_y)), 0.0, 1.0);
+                            area = _mm256_sub_ps(area, im1);
+                        }
+
+                        _mm256_storeu_ps(areas.as_mut_ptr().add((4 * x__) as usize), area);
+                    }
+                }
+
+                for x in x0..x1 {
+                    let mut alphas = 0u32;
+
+                    for y in 0..4 {
+                        let area = areas[(x * 4 + y) as usize];
+
+                        let area_u8 = match fill_rule {
+                            FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
+                            FillRule::EvenOdd => {
+                                let area_abs = area.abs();
+                                let area_fract = area_abs.fract();
+                                let odd = area_abs as i32 & 1;
+                                // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
+                                // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
+                                // `add_val` represents the 1, sign represents the minus.
+                                // If we have for example 2.68, then opacity is 68%, while for
+                                // 1.68 it would be (1 - 0.68) = 32%.
+                                // So for odd, add_val should be 1, while for even it should be 0.
+                                let add_val = odd as f32;
+                                // 1 for even, -1 for odd.
+                                let sign = (-2 * odd + 1) as f32;
+                                let factor = add_val + sign * area_fract;
+
+                                (factor * 255.0 + 0.5) as u32
+                            }
+                        };
+
+                        alphas += area_u8 << (y * 8);
+                    }
+
                     alpha_buf.push(alphas);
                 }
 
