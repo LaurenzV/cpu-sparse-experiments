@@ -86,7 +86,68 @@ pub(crate) mod scalar {
             areas: &mut [f32; 16],
             delta: &mut i32,
         ) {
-            calculate_areas(tiles, tile_start, tile_end, x0, x1, areas, delta);
+            for j in tile_start..tile_end {
+                let tile = tiles.get_tile(j);
+
+                *delta += tile.delta();
+
+                let p0 = tile.p0();
+                let p1 = tile.p1();
+                let inv_slope = (p1.x - p0.x) / (p1.y - p0.y);
+
+                // Note: We are iterating in column-major order because the inner loop always
+                // has a constant number of iterations, which makes it more SIMD-friendly. Worth
+                // running some tests whether a different order allows for better performance.
+                for x in x0..x1 {
+                    // Relative x offset of the start point from the
+                    // current column.
+                    let rel_x = p0.x - x as f32;
+
+                    for y in 0..4 {
+                        // Relative y offset of the start
+                        // point from the current row.
+                        let rel_y = p0.y - y as f32;
+                        // y values will be 1 if the point is below the current row,
+                        // 0 if the point is above the current row, and between 0-1
+                        // if it is on the same row.
+                        let y0 = rel_y.clamp(0.0, 1.0);
+                        let y1 = (p1.y - y as f32).clamp(0.0, 1.0);
+                        // If != 0, then the line intersects the current row
+                        // in the current tile.
+                        let dy = y0 - y1;
+
+                        // x intersection points in the current tile.
+                        let xx0 = rel_x + (y0 - rel_y) * inv_slope;
+                        let xx1 = rel_x + (y1 - rel_y) * inv_slope;
+                        let xmin0 = xx0.min(xx1);
+                        let xmax = xx0.max(xx1);
+                        // Subtract a small delta to prevent a division by zero below.
+                        let xmin = xmin0.min(1.0) - 1e-6;
+                        // Clip x_max to the right side of the pixel.
+                        let b = xmax.min(1.0);
+                        // Clip x_max to the left side of the pixel.
+                        let c = b.max(0.0);
+                        // Clip x_min to the left side of the pixel.
+                        let d = xmin.max(0.0);
+                        // Calculate the covered area.
+                        // TODO: How is this formula derived?
+                        let mut a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
+                        // a can be NaN if dy == 0 (since inv_slope will be NaN).
+                        // This code changes those NaNs to 0.
+                        a = a.abs().max(0.).copysign(a);
+
+                        areas[(x * 4) as usize + y] += a * dy;
+
+                        // Making this branchless doesn't lead to any performance improvements
+                        // according to my measurements.
+                        if p0.x == 0.0 {
+                            areas[(x * 4) as usize + y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
+                        } else if p1.x == 0.0 {
+                            areas[(x * 4) as usize + y] -= (y as f32 - p1.y + 1.0).clamp(0.0, 1.0);
+                        }
+                    }
+                }
+            }
         }
 
         fn fill_alphas(
@@ -96,7 +157,47 @@ pub(crate) mod scalar {
             x1: u32,
             fill_rule: FillRule,
         ) {
-            fill_alphas(areas, alpha_buf, x0, x1, fill_rule);
+            macro_rules! fill {
+                ($rule:expr) => {
+                    for x in x0..x1 {
+                        let mut alphas = 0u32;
+
+                        for y in 0..4 {
+                            let area = areas[(x * 4) as usize + y];
+                            let area_u8 = $rule(area);
+
+                            alphas += area_u8 << (y * 8);
+                        }
+
+                        alpha_buf.push(alphas);
+                    }
+                };
+            }
+
+            match fill_rule {
+                FillRule::NonZero => {
+                    fill!(|area: f32| (area.abs().min(1.0) * 255.0 + 0.5) as u32)
+                }
+                FillRule::EvenOdd => {
+                    fill!(|area: f32| {
+                        let area_abs = area.abs();
+                        let area_fract = area_abs.fract();
+                        let odd = area_abs as i32 & 1;
+                        // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
+                        // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
+                        // `add_val` represents the 1, sign represents the minus.
+                        // If we have for example 2.68, then opacity is 68%, while for
+                        // 1.68 it would be (1 - 0.68) = 32%.
+                        // So for odd, add_val should be 1, while for even it should be 0.
+                        let add_val = odd as f32;
+                        // 1 for even, -1 for odd.
+                        let sign = -2.0 * add_val + 1.0;
+                        let factor = add_val + sign * area_fract;
+
+                        (factor * 255.0 + 0.5) as u32
+                    })
+                }
+            }
         }
     }
 
@@ -130,8 +231,8 @@ pub(crate) mod scalar {
                 let x1 = fp.x1();
                 let mut areas = [start_delta as f32; 16];
 
-                calculate_areas(tiles, seg_start, i, x0, x1, &mut areas, &mut delta);
-                fill_alphas(&areas, alpha_buf, x0, x1, fill_rule);
+                Scalar::calculate_areas(tiles, seg_start, i, x0, x1, &mut areas, &mut delta);
+                Scalar::fill_alphas(&areas, alpha_buf, x0, x1, fill_rule);
 
                 if strip_start {
                     let strip = Strip {
@@ -162,129 +263,6 @@ pub(crate) mod scalar {
             fp.merge(&tile.footprint());
 
             prev_tile = tile;
-        }
-    }
-
-    fn calculate_areas(
-        tiles: &Tiles,
-        tile_start: u32,
-        tile_end: u32,
-        x0: u32,
-        x1: u32,
-        areas: &mut [f32; 16],
-        delta: &mut i32,
-    ) {
-        for j in tile_start..tile_end {
-            let tile = tiles.get_tile(j);
-
-            *delta += tile.delta();
-
-            let p0 = tile.p0();
-            let p1 = tile.p1();
-            let inv_slope = (p1.x - p0.x) / (p1.y - p0.y);
-
-            // Note: We are iterating in column-major order because the inner loop always
-            // has a constant number of iterations, which makes it more SIMD-friendly. Worth
-            // running some tests whether a different order allows for better performance.
-            for x in x0..x1 {
-                // Relative x offset of the start point from the
-                // current column.
-                let rel_x = p0.x - x as f32;
-
-                for y in 0..4 {
-                    // Relative y offset of the start
-                    // point from the current row.
-                    let rel_y = p0.y - y as f32;
-                    // y values will be 1 if the point is below the current row,
-                    // 0 if the point is above the current row, and between 0-1
-                    // if it is on the same row.
-                    let y0 = rel_y.clamp(0.0, 1.0);
-                    let y1 = (p1.y - y as f32).clamp(0.0, 1.0);
-                    // If != 0, then the line intersects the current row
-                    // in the current tile.
-                    let dy = y0 - y1;
-
-                    // x intersection points in the current tile.
-                    let xx0 = rel_x + (y0 - rel_y) * inv_slope;
-                    let xx1 = rel_x + (y1 - rel_y) * inv_slope;
-                    let xmin0 = xx0.min(xx1);
-                    let xmax = xx0.max(xx1);
-                    // Subtract a small delta to prevent a division by zero below.
-                    let xmin = xmin0.min(1.0) - 1e-6;
-                    // Clip x_max to the right side of the pixel.
-                    let b = xmax.min(1.0);
-                    // Clip x_max to the left side of the pixel.
-                    let c = b.max(0.0);
-                    // Clip x_min to the left side of the pixel.
-                    let d = xmin.max(0.0);
-                    // Calculate the covered area.
-                    // TODO: How is this formula derived?
-                    let mut a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
-                    // a can be NaN if dy == 0 (since inv_slope will be NaN).
-                    // This code changes those NaNs to 0.
-                    a = a.abs().max(0.).copysign(a);
-
-                    areas[(x * 4) as usize + y] += a * dy;
-
-                    // Making this branchless doesn't lead to any performance improvements
-                    // according to my measurements.
-                    if p0.x == 0.0 {
-                        areas[(x * 4) as usize + y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
-                    } else if p1.x == 0.0 {
-                        areas[(x * 4) as usize + y] -= (y as f32 - p1.y + 1.0).clamp(0.0, 1.0);
-                    }
-                }
-            }
-        }
-    }
-
-    fn fill_alphas(
-        areas: &[f32; 16],
-        alpha_buf: &mut Vec<u32>,
-        x0: u32,
-        x1: u32,
-        fill_rule: FillRule,
-    ) {
-        macro_rules! fill {
-            ($rule:expr) => {
-                for x in x0..x1 {
-                    let mut alphas = 0u32;
-
-                    for y in 0..4 {
-                        let area = areas[(x * 4) as usize + y];
-                        let area_u8 = $rule(area);
-
-                        alphas += area_u8 << (y * 8);
-                    }
-
-                    alpha_buf.push(alphas);
-                }
-            };
-        }
-
-        match fill_rule {
-            FillRule::NonZero => {
-                fill!(|area: f32| (area.abs().min(1.0) * 255.0 + 0.5) as u32)
-            }
-            FillRule::EvenOdd => {
-                fill!(|area: f32| {
-                    let area_abs = area.abs();
-                    let area_fract = area_abs.fract();
-                    let odd = area_abs as i32 & 1;
-                    // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
-                    // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
-                    // `add_val` represents the 1, sign represents the minus.
-                    // If we have for example 2.68, then opacity is 68%, while for
-                    // 1.68 it would be (1 - 0.68) = 32%.
-                    // So for odd, add_val should be 1, while for even it should be 0.
-                    let add_val = odd as f32;
-                    // 1 for even, -1 for odd.
-                    let sign = -2.0 * add_val + 1.0;
-                    let factor = add_val + sign * area_fract;
-
-                    (factor * 255.0 + 0.5) as u32
-                })
-            }
         }
     }
 }
