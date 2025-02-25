@@ -372,10 +372,10 @@ pub(crate) mod neon {
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 pub(crate) mod avx2 {
-    use std::arch::x86_64::*;
     use crate::strip::Strip;
     use crate::tiling::{Footprint, Tiles};
     use crate::FillRule;
+    use std::arch::x86_64::*;
 
     #[target_feature(enable = "avx2")]
     unsafe fn clamp(val: __m256, min: f32, max: f32) -> __m256 {
@@ -385,7 +385,7 @@ pub(crate) mod avx2 {
     #[target_feature(enable = "avx2")]
     unsafe fn remove_nan(val: __m256) -> __m256 {
         let sign_bit = _mm256_set1_ps(-0.0);
-        let abs =  _mm256_andnot_ps(sign_bit, val);
+        let abs = _mm256_andnot_ps(sign_bit, val);
         let im2 = _mm256_max_ps(abs, _mm256_set1_ps(0.0));
         let res = _mm256_or_ps(im2, _mm256_and_ps(sign_bit, val));
         res
@@ -441,7 +441,8 @@ pub(crate) mod avx2 {
                     for x in 0..2 {
                         let x__ = x * 2;
                         let x_ = x__ as f32;
-                        let x = _mm256_set_ps(x_ + 1.0, x_ + 1.0, x_ + 1.0, x_ + 1.0, x_, x_, x_, x_);
+                        let x =
+                            _mm256_set_ps(x_ + 1.0, x_ + 1.0, x_ + 1.0, x_ + 1.0, x_, x_, x_, x_);
                         let rel_x = _mm256_sub_ps(p0_x, x);
 
                         let y = _mm256_set_ps(3.0, 2.0, 1.0, 0.0, 3.0, 2.0, 1.0, 0.0);
@@ -450,8 +451,14 @@ pub(crate) mod avx2 {
                         let y1 = clamp(_mm256_sub_ps(p1_y, y), 0.0, 1.0);
                         let dy = _mm256_sub_ps(y0, y1);
 
-                        let xx0 = _mm256_add_ps(rel_x, _mm256_mul_ps(_mm256_sub_ps(y0, rel_y), inv_slope));
-                        let xx1 = _mm256_add_ps(rel_x, _mm256_mul_ps(_mm256_sub_ps(y1, rel_y), inv_slope));
+                        let xx0 = _mm256_add_ps(
+                            rel_x,
+                            _mm256_mul_ps(_mm256_sub_ps(y0, rel_y), inv_slope),
+                        );
+                        let xx1 = _mm256_add_ps(
+                            rel_x,
+                            _mm256_mul_ps(_mm256_sub_ps(y1, rel_y), inv_slope),
+                        );
                         let xmin0 = _mm256_min_ps(xx0, xx1);
                         let xmax = _mm256_max_ps(xx0, xx1);
                         let xmin = _mm256_sub_ps(_mm256_min_ps(xmin0, ones), _mm256_set1_ps(1e-6));
