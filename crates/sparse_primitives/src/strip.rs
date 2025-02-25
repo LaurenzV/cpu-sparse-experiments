@@ -183,7 +183,7 @@ pub(crate) mod scalar {
                             // So for odd, add_val should be 1, while for even it should be 0.
                             let add_val = odd as f32;
                             // 1 for even, -1 for odd.
-                            let sign = (-2 * odd + 1) as f32;
+                            let sign = -2.0 * add_val + 1.0;
                             let factor = add_val + sign * area_fract;
 
                             (factor * 255.0 + 0.5) as u32
@@ -541,8 +541,28 @@ pub(crate) mod avx2 {
                             _mm_extract_epi32::<0>(shifted) as u32
                         })
                     }
+
                     FillRule::EvenOdd => {
-                        unimplemented!()
+                        fill!(|idx: usize| {
+                            let area = _mm_loadu_ps(areas.as_ptr().add(idx));
+                            let area_abs = abs_128(area);
+                            let floored = _mm_floor_ps(area_abs);
+                            let area_fract = _mm_sub_ps(area_abs, floored);
+                            let odd = _mm_and_si128(_mm_set1_epi32(1), _mm_cvtps_epi32(floored));
+                            let add_val = _mm_cvtepi32_ps(odd);
+                            let sign = _mm_add_ps(
+                                _mm_mul_ps(_mm_set1_ps(-2.0), add_val),
+                                _mm_set1_ps(1.0),
+                            );
+                            let factor = _mm_add_ps(add_val, _mm_mul_ps(sign, area_fract));
+                            let rounded =
+                                _mm_round_ps::<0b1000>(_mm_mul_ps(factor, _mm_set1_ps(255.0)));
+                            let converted = _mm_cvtps_epi32(rounded);
+
+                            let shifted = _mm_packus_epi16(converted, converted);
+                            let shifted = _mm_packus_epi16(shifted, shifted);
+                            _mm_extract_epi32::<0>(shifted) as u32
+                        })
                     }
                 }
 
