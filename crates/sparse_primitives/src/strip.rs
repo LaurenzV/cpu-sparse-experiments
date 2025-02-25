@@ -309,8 +309,8 @@ pub(crate) mod neon {
                         let y1 = clamp(vsubq_f32(p1_y, y), 0.0, 1.0);
                         let dy = vsubq_f32(y0, y1);
 
-                        let xx0 = vfmaq_f32(vsubq_f32(y0, rel_y), inv_slope, rel_x);
-                        let xx1 = vfmaq_f32(vsubq_f32(y1, rel_y), inv_slope, rel_x);
+                        let xx0 = vfmaq_f32(rel_x, inv_slope, vsubq_f32(y0, rel_y));
+                        let xx1 = vfmaq_f32(rel_x, inv_slope, vsubq_f32(y1, rel_y));
                         let xmin0 = vminq_f32(xx0, xx1);
                         let xmax = vmaxq_f32(xx0, xx1);
                         let xmin = vsubq_f32(vminq_f32(xmin0, ones), vdupq_n_f32(1e-6));
@@ -322,15 +322,14 @@ pub(crate) mod neon {
                             let im1 = vmulq_f32(d, d);
                             let im2 = vmulq_f32(c, c);
                             let im3 = vsubq_f32(im1, im2);
-                            let im4 = vfmaq_f32(vdupq_n_f32(0.5), im3, b);
+                            let im4 = vfmaq_f32(b, im3, vdupq_n_f32(0.5));
                             let im5 = vsubq_f32(im4, xmin);
                             let im6 = vdivq_f32(im5, vsubq_f32(xmax, xmin));
-                            // remove_nan(im6)
-                            im6
+                            remove_nan(im6)
                         };
 
                         let mut area = vld1q_f32(areas.as_ptr().add((4 * x) as usize));
-                        area = vfmaq_f32(a, dy, area);
+                        area = vfmaq_f32(area, dy, a);
 
                         if p0.x == 0.0 {
                             let im1 = clamp(vaddq_f32(ones, vsubq_f32(y, p0_y)), 0.0, 1.0);
@@ -405,13 +404,11 @@ pub(crate) mod neon {
         }
     }
 
-    // unsafe fn remove_nan(val: float32x4_t) -> float32x4_t {
-    //     let sign_bit = vdupq_n_f32(-0.0);
-    //     let abs = vabsq_f32(val);
-    //     let im2 = vmaxq_f32(abs, vdupq_n_f32(0.0));
-    //     let res = _mm256_or_ps(im2, _mm256_and_ps(sign_bit, val));
-    //     res
-    // }
+    unsafe fn remove_nan(val: float32x4_t) -> float32x4_t {
+        let mask = vceqq_f32(val, val);
+
+        vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(val), mask))
+    }
 
     unsafe fn clamp(val: float32x4_t, min: f32, max: f32) -> float32x4_t {
         vmaxq_f32(vminq_f32(val, vdupq_n_f32(max)), vdupq_n_f32(min))
