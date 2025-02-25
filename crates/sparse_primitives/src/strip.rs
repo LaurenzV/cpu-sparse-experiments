@@ -472,13 +472,8 @@ pub(crate) mod avx2 {
                         let y1 = clamp(_mm256_sub_ps(p1_y, y), 0.0, 1.0);
                         let dy = _mm256_sub_ps(y0, y1);
 
-                        let xx0 = _mm256_fmadd_ps(
-                            _mm256_sub_ps(y0, rel_y), inv_slope,
-                            rel_x,
-                        );
-                        let xx1 = _mm256_fmadd_ps(_mm256_sub_ps(y1, rel_y), inv_slope,
-                            rel_x,
-                        );
+                        let xx0 = _mm256_fmadd_ps(_mm256_sub_ps(y0, rel_y), inv_slope, rel_x);
+                        let xx1 = _mm256_fmadd_ps(_mm256_sub_ps(y1, rel_y), inv_slope, rel_x);
                         let xmin0 = _mm256_min_ps(xx0, xx1);
                         let xmax = _mm256_max_ps(xx0, xx1);
                         let xmin = _mm256_sub_ps(_mm256_min_ps(xmin0, ones), _mm256_set1_ps(1e-6));
