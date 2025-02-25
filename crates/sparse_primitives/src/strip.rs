@@ -133,6 +133,7 @@ pub(crate) mod scalar {
     use crate::FillRule;
 
     impl RenderStrip for Scalar {
+        #[inline(always)]
         fn calculate_areas(
             tiles: &Tiles,
             tile_start: u32,
@@ -158,6 +159,7 @@ pub(crate) mod scalar {
                     // Relative x offset of the start point from the
                     // current column.
                     let rel_x = p0.x - x as f32;
+                    let areas = &mut areas[(x * 4) as usize..][..4];
 
                     for y in 0..4 {
                         // Relative y offset of the start
@@ -192,20 +194,21 @@ pub(crate) mod scalar {
                         // This code changes those NaNs to 0.
                         a = a.abs().max(0.).copysign(a);
 
-                        areas[(x * 4) as usize + y] += a * dy;
+                        areas[y] += a * dy;
 
-                        // Making this branchless doesn't lead to any performance improvements
-                        // according to my measurements.
-                        if p0.x == 0.0 {
-                            areas[(x * 4) as usize + y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
-                        } else if p1.x == 0.0 {
-                            areas[(x * 4) as usize + y] -= (y as f32 - p1.y + 1.0).clamp(0.0, 1.0);
-                        }
+                        // // Making this branchless doesn't lead to any performance improvements
+                        // // according to my measurements.
+                        // if p0.x == 0.0 {
+                        //     areas[y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
+                        // } else if p1.x == 0.0 {
+                        //     areas[y] -= (y as f32 - p1.y + 1.0).clamp(0.0, 1.0);
+                        // }
                     }
                 }
             }
         }
 
+        #[inline(always)]
         fn fill_alphas(
             areas: &[f32; 16],
             alpha_buf: &mut Vec<u32>,
@@ -217,9 +220,10 @@ pub(crate) mod scalar {
                 ($rule:expr) => {
                     for x in x0..x1 {
                         let mut alphas = 0u32;
+                        let areas = &areas[(x * 4) as usize..][..4];
 
                         for y in 0..4 {
-                            let area = areas[(x * 4) as usize + y];
+                            let area = areas[y];
                             let area_u8 = $rule(area);
 
                             alphas += area_u8 << (y * 8);
@@ -268,6 +272,7 @@ pub(crate) mod neon {
 
     impl RenderStrip for Neon {
         /// SAFETY: The CPU needs to support the target feature `neon`.
+        #[inline(always)]
         fn calculate_areas(
             tiles: &Tiles,
             tile_start: u32,
@@ -342,6 +347,7 @@ pub(crate) mod neon {
         }
 
         /// SAFETY: The CPU needs to support the target feature `neon`.
+        #[inline(always)]
         fn fill_alphas(
             areas: &[f32; 16],
             alpha_buf: &mut Vec<u32>,
@@ -422,6 +428,7 @@ pub(crate) mod avx2 {
 
     impl RenderStrip for Avx2 {
         /// SAFETY: The CPU needs to support the target feature `avx2` and `fma`.
+        #[inline(always)]
         fn calculate_areas(
             tiles: &Tiles,
             tile_start: u32,
@@ -498,6 +505,7 @@ pub(crate) mod avx2 {
         }
 
         /// SAFETY: The CPU needs to support the target feature `avx2` and `fma`.
+        #[inline(always)]
         fn fill_alphas(
             areas: &[f32; 16],
             alpha_buf: &mut Vec<u32>,
