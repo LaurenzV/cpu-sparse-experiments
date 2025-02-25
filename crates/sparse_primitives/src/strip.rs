@@ -404,12 +404,14 @@ pub(crate) mod neon {
         }
     }
 
+    /// SAFETY: The CPU needs to support the target feature `neon`.
     unsafe fn remove_nan(val: float32x4_t) -> float32x4_t {
         let mask = vceqq_f32(val, val);
 
         vreinterpretq_f32_u32(vandq_u32(vreinterpretq_u32_f32(val), mask))
     }
 
+    /// SAFETY: The CPU needs to support the target feature `neon`.
     unsafe fn clamp(val: float32x4_t, min: f32, max: f32) -> float32x4_t {
         vmaxq_f32(vminq_f32(val, vdupq_n_f32(max)), vdupq_n_f32(min))
     }
