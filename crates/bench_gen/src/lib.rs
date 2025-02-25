@@ -210,7 +210,7 @@ impl ShapeKind {
             ShapeKind::Butterfly => "butterfly",
             ShapeKind::Dragon => "dragon",
             ShapeKind::Fish => "fish",
-            ShapeKind::World => "world"
+            ShapeKind::World => "world",
         }
     }
 }
@@ -255,8 +255,10 @@ impl Iterator for ShapeIterator {
 }
 
 fn load_shape_path(shape: ShapeKind, scale: f32) -> BezPath {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("assets/{}.txt", shape.name()));
-    let bez_path = BezPath::from_svg(std::str::from_utf8(&std::fs::read(path).unwrap()).unwrap()).unwrap();
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("assets/{}.txt", shape.name()));
+    let bez_path =
+        BezPath::from_svg(std::str::from_utf8(&std::fs::read(path).unwrap()).unwrap()).unwrap();
     let transform = Affine::scale(scale as f64);
 
     transform * bez_path
