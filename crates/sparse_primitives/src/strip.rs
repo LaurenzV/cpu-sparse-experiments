@@ -408,7 +408,7 @@ pub(crate) mod avx2 {
         _mm_andnot_ps(sign_bit, val)
     }
 
-    #[target_feature(enable = "avx2")]
+    #[target_feature(enable = "avx2,fma")]
     pub(crate) unsafe fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
@@ -468,13 +468,12 @@ pub(crate) mod avx2 {
                         let y1 = clamp(_mm256_sub_ps(p1_y, y), 0.0, 1.0);
                         let dy = _mm256_sub_ps(y0, y1);
 
-                        let xx0 = _mm256_add_ps(
+                        let xx0 = _mm256_fmadd_ps(
+                            _mm256_sub_ps(y0, rel_y), inv_slope,
                             rel_x,
-                            _mm256_mul_ps(_mm256_sub_ps(y0, rel_y), inv_slope),
                         );
-                        let xx1 = _mm256_add_ps(
+                        let xx1 = _mm256_fmadd_ps(_mm256_sub_ps(y1, rel_y), inv_slope,
                             rel_x,
-                            _mm256_mul_ps(_mm256_sub_ps(y1, rel_y), inv_slope),
                         );
                         let xmin0 = _mm256_min_ps(xx0, xx1);
                         let xmax = _mm256_max_ps(xx0, xx1);
@@ -487,16 +486,14 @@ pub(crate) mod avx2 {
                             let im1 = _mm256_mul_ps(d, d);
                             let im2 = _mm256_mul_ps(c, c);
                             let im3 = _mm256_sub_ps(im1, im2);
-                            let im4 = _mm256_mul_ps(_mm256_set1_ps(0.5), im3);
-                            let im5 = _mm256_add_ps(b, im4);
-                            let im6 = _mm256_sub_ps(im5, xmin);
-                            let im7 = _mm256_div_ps(im6, _mm256_sub_ps(xmax, xmin));
-                            remove_nan(im7)
+                            let im4 = _mm256_fmadd_ps(_mm256_set1_ps(0.5), im3, b);
+                            let im5 = _mm256_sub_ps(im4, xmin);
+                            let im6 = _mm256_div_ps(im5, _mm256_sub_ps(xmax, xmin));
+                            remove_nan(im6)
                         };
 
-                        let mulled = _mm256_mul_ps(a, dy);
                         let mut area = _mm256_loadu_ps(areas.as_ptr().add((4 * x__) as usize));
-                        area = _mm256_add_ps(mulled, area);
+                        area = _mm256_fmadd_ps(a, dy, area);
 
                         if p0.x == 0.0 {
                             let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p0_y)), 0.0, 1.0);
@@ -544,11 +541,8 @@ pub(crate) mod avx2 {
                             let area_fract = _mm_sub_ps(area_abs, floored);
                             let odd = _mm_and_si128(_mm_set1_epi32(1), _mm_cvtps_epi32(floored));
                             let add_val = _mm_cvtepi32_ps(odd);
-                            let sign = _mm_add_ps(
-                                _mm_mul_ps(_mm_set1_ps(-2.0), add_val),
-                                _mm_set1_ps(1.0),
-                            );
-                            let factor = _mm_add_ps(add_val, _mm_mul_ps(sign, area_fract));
+                            let sign = _mm_fmadd_ps(_mm_set1_ps(-2.0), add_val, _mm_set1_ps(1.0));
+                            let factor = _mm_fmadd_ps(sign, area_fract, add_val);
                             let rounded =
                                 _mm_round_ps::<0b1000>(_mm_mul_ps(factor, _mm_set1_ps(255.0)));
                             let converted = _mm_cvtps_epi32(rounded);
