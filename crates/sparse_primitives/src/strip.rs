@@ -196,13 +196,13 @@ pub(crate) mod scalar {
 
                         areas[y] += a * dy;
 
-                        // // Making this branchless doesn't lead to any performance improvements
-                        // // according to my measurements.
-                        // if p0.x == 0.0 {
-                        //     areas[y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
-                        // } else if p1.x == 0.0 {
-                        //     areas[y] -= (y as f32 - p1.y + 1.0).clamp(0.0, 1.0);
-                        // }
+                        // Making this branchless doesn't lead to any performance improvements
+                        // according to my measurements on x86. Haven't checked ARM.
+                        if p0.x == 0.0 {
+                            areas[y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
+                        } else if p1.x == 0.0 {
+                            areas[y] -= (y as f32 - p1.y + 1.0).clamp(0.0, 1.0);
+                        }
                     }
                 }
             }
