@@ -132,12 +132,14 @@ pub(crate) mod scalar {
                             // Calculate the covered area.
                             // TODO: How is this formula derived?
                             let mut a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
-                            // a can be NaN if dy == 0 (and this xmax - xmin = 0, and we have
+                            // a can be NaN if dy == 0 (and thus xmax - xmin = 0, resulting in
                             // a division by 0 above). This code changes those NaNs to 0.
                             a = a.abs().max(0.).copysign(a);
 
                             areas[x as usize][y] += a * dy;
 
+                            // Making this branchless doesn't lead to any performance improvements
+                            // according to my measurements.
                             if p0.x == 0.0 {
                                 areas[x as usize][y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
                             } else if p1.x == 0.0 {
@@ -147,37 +149,46 @@ pub(crate) mod scalar {
                     }
                 }
 
-                for x in x0..x1 {
-                    let mut alphas = 0u32;
+                macro_rules! fill {
+                    ($rule:expr) => {
+                        for x in x0..x1 {
+                            let mut alphas = 0u32;
 
-                    for y in 0..4 {
-                        let area = areas[x as usize][y];
+                            for y in 0..4 {
+                                let area = areas[x as usize][y];
+                                let area_u8 = $rule(area);
 
-                        let area_u8 = match fill_rule {
-                            FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
-                            FillRule::EvenOdd => {
-                                let area_abs = area.abs();
-                                let area_fract = area_abs.fract();
-                                let odd = area_abs as i32 & 1;
-                                // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
-                                // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
-                                // `add_val` represents the 1, sign represents the minus.
-                                // If we have for example 2.68, then opacity is 68%, while for
-                                // 1.68 it would be (1 - 0.68) = 32%.
-                                // So for odd, add_val should be 1, while for even it should be 0.
-                                let add_val = odd as f32;
-                                // 1 for even, -1 for odd.
-                                let sign = (-2 * odd + 1) as f32;
-                                let factor = add_val + sign * area_fract;
-
-                                (factor * 255.0 + 0.5) as u32
+                                alphas += area_u8 << (y * 8);
                             }
-                        };
 
-                        alphas += area_u8 << (y * 8);
+                            alpha_buf.push(alphas);
+                        }
+                    };
+                }
+
+                match fill_rule {
+                    FillRule::NonZero => {
+                        fill!(|area: f32| (area.abs().min(1.0) * 255.0 + 0.5) as u32)
                     }
+                    FillRule::EvenOdd => {
+                        fill!(|area: f32| {
+                            let area_abs = area.abs();
+                            let area_fract = area_abs.fract();
+                            let odd = area_abs as i32 & 1;
+                            // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
+                            // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
+                            // `add_val` represents the 1, sign represents the minus.
+                            // If we have for example 2.68, then opacity is 68%, while for
+                            // 1.68 it would be (1 - 0.68) = 32%.
+                            // So for odd, add_val should be 1, while for even it should be 0.
+                            let add_val = odd as f32;
+                            // 1 for even, -1 for odd.
+                            let sign = (-2 * odd + 1) as f32;
+                            let factor = add_val + sign * area_fract;
 
-                    alpha_buf.push(alphas);
+                            (factor * 255.0 + 0.5) as u32
+                        })
+                    }
                 }
 
                 if strip_start {
