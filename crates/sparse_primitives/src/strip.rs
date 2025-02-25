@@ -98,7 +98,7 @@ pub(crate) mod scalar {
                     // Note: We are iterating in column-major order because the inner loop always
                     // has a constant number of iterations, which makes it more SIMD-friendly. Worth
                     // running some tests whether a different order allows for better performance.
-                    for x in 0..4 {
+                    for x in x0..x1 {
                         // Relative x offset of the start point from the
                         // current column.
                         let rel_x = p0.x - x as f32;
