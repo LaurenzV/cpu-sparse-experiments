@@ -260,11 +260,11 @@ pub(crate) mod scalar {
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
 pub(crate) mod neon {
-    use std::arch::aarch64::*;
     use crate::execute::{Neon, Scalar};
     use crate::strip::RenderStrip;
     use crate::tiling::Tiles;
     use crate::FillRule;
+    use std::arch::aarch64::*;
 
     impl RenderStrip for Neon {
         /// SAFETY: The CPU needs to support the target feature `neon`.
@@ -302,36 +302,36 @@ pub(crate) mod neon {
                 match fill_rule {
                     FillRule::NonZero => {
                         fill!(|idx: usize| {
-                           let area = vld1q_f32(areas.as_ptr().add(idx));
-                           let abs = vabsq_f32(area);
-                           let minned = vminq_f32(abs, vdupq_n_f32(1.0));
-                           let mulled = vmulq_f32(minned, vdupq_n_f32(255.0));
-                           let rounded = vrndnq_f32(mulled);
-                           let converted = vcvtq_u32_f32(rounded);
+                            let area = vld1q_f32(areas.as_ptr().add(idx));
+                            let abs = vabsq_f32(area);
+                            let minned = vminq_f32(abs, vdupq_n_f32(1.0));
+                            let mulled = vmulq_f32(minned, vdupq_n_f32(255.0));
+                            let rounded = vrndnq_f32(mulled);
+                            let converted = vcvtq_u32_f32(rounded);
 
-                           let shifted = vmovn_u32(converted);
-                           let shifted = vmovn_u16(vcombine_u16(shifted, vdup_n_u16(0)));
-                           vget_lane_u32::<0>(vreinterpret_u32_u8(shifted))
+                            let shifted = vmovn_u32(converted);
+                            let shifted = vmovn_u16(vcombine_u16(shifted, vdup_n_u16(0)));
+                            vget_lane_u32::<0>(vreinterpret_u32_u8(shifted))
                         })
                     }
                     FillRule::EvenOdd => {
-                        // fill!(|idx: usize| {
-                        //     let area = _mm_loadu_ps(areas.as_ptr().add(idx));
-                        //     let area_abs = abs_128(area);
-                        //     let floored = _mm_floor_ps(area_abs);
-                        //     let area_fract = _mm_sub_ps(area_abs, floored);
-                        //     let odd = _mm_and_si128(_mm_set1_epi32(1), _mm_cvtps_epi32(floored));
-                        //     let add_val = _mm_cvtepi32_ps(odd);
-                        //     let sign = _mm_fmadd_ps(_mm_set1_ps(-2.0), add_val, _mm_set1_ps(1.0));
-                        //     let factor = _mm_fmadd_ps(sign, area_fract, add_val);
-                        //     let rounded =
-                        //         _mm_round_ps::<0b1000>(_mm_mul_ps(factor, _mm_set1_ps(255.0)));
-                        //     let converted = _mm_cvtps_epi32(rounded);
-                        //
-                        //     let shifted = _mm_packus_epi16(converted, converted);
-                        //     let shifted = _mm_packus_epi16(shifted, shifted);
-                        //     _mm_extract_epi32::<0>(shifted) as u32
-                        // })
+                        fill!(|idx: usize| {
+                            let area = vld1q_f32(areas.as_ptr().add(idx));
+                            let area_abs = vabsq_f32(area);
+                            let floored = vrndmq_f32(area_abs);
+                            let area_fract = vsubq_f32(area_abs, floored);
+                            let odd = vandq_u32(vdupq_n_u32(1), vcvtq_u32_f32(floored));
+
+                            let add_val = vcvtq_f32_u32(odd);
+                            let sign = vfmaq_n_f32(vdupq_n_f32(1.0), add_val, -2.0);
+                            let factor = vfmaq_f32(add_val, area_fract, sign);
+                            let rounded = vrndnq_f32(vmulq_f32(factor, vdupq_n_f32(255.0)));
+                            let converted = vcvtq_u32_f32(rounded);
+
+                            let shifted = vmovn_u32(converted);
+                            let shifted = vmovn_u16(vcombine_u16(shifted, vdup_n_u16(0)));
+                            vget_lane_u32::<0>(vreinterpret_u32_u8(shifted))
+                        })
                     }
                 }
             }
