@@ -132,12 +132,14 @@ pub(crate) mod scalar {
                             // Calculate the covered area.
                             // TODO: How is this formula derived?
                             let mut a = (b + 0.5 * (d * d - c * c) - xmin) / (xmax - xmin);
-                            // a can be NaN if dy == 0 (and this xmax - xmin = 0, and we have
+                            // a can be NaN if dy == 0 (and thus xmax - xmin = 0, resulting in
                             // a division by 0 above). This code changes those NaNs to 0.
                             a = a.abs().max(0.).copysign(a);
 
                             areas[x as usize][y] += a * dy;
 
+                            // Making this branchless doesn't lead to any performance improvements
+                            // according to my measurements.
                             if p0.x == 0.0 {
                                 areas[x as usize][y] += (y as f32 - p0.y + 1.0).clamp(0.0, 1.0);
                             } else if p1.x == 0.0 {
@@ -147,37 +149,46 @@ pub(crate) mod scalar {
                     }
                 }
 
-                for x in x0..x1 {
-                    let mut alphas = 0u32;
+                macro_rules! fill {
+                    ($rule:expr) => {
+                        for x in x0..x1 {
+                            let mut alphas = 0u32;
 
-                    for y in 0..4 {
-                        let area = areas[x as usize][y];
+                            for y in 0..4 {
+                                let area = areas[x as usize][y];
+                                let area_u8 = $rule(area);
 
-                        let area_u8 = match fill_rule {
-                            FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
-                            FillRule::EvenOdd => {
-                                let area_abs = area.abs();
-                                let area_fract = area_abs.fract();
-                                let odd = area_abs as i32 & 1;
-                                // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
-                                // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
-                                // `add_val` represents the 1, sign represents the minus.
-                                // If we have for example 2.68, then opacity is 68%, while for
-                                // 1.68 it would be (1 - 0.68) = 32%.
-                                // So for odd, add_val should be 1, while for even it should be 0.
-                                let add_val = odd as f32;
-                                // 1 for even, -1 for odd.
-                                let sign = (-2 * odd + 1) as f32;
-                                let factor = add_val + sign * area_fract;
-
-                                (factor * 255.0 + 0.5) as u32
+                                alphas += area_u8 << (y * 8);
                             }
-                        };
 
-                        alphas += area_u8 << (y * 8);
+                            alpha_buf.push(alphas);
+                        }
+                    };
+                }
+
+                match fill_rule {
+                    FillRule::NonZero => {
+                        fill!(|area: f32| (area.abs().min(1.0) * 255.0 + 0.5) as u32)
                     }
+                    FillRule::EvenOdd => {
+                        fill!(|area: f32| {
+                            let area_abs = area.abs();
+                            let area_fract = area_abs.fract();
+                            let odd = area_abs as i32 & 1;
+                            // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
+                            // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
+                            // `add_val` represents the 1, sign represents the minus.
+                            // If we have for example 2.68, then opacity is 68%, while for
+                            // 1.68 it would be (1 - 0.68) = 32%.
+                            // So for odd, add_val should be 1, while for even it should be 0.
+                            let add_val = odd as f32;
+                            // 1 for even, -1 for odd.
+                            let sign = -2.0 * add_val + 1.0;
+                            let factor = add_val + sign * area_fract;
 
-                    alpha_buf.push(alphas);
+                            (factor * 255.0 + 0.5) as u32
+                        })
+                    }
                 }
 
                 if strip_start {
@@ -377,11 +388,13 @@ pub(crate) mod avx2 {
     use crate::FillRule;
     use std::arch::x86_64::*;
 
+    /// SAFETY: The CPU needs to support the target feature `avx2`.
     #[target_feature(enable = "avx2")]
     unsafe fn clamp(val: __m256, min: f32, max: f32) -> __m256 {
         _mm256_max_ps(_mm256_min_ps(val, _mm256_set1_ps(max)), _mm256_set1_ps(min))
     }
 
+    /// SAFETY: The CPU needs to support the target feature `avx2`.
     #[target_feature(enable = "avx2")]
     unsafe fn remove_nan(val: __m256) -> __m256 {
         let sign_bit = _mm256_set1_ps(-0.0);
@@ -391,7 +404,15 @@ pub(crate) mod avx2 {
         res
     }
 
+    /// SAFETY: The CPU needs to support the target feature `avx2`.
     #[target_feature(enable = "avx2")]
+    unsafe fn abs_128(val: __m128) -> __m128 {
+        let sign_bit = _mm_set1_ps(-0.0);
+        _mm_andnot_ps(sign_bit, val)
+    }
+
+    /// SAFETY: The CPU needs to support the target feature `avx2` and `fma`.
+    #[target_feature(enable = "avx2,fma")]
     pub(crate) unsafe fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
@@ -451,14 +472,8 @@ pub(crate) mod avx2 {
                         let y1 = clamp(_mm256_sub_ps(p1_y, y), 0.0, 1.0);
                         let dy = _mm256_sub_ps(y0, y1);
 
-                        let xx0 = _mm256_add_ps(
-                            rel_x,
-                            _mm256_mul_ps(_mm256_sub_ps(y0, rel_y), inv_slope),
-                        );
-                        let xx1 = _mm256_add_ps(
-                            rel_x,
-                            _mm256_mul_ps(_mm256_sub_ps(y1, rel_y), inv_slope),
-                        );
+                        let xx0 = _mm256_fmadd_ps(_mm256_sub_ps(y0, rel_y), inv_slope, rel_x);
+                        let xx1 = _mm256_fmadd_ps(_mm256_sub_ps(y1, rel_y), inv_slope, rel_x);
                         let xmin0 = _mm256_min_ps(xx0, xx1);
                         let xmax = _mm256_max_ps(xx0, xx1);
                         let xmin = _mm256_sub_ps(_mm256_min_ps(xmin0, ones), _mm256_set1_ps(1e-6));
@@ -470,16 +485,14 @@ pub(crate) mod avx2 {
                             let im1 = _mm256_mul_ps(d, d);
                             let im2 = _mm256_mul_ps(c, c);
                             let im3 = _mm256_sub_ps(im1, im2);
-                            let im4 = _mm256_mul_ps(_mm256_set1_ps(0.5), im3);
-                            let im5 = _mm256_add_ps(b, im4);
-                            let im6 = _mm256_sub_ps(im5, xmin);
-                            let im7 = _mm256_div_ps(im6, _mm256_sub_ps(xmax, xmin));
-                            remove_nan(im7)
+                            let im4 = _mm256_fmadd_ps(_mm256_set1_ps(0.5), im3, b);
+                            let im5 = _mm256_sub_ps(im4, xmin);
+                            let im6 = _mm256_div_ps(im5, _mm256_sub_ps(xmax, xmin));
+                            remove_nan(im6)
                         };
 
-                        let mulled = _mm256_mul_ps(a, dy);
                         let mut area = _mm256_loadu_ps(areas.as_ptr().add((4 * x__) as usize));
-                        area = _mm256_add_ps(mulled, area);
+                        area = _mm256_fmadd_ps(a, dy, area);
 
                         if p0.x == 0.0 {
                             let im1 = clamp(_mm256_add_ps(ones, _mm256_sub_ps(y, p0_y)), 0.0, 1.0);
@@ -493,37 +506,51 @@ pub(crate) mod avx2 {
                     }
                 }
 
-                for x in x0..x1 {
-                    let mut alphas = 0u32;
+                macro_rules! fill {
+                    ($rule:expr) => {
+                        for x in x0..x1 {
+                            let area_u32 = $rule((x * 4) as usize);
 
-                    for y in 0..4 {
-                        let area = areas[(x * 4 + y) as usize];
+                            alpha_buf.push(area_u32);
+                        }
+                    };
+                }
 
-                        let area_u8 = match fill_rule {
-                            FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
-                            FillRule::EvenOdd => {
-                                let area_abs = area.abs();
-                                let area_fract = area_abs.fract();
-                                let odd = area_abs as i32 & 1;
-                                // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
-                                // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
-                                // `add_val` represents the 1, sign represents the minus.
-                                // If we have for example 2.68, then opacity is 68%, while for
-                                // 1.68 it would be (1 - 0.68) = 32%.
-                                // So for odd, add_val should be 1, while for even it should be 0.
-                                let add_val = odd as f32;
-                                // 1 for even, -1 for odd.
-                                let sign = (-2 * odd + 1) as f32;
-                                let factor = add_val + sign * area_fract;
+                match fill_rule {
+                    FillRule::NonZero => {
+                        fill!(|idx: usize| {
+                            let area = _mm_loadu_ps(areas.as_ptr().add(idx));
+                            let abs = abs_128(area);
+                            let minned = _mm_min_ps(abs, _mm_set1_ps(1.0));
+                            let mulled = _mm_mul_ps(minned, _mm_set1_ps(255.0));
+                            let added = _mm_round_ps::<0b1000>(mulled);
+                            let converted = _mm_cvtps_epi32(added);
 
-                                (factor * 255.0 + 0.5) as u32
-                            }
-                        };
-
-                        alphas += area_u8 << (y * 8);
+                            let shifted = _mm_packus_epi16(converted, converted);
+                            let shifted = _mm_packus_epi16(shifted, shifted);
+                            _mm_extract_epi32::<0>(shifted) as u32
+                        })
                     }
 
-                    alpha_buf.push(alphas);
+                    FillRule::EvenOdd => {
+                        fill!(|idx: usize| {
+                            let area = _mm_loadu_ps(areas.as_ptr().add(idx));
+                            let area_abs = abs_128(area);
+                            let floored = _mm_floor_ps(area_abs);
+                            let area_fract = _mm_sub_ps(area_abs, floored);
+                            let odd = _mm_and_si128(_mm_set1_epi32(1), _mm_cvtps_epi32(floored));
+                            let add_val = _mm_cvtepi32_ps(odd);
+                            let sign = _mm_fmadd_ps(_mm_set1_ps(-2.0), add_val, _mm_set1_ps(1.0));
+                            let factor = _mm_fmadd_ps(sign, area_fract, add_val);
+                            let rounded =
+                                _mm_round_ps::<0b1000>(_mm_mul_ps(factor, _mm_set1_ps(255.0)));
+                            let converted = _mm_cvtps_epi32(rounded);
+
+                            let shifted = _mm_packus_epi16(converted, converted);
+                            let shifted = _mm_packus_epi16(shifted, shifted);
+                            _mm_extract_epi32::<0>(shifted) as u32
+                        })
+                    }
                 }
 
                 if strip_start {
