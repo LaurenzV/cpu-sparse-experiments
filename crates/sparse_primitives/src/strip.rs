@@ -504,37 +504,46 @@ pub(crate) mod avx2 {
                     }
                 }
 
-                for x in x0..x1 {
-                    let mut alphas = 0u32;
+                macro_rules! fill {
+                    ($rule:expr) => {
+                        for x in x0..x1 {
+                            let mut alphas = 0u32;
 
-                    for y in 0..4 {
-                        let area = areas[(x * 4 + y) as usize];
+                            for y in 0..4 {
+                                let area = areas[(x * 4 + y) as usize];
+                                let area_u8 = $rule(area);
 
-                        let area_u8 = match fill_rule {
-                            FillRule::NonZero => (area.abs().min(1.0) * 255.0 + 0.5) as u32,
-                            FillRule::EvenOdd => {
-                                let area_abs = area.abs();
-                                let area_fract = area_abs.fract();
-                                let odd = area_abs as i32 & 1;
-                                // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
-                                // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
-                                // `add_val` represents the 1, sign represents the minus.
-                                // If we have for example 2.68, then opacity is 68%, while for
-                                // 1.68 it would be (1 - 0.68) = 32%.
-                                // So for odd, add_val should be 1, while for even it should be 0.
-                                let add_val = odd as f32;
-                                // 1 for even, -1 for odd.
-                                let sign = (-2 * odd + 1) as f32;
-                                let factor = add_val + sign * area_fract;
-
-                                (factor * 255.0 + 0.5) as u32
+                                alphas += area_u8 << (y * 8);
                             }
-                        };
 
-                        alphas += area_u8 << (y * 8);
+                            alpha_buf.push(alphas);
+                        }
+                    };
+                }
+
+                match fill_rule {
+                    FillRule::NonZero => {
+                        fill!(|area: f32| (area.abs().min(1.0) * 255.0 + 0.5) as u32)
                     }
+                    FillRule::EvenOdd => {
+                        fill!(|area: f32| {
+                            let area_abs = area.abs();
+                            let area_fract = area_abs.fract();
+                            let odd = area_abs as i32 & 1;
+                            // Even case: 2.68 -> The opacity should be (0 + 0.68) = 68%.
+                            // Odd case: 1.68 -> The opacity should be (1 - 0.68) = 32%.
+                            // `add_val` represents the 1, sign represents the minus.
+                            // If we have for example 2.68, then opacity is 68%, while for
+                            // 1.68 it would be (1 - 0.68) = 32%.
+                            // So for odd, add_val should be 1, while for even it should be 0.
+                            let add_val = odd as f32;
+                            // 1 for even, -1 for odd.
+                            let sign = (-2 * odd + 1) as f32;
+                            let factor = add_val + sign * area_fract;
 
-                    alpha_buf.push(alphas);
+                            (factor * 255.0 + 0.5) as u32
+                        })
+                    }
                 }
 
                 if strip_start {
