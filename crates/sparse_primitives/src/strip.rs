@@ -388,11 +388,13 @@ pub(crate) mod avx2 {
     use crate::FillRule;
     use std::arch::x86_64::*;
 
+    /// SAFETY: The CPU needs to support the target feature `avx2`.
     #[target_feature(enable = "avx2")]
     unsafe fn clamp(val: __m256, min: f32, max: f32) -> __m256 {
         _mm256_max_ps(_mm256_min_ps(val, _mm256_set1_ps(max)), _mm256_set1_ps(min))
     }
 
+    /// SAFETY: The CPU needs to support the target feature `avx2`.
     #[target_feature(enable = "avx2")]
     unsafe fn remove_nan(val: __m256) -> __m256 {
         let sign_bit = _mm256_set1_ps(-0.0);
@@ -402,12 +404,14 @@ pub(crate) mod avx2 {
         res
     }
 
+    /// SAFETY: The CPU needs to support the target feature `avx2`.
     #[target_feature(enable = "avx2")]
     unsafe fn abs_128(val: __m128) -> __m128 {
         let sign_bit = _mm_set1_ps(-0.0);
         _mm_andnot_ps(sign_bit, val)
     }
 
+    /// SAFETY: The CPU needs to support the target feature `avx2` and `fma`.
     #[target_feature(enable = "avx2,fma")]
     pub(crate) unsafe fn render_strips(
         tiles: &Tiles,
