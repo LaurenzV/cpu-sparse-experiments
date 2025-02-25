@@ -74,7 +74,9 @@ impl KernelExecutor for Avx2 {
         alpha_buf: &mut Vec<u32>,
         fill_rule: FillRule,
     ) {
-        strip::scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
+        unsafe {
+            strip::avx2::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
+        }
     }
 }
 
