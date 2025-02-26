@@ -5,9 +5,7 @@ edition = "2021"
 [dependencies]
 peniko = {workspace = true}
 flatten = { workspace = true }
-zune-png = { workspace = true }
 usvg = { workspace = true }
-resvg = { workspace = true }
 
 [[bench]]
 name = "main"
@@ -17,11 +15,8 @@ harness = false
 oxipng = { workspace = true }
 png = { workspace = true }
 once_cell = { workspace = true }
-roxmltree = { workspace = true }
 image = { workspace = true }
-tiny-skia = { workspace = true }
 bench_gen = { workspace = true }
-svg = { workspace = true }
 rand = { workspace = true }
 criterion = { workspace = true }
 
