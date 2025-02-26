@@ -16,18 +16,11 @@ categories = ["graphics"]
 peniko = "0.3.0"
 flatten = { git = "https://github.com/linebender/gpu-stroke-expansion-paper", rev = "827ccf6" }
 bench_gen = { path = "crates/bench_gen" }
-sparse_primitives = { path = "crates/sparse_primitives" }
-svg = "0.18.0"
 rand = "0.8.5"
-usvg = "0.44.0"
-resvg = "0.44.0"
-zune-png = "0.4.10"
 oxipng = "9.1.3"
 png = "0.17.14"
 once_cell = "1.20.2"
-roxmltree = "0.20.0"
 image = "0.25.5"
-tiny-skia = {version = "0.11.4", features = ["png", "simd"]}
 criterion = { version = "0.4", features = ["html_reports"] }
 
 [profile.release]

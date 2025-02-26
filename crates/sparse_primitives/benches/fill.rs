@@ -43,17 +43,5 @@ pub fn fill(c: &mut Criterion) {
         };
     }
 
-    fill!(clear, Compose::Clear);
-    fill!(copy, Compose::Copy);
-    fill!(dest, Compose::Dest);
     fill!(src_over, Compose::SrcOver);
-    fill!(dest_over, Compose::DestOver);
-    fill!(src_in, Compose::SrcIn);
-    fill!(dest_in, Compose::DestIn);
-    fill!(src_out, Compose::SrcOut);
-    fill!(dest_out, Compose::DestOut);
-    fill!(src_atop, Compose::SrcAtop);
-    fill!(dest_atop, Compose::DestAtop);
-    fill!(xor, Compose::Xor);
-    fill!(plus, Compose::Plus);
 }

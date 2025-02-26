@@ -85,26 +85,25 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
     }
 
     #[inline(never)]
-    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint, mut compose: peniko::Compose) {
+    pub fn fill(&mut self, x: usize, width: usize, paint: &Paint, compose: peniko::Compose) {
         match paint {
             Paint::Solid(c) => {
                 let color = c.premultiply().to_rgba8_fast();
 
-                // If color is completely opaque with SrcOver, it's the same as filling using Copy.
-                if compose == peniko::Compose::SrcOver && color[3] == 255 {
-                    compose = peniko::Compose::Copy
-                }
-
-                if compose == peniko::Compose::Dest {
-                    return;
-                }
-
                 let target =
                     &mut self.scratch[x * TOTAL_STRIP_HEIGHT..][..TOTAL_STRIP_HEIGHT * width];
 
+                // If color is completely opaque we can just memcopy the colors.
+                if color[3] == 255 {
+                    for t in target.chunks_exact_mut(COLOR_COMPONENTS) {
+                        t.copy_from_slice(&color);
+                    }
+
+                    return;
+                }
+
                 KE::compose_fill(target, &color, compose);
             }
-            Paint::Pattern(_) => unimplemented!(),
         }
     }
 
@@ -128,7 +127,6 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
 
                 KE::compose_strip(target, &color, alphas, compose);
             }
-            Paint::Pattern(_) => unimplemented!(),
         }
     }
 }

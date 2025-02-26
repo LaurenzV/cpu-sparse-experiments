@@ -1,5 +1,5 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use peniko::color::palette::css::{DARK_BLUE, DARK_GREEN, WHITE, YELLOW};
+use peniko::color::palette::css::{DARK_GREEN, YELLOW};
 use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
 use peniko::{BlendMode, Compose, Mix};
 use sparse_primitives::color::palette::css::{
@@ -492,66 +492,6 @@ macro_rules! compose_impl {
 }
 
 #[test]
-fn compose_solid_clear() {
-    compose_impl!(Compose::Clear, "compose_solid_clear");
-}
-
-#[test]
-fn compose_solid_copy() {
-    compose_impl!(Compose::Copy, "compose_solid_copy");
-}
-
-#[test]
-fn compose_solid_dest() {
-    compose_impl!(Compose::Dest, "compose_solid_dest");
-}
-
-#[test]
 fn compose_solid_src_over() {
     compose_impl!(Compose::SrcOver, "compose_solid_src_over");
-}
-
-#[test]
-fn compose_solid_dest_over() {
-    compose_impl!(Compose::DestOver, "compose_solid_dest_over");
-}
-
-#[test]
-fn compose_solid_src_in() {
-    compose_impl!(Compose::SrcIn, "compose_solid_src_in");
-}
-
-#[test]
-fn compose_solid_dest_in() {
-    compose_impl!(Compose::DestIn, "compose_solid_dest_in");
-}
-
-#[test]
-fn compose_solid_src_out() {
-    compose_impl!(Compose::SrcOut, "compose_solid_src_out");
-}
-
-#[test]
-fn compose_solid_dest_out() {
-    compose_impl!(Compose::DestOut, "compose_solid_dest_out");
-}
-
-#[test]
-fn compose_solid_src_atop() {
-    compose_impl!(Compose::SrcAtop, "compose_solid_src_atop");
-}
-
-#[test]
-fn compose_solid_dest_atop() {
-    compose_impl!(Compose::DestAtop, "compose_solid_dest_atop");
-}
-
-#[test]
-fn compose_solid_xor() {
-    compose_impl!(Compose::Xor, "compose_solid_xor");
-}
-
-#[test]
-fn compose_solid_plus() {
-    compose_impl!(Compose::Plus, "compose_solid_plus");
 }

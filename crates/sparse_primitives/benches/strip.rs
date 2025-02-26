@@ -60,17 +60,5 @@ pub fn strip(c: &mut Criterion) {
         };
     }
 
-    strip!(clear, Compose::Clear);
-    strip!(copy, Compose::Copy);
-    strip!(dest, Compose::Dest);
     strip!(src_over, Compose::SrcOver);
-    strip!(dest_over, Compose::DestOver);
-    strip!(src_in, Compose::SrcIn);
-    strip!(dest_in, Compose::DestIn);
-    strip!(src_out, Compose::SrcOut);
-    strip!(dest_out, Compose::DestOut);
-    strip!(src_atop, Compose::SrcAtop);
-    strip!(dest_atop, Compose::DestAtop);
-    strip!(xor, Compose::Xor);
-    strip!(plus, Compose::Plus);
 }
