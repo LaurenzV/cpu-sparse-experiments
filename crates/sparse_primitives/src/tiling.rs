@@ -466,12 +466,13 @@ impl Tile {
         }
     }
 
+    // TODO: Profiling shows that this method takes up quite a lot of time in AVX SIMD, investigate
+    // if it can be improved.
     pub(crate) fn footprint(&self) -> Footprint {
         let x0 = self.p0().x;
         let x1 = self.p1().x;
         let x_min = x0.min(x1).floor();
         let x_max = x0.max(x1).ceil();
-        // On CPU, might be better to do this as fixed point
         let start_i = x_min as u32;
         let end_i = (start_i + 1).max(x_max as u32).min(TILE_SIZE);
 

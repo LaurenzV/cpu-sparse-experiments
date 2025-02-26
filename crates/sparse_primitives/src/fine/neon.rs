@@ -29,7 +29,7 @@ impl fine::Compose for Neon {
 
 mod fill {
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
-    use crate::util::scalar::{splat_x2, splat_x4};
+    use crate::util::scalar::splat_x4;
 
     use crate::util::neon::{div_255, inv};
     use std::arch::aarch64::*;
@@ -64,7 +64,6 @@ mod fill {
 mod strip {
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::util::neon::{div_255, inv};
-    use crate::util::scalar::splat_x2;
     use std::arch::aarch64::*;
 
     /// SAFETY: The CPU needs to support the target feature `neon`.
