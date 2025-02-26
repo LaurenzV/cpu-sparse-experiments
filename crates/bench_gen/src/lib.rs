@@ -3,6 +3,7 @@ use peniko::kurbo::{Affine, BezPath, Point, Rect, RoundedRectRadii, Shape};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::f64::consts::PI;
+use std::path::PathBuf;
 
 const SEED: [u8; 32] = [0; 32];
 
@@ -193,6 +194,74 @@ impl Iterator for PolyIterator {
             Some(Command::FillPath(path.into(), color, self.nz))
         }
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ShapeKind {
+    Butterfly,
+    Dragon,
+    Fish,
+    World,
+}
+
+impl ShapeKind {
+    fn name(&self) -> &'static str {
+        match self {
+            ShapeKind::Butterfly => "butterfly",
+            ShapeKind::Dragon => "dragon",
+            ShapeKind::Fish => "fish",
+            ShapeKind::World => "world",
+        }
+    }
+}
+
+pub struct ShapeIterator {
+    params: Params,
+    color_iter: ColorIter,
+    shape_path: BezPath,
+    rng: StdRng,
+}
+
+impl ShapeIterator {
+    pub fn new(params: Params, kind: ShapeKind) -> Self {
+        let shape_path = load_shape_path(kind, params.size as f32 / 8.0);
+
+        Self {
+            params,
+            shape_path,
+            color_iter: ColorIter::new(false),
+            rng: StdRng::from_seed(SEED),
+        }
+    }
+}
+
+impl Iterator for ShapeIterator {
+    type Item = Command;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let size = self.params.size;
+        let x = self.rng.random_range(0..=(self.params.width - size)) as f64;
+        let y = self.rng.random_range(0..=(self.params.height - size)) as f64;
+
+        let transformed_path = Affine::translate((x, y)) * self.shape_path.clone();
+        let color = self.color_iter.next().unwrap();
+
+        if self.params.stroke {
+            Some(Command::StrokePath(transformed_path, color))
+        } else {
+            Some(Command::FillPath(transformed_path, color, true))
+        }
+    }
+}
+
+fn load_shape_path(shape: ShapeKind, scale: f32) -> BezPath {
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("assets/{}.txt", shape.name()));
+    let bez_path =
+        BezPath::from_svg(std::str::from_utf8(&std::fs::read(path).unwrap()).unwrap()).unwrap();
+    let transform = Affine::scale(scale as f64);
+
+    transform * bez_path
 }
 
 pub struct ColorIter {
