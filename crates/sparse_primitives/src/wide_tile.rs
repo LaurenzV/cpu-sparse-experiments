@@ -63,8 +63,8 @@ impl WideTile {
     pub(crate) fn fill(&mut self, x: u32, width: u32, paint: Paint, compose: Compose) {
         if let Paint::Solid(s) = &paint {
             let can_override = x == 0 && width == WIDE_TILE_WIDTH as u32 && s.components[3] == 1.0;
-            let shortcut_compose = matches!(compose, Compose::Copy | Compose::SrcOver);
-            if can_override && shortcut_compose {
+
+            if can_override {
                 self.cmds.clear();
                 self.bg = *s;
             } else {

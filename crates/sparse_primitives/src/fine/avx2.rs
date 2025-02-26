@@ -7,7 +7,7 @@ impl fine::Compose for Avx2 {
         unsafe {
             match compose {
                 peniko::Compose::SrcOver => fill::src_over(target, cs),
-                _ => Scalar::compose_fill(target, cs, compose),
+                _ => unimplemented!(),
             }
         }
     }
@@ -21,7 +21,7 @@ impl fine::Compose for Avx2 {
         unsafe {
             match compose {
                 peniko::Compose::SrcOver => strip::src_over(target, cs, alphas),
-                _ => Scalar::compose_strip(target, cs, alphas, compose),
+                _ => unimplemented!(),
             }
         }
     }
