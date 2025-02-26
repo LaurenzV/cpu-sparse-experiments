@@ -18,6 +18,7 @@ impl ColorExt for PremulColor<Srgb> {
 }
 
 pub(crate) mod scalar {
+    #[cfg(feature = "simd")]
     use crate::fine::COLOR_COMPONENTS;
 
     #[inline(always)]
@@ -26,6 +27,7 @@ pub(crate) mod scalar {
     }
 
     #[inline(always)]
+    #[cfg(feature = "simd")]
     pub(crate) fn splat_x4(val: &[u8; COLOR_COMPONENTS]) -> [u8; 4 * COLOR_COMPONENTS] {
         let mut buf = [0; 4 * COLOR_COMPONENTS];
 

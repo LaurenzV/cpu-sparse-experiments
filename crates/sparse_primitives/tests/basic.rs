@@ -1,5 +1,5 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use peniko::color::palette::css::{DARK_BLUE, DARK_GREEN, WHITE, YELLOW};
+use peniko::color::palette::css::{DARK_GREEN, YELLOW};
 use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
 use peniko::{BlendMode, Compose, Mix};
 use sparse_primitives::color::palette::css::{

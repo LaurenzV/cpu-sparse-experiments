@@ -6,7 +6,7 @@ impl fine::Compose for Scalar {
     fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {
         match compose {
             peniko::Compose::SrcOver => fill::src_over(target, cs),
-            _ => unimplemented!()
+            _ => unimplemented!(),
         }
     }
 

@@ -20,6 +20,9 @@ static DIFFS_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 
 pub fn get_ctx(width: usize, height: usize, transparent: bool) -> RenderContext {
+    #[cfg(not(feature = "simd"))]
+    let execution_mode = ExecutionMode::Scalar;
+    #[cfg(feature = "simd")]
     let mut execution_mode = ExecutionMode::Scalar;
 
     #[cfg(all(target_arch = "aarch64", feature = "simd"))]

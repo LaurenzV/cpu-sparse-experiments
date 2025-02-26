@@ -104,7 +104,6 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
 
                 KE::compose_fill(target, &color, compose);
             }
-            Paint::Pattern(_) => unimplemented!(),
         }
     }
 
@@ -128,7 +127,6 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
 
                 KE::compose_strip(target, &color, alphas, compose);
             }
-            Paint::Pattern(_) => unimplemented!(),
         }
     }
 }

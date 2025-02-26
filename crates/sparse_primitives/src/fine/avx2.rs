@@ -1,4 +1,4 @@
-use crate::execute::{Avx2, Scalar};
+use crate::execute::Avx2;
 use crate::fine;
 use crate::fine::COLOR_COMPONENTS;
 
@@ -78,7 +78,6 @@ mod strip {
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::util::avx2::div_255;
     use crate::util::scalar::splat_x4;
-    use crate::wide_tile::STRIP_HEIGHT;
     use std::arch::x86_64::*;
 
     #[target_feature(enable = "avx2")]

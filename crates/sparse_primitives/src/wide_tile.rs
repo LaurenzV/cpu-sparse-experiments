@@ -61,20 +61,12 @@ pub struct CmdStrip {
 
 impl WideTile {
     pub(crate) fn fill(&mut self, x: u32, width: u32, paint: Paint, compose: Compose) {
-        if let Paint::Solid(s) = &paint {
-            let can_override = x == 0 && width == WIDE_TILE_WIDTH as u32 && s.components[3] == 1.0;
+        let Paint::Solid(s) = &paint;
+        let can_override = x == 0 && width == WIDE_TILE_WIDTH as u32 && s.components[3] == 1.0;
 
-            if can_override {
-                self.cmds.clear();
-                self.bg = *s;
-            } else {
-                self.cmds.push(Cmd::Fill(CmdFill {
-                    x,
-                    width,
-                    paint,
-                    compose,
-                }));
-            }
+        if can_override {
+            self.cmds.clear();
+            self.bg = *s;
         } else {
             self.cmds.push(Cmd::Fill(CmdFill {
                 x,
