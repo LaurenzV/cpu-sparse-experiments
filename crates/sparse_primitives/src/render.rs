@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 use vello_common::color::palette::css::BLACK;
 use vello_common::color::AlphaColor;
 use vello_common::flatten;
-use vello_common::flatten::FlatLine;
+use vello_common::flatten::Line;
 use vello_common::kurbo::{Affine, BezPath, Cap, Join, Stroke};
 use vello_common::paint::Paint;
 use vello_common::peniko::{BlendMode, Compose, Fill, Mix};
@@ -26,7 +26,7 @@ pub(crate) struct InnerContext<KE: KernelExecutor> {
     pub(crate) height: usize,
     pub(crate) wide_tiles: Vec<WideTile>,
     pub(crate) alphas: Vec<u32>,
-    pub(crate) line_buf: Vec<FlatLine>,
+    pub(crate) line_buf: Vec<Line>,
     pub(crate) tiles: Tiles,
     pub(crate) strip_buf: Vec<Strip>,
     pub(crate) paint: Paint,
@@ -177,7 +177,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         &self.alphas
     }
 
-    pub(crate) fn line_buf(&self) -> &[FlatLine] {
+    pub(crate) fn line_buf(&self) -> &[Line] {
         &self.line_buf
     }
 

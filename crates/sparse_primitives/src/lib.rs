@@ -169,7 +169,7 @@ impl RenderContext {
     }
 
     /// Get the line buffer of the render context.
-    pub fn line_buf(&self) -> &[FlatLine] {
+    pub fn line_buf(&self) -> &[Line] {
         dispatch!(func: line_buf(), self)
     }
 
@@ -247,7 +247,7 @@ use crate::render::InnerContext;
 use crate::wide_tile::WideTile;
 pub use pixmap::Pixmap;
 use vello_common::execute::{Avx2, ExecutionMode, Scalar};
-use vello_common::flatten::FlatLine;
+use vello_common::flatten::Line;
 use vello_common::kurbo::{Affine, BezPath, Rect, Stroke};
 use vello_common::paint::Paint;
 use vello_common::peniko::{BlendMode, Fill};
