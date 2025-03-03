@@ -138,23 +138,23 @@ impl<KE: KernelExecutor> InnerContext<KE> {
             rect.max_y() as f32,
         );
 
-        let top_strip_index = y0 as u32 / STRIP_HEIGHT as u32;
-        let top_strip_y = top_strip_index * STRIP_HEIGHT as u32;
+        let top_strip_index = y0 as u16 / STRIP_HEIGHT as u16;
+        let top_strip_y = top_strip_index * STRIP_HEIGHT as u16;
 
-        let bottom_strip_index = y1 as u32 / STRIP_HEIGHT as u32;
-        let bottom_strip_y = bottom_strip_index * STRIP_HEIGHT as u32;
+        let bottom_strip_index = y1 as u16 / STRIP_HEIGHT as u16;
+        let bottom_strip_y = bottom_strip_index * STRIP_HEIGHT as u16;
 
         let x0_floored = x0.floor();
         let x1_floored = x1.floor();
 
-        let x_start = x0_floored as u32;
+        let x_start = x0_floored as u16;
         // Inclusive, i.e. the pixel at column `x_end` is the very right border (possibly only anti-aliased)
         // of the rectangle, which should still be stripped.
-        let x_end = x1_floored as u32;
+        let x_end = x1_floored as u16;
 
         // Calculate the vertical/horizontal coverage of a pixel, using a start
         // and end point whose area in-between should be considered covered.
-        let pixel_coverage = |pixel_pos: u32, start: f32, end: f32| {
+        let pixel_coverage = |pixel_pos: u16, start: f32, end: f32| {
             let pixel_pos = pixel_pos as f32;
             let end = (end - pixel_pos).clamp(0.0, 1.0);
             let start = (start - pixel_pos).clamp(0.0, 1.0);
@@ -163,12 +163,12 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         };
 
         // Calculate the alpha coverages of the top/bottom borders of the rectangle.
-        let horizontal_alphas = |strip_y: u32| {
+        let horizontal_alphas = |strip_y: u16| {
             let mut buf = [0.0f32; STRIP_HEIGHT];
 
             // For each row in the strip, calculate how much it is covered by y0/y1.
-            for i in 0..STRIP_HEIGHT {
-                buf[i] = pixel_coverage(strip_y + i as u32, y0, y1);
+            for i in 0..STRIP_HEIGHT as u16 {
+                buf[i as usize] = pixel_coverage(strip_y + i, y0, y1);
             }
 
             buf
@@ -196,7 +196,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         let horizontal_strip = |alpha_buf: &mut Vec<u32>,
                                 strip_buf: &mut Vec<Strip>,
                                 alphas: &[f32; 4],
-                                strip_y: u32| {
+                                strip_y: u16| {
             // Strip the first column, which might have an additional alpha mask due to non-integer
             // alignment of x0.
             let col = alpha_buf.len() as u32;
@@ -245,7 +245,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
 
                 self.strip_buf.push(Strip {
                     x: x0_floored as i32,
-                    y: i * STRIP_HEIGHT as u32,
+                    y: i * STRIP_HEIGHT as u16,
                     col,
                     winding: 0,
                 });
@@ -257,7 +257,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
 
                     self.strip_buf.push(Strip {
                         x: x1_floored as i32,
-                        y: i * STRIP_HEIGHT as u32,
+                        y: i * STRIP_HEIGHT as u16,
                         col,
                         winding: 1,
                     });
