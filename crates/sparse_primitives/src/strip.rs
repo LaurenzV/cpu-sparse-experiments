@@ -419,7 +419,7 @@ pub(crate) mod neon {
                 if strip_start {
                     let strip = Strip {
                         x: 4 * prev_tile.x() + x0 as i32,
-                        y: 4 * prev_tile.y() as u32,
+                        y: 4 * prev_tile.y(),
                         col: cols,
                         winding: start_delta,
                     };
