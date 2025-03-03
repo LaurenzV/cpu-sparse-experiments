@@ -5,10 +5,13 @@
 
 use std::fmt::Debug;
 
-pub const TILE_SIZE: u32 = 4;
+pub const TILE_WIDTH: u32 = 4;
+pub const TILE_HEIGHT: u32 = 4;
 
-const TILE_SCALE: f32 = TILE_SIZE as f32;
-const INV_TILE_SCALE: f32 = 1.0 / TILE_SCALE;
+const TILE_WIDTH_SCALE: f32 = TILE_WIDTH as f32;
+const TILE_HEIGHT_SCALE: f32 = TILE_HEIGHT as f32;
+const INV_TILE_WIDTH_SCALE: f32 = 1.0 / TILE_WIDTH_SCALE;
+const INV_TILE_HEIGHT_SCALE: f32 = 1.0 / TILE_HEIGHT_SCALE;
 const NUDGE_FACTOR: f32 = 0.0000001;
 
 /// Handles the tiling of paths.
@@ -474,7 +477,7 @@ impl Tile {
         let x_min = x0.min(x1).floor();
         let x_max = x0.max(x1).ceil();
         let start_i = x_min as u32;
-        let end_i = (start_i + 1).max(x_max as u32).min(TILE_SIZE);
+        let end_i = (start_i + 1).max(x_max as u32).min(TILE_WIDTH);
 
         Footprint::from_range(start_i as u8, end_i as u8)
     }
@@ -538,7 +541,7 @@ const fn scale_up(z: f32) -> f32 {
 }
 
 fn scale_down(z: Point) -> Point {
-    z * INV_TILE_SCALE
+    Point::new(z.x * INV_TILE_WIDTH_SCALE, z.y * INV_TILE_HEIGHT_SCALE)
 }
 
 #[cfg(test)]
