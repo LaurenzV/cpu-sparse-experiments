@@ -122,9 +122,9 @@ pub(crate) mod scalar {
         for i in 1..tiles.len() {
             let tile = tiles.get_tile(i);
 
-            if prev_tile.loc() != tile.loc() {
+            if !prev_tile.same_loc(tile) {
                 let start_delta = delta;
-                let same_strip = prev_tile.loc().same_strip(&tile.loc());
+                let same_strip = prev_tile.same_strip(&tile);
 
                 if same_strip {
                     fp.extend(3);
@@ -260,7 +260,7 @@ pub(crate) mod scalar {
                 strip_start = !same_strip;
                 seg_start = i;
 
-                if !prev_tile.loc().same_row(&tile.loc()) {
+                if !prev_tile.same_row(&tile) {
                     delta = 0;
                 }
             }
@@ -298,9 +298,9 @@ pub(crate) mod neon {
         for i in 1..tiles.len() {
             let tile = tiles.get_tile(i);
 
-            if prev_tile.loc() != tile.loc() {
+            if prev_tile != tile {
                 let start_delta = delta;
-                let same_strip = prev_tile.loc().same_strip(&tile.loc());
+                let same_strip = prev_tile.same_strip(&tile);
 
                 if same_strip {
                     fp.extend(3);
@@ -437,7 +437,7 @@ pub(crate) mod neon {
                 strip_start = !same_strip;
                 seg_start = i;
 
-                if !prev_tile.loc().same_row(&tile.loc()) {
+                if !prev_tile.same_row(&tile) {
                     delta = 0;
                 }
             }
@@ -511,9 +511,9 @@ pub(crate) mod avx2 {
         for i in 1..tiles.len() {
             let tile = tiles.get_tile(i);
 
-            if prev_tile.loc() != tile.loc() {
+            if !prev_tile.same_loc(tile) {
                 let start_delta = delta;
-                let same_strip = prev_tile.loc().same_strip(&tile.loc());
+                let same_strip = prev_tile.same_strip(&tile);
 
                 if same_strip {
                     fp.extend(3);
@@ -654,7 +654,7 @@ pub(crate) mod avx2 {
                 strip_start = !same_strip;
                 seg_start = i;
 
-                if !prev_tile.loc().same_row(&tile.loc()) {
+                if !prev_tile.same_row(&tile) {
                     delta = 0;
                 }
             }

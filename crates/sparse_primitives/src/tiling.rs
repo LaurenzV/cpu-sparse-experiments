@@ -326,30 +326,6 @@ impl Tiles {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Loc {
-    // TODO: Unlike y, will not always be positive since we cannot ignore tiles where x < 0 because
-    // they still impact the winding number. We should be able to change this once we have viewport
-    // culling.
-    pub x: i32,
-    pub y: u16,
-}
-
-impl Loc {
-    pub fn zero() -> Self {
-        Loc { x: 0, y: 0 }
-    }
-    /// Check whether two locations are on the same strip. This is the case if they are in the same
-    /// row and right next to each other.
-    pub(crate) fn same_strip(&self, other: &Self) -> bool {
-        self.same_row(other) && (other.x - self.x).abs() <= 1
-    }
-
-    pub(crate) fn same_row(&self, other: &Self) -> bool {
-        self.y == other.y
-    }
-}
-
 /// A footprint represents in a compact fashion the range of pixels covered by a tile.
 /// We represent this as a u32 so that we can work with bit-shifting for better performance.
 pub(crate) struct Footprint(pub(crate) u32);
@@ -462,11 +438,16 @@ impl Tile {
         self.p1
     }
 
-    pub(crate) fn loc(&self) -> Loc {
-        Loc {
-            x: self.x(),
-            y: self.y,
-        }
+    pub fn same_loc(&self, other: &Tile) -> bool {
+        self.x == other.x && self.same_row(other)
+    }
+
+    pub(crate) fn same_strip(&self, other: &Self) -> bool {
+        self.same_row(other) && (other.x - self.x).abs() <= 1
+    }
+
+    pub(crate) fn same_row(&self, other: &Self) -> bool {
+        self.y == other.y
     }
 
     // TODO: Profiling shows that this method takes up quite a lot of time in AVX SIMD, investigate
