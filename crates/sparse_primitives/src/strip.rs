@@ -19,7 +19,7 @@ use peniko::Fill;
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
     pub x: i32,
-    pub y: u32,
+    pub y: u16,
     pub col: u32,
     pub winding: i32,
 }
@@ -89,13 +89,13 @@ impl Strip {
         self.x
     }
 
-    pub fn y(&self) -> u32 {
+    pub fn y(&self) -> u16 {
         self.y
     }
 
-    pub fn strip_y(&self) -> u32 {
+    pub fn strip_y(&self) -> u16 {
         // TODO: Don't convert?
-        self.y / STRIP_HEIGHT as u32
+        self.y / STRIP_HEIGHT as u16
     }
 }
 
@@ -242,7 +242,7 @@ pub(crate) mod scalar {
                 if strip_start {
                     let strip = Strip {
                         x: 4 * prev_tile.x() + x0 as i32,
-                        y: 4 * prev_tile.y() as u32,
+                        y: 4 * prev_tile.y(),
                         col: cols,
                         winding: start_delta,
                     };
@@ -419,7 +419,7 @@ pub(crate) mod neon {
                 if strip_start {
                     let strip = Strip {
                         x: 4 * prev_tile.x() + x0 as i32,
-                        y: 4 * prev_tile.y() as u32,
+                        y: 4 * prev_tile.y(),
                         col: cols,
                         winding: start_delta,
                     };
@@ -636,7 +636,7 @@ pub(crate) mod avx2 {
                 if strip_start {
                     let strip = Strip {
                         x: 4 * prev_tile.x() + x0 as i32,
-                        y: 4 * prev_tile.y() as u32,
+                        y: 4 * prev_tile.y(),
                         col: cols,
                         winding: start_delta,
                     };
