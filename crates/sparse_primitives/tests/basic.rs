@@ -5,7 +5,7 @@ use peniko::{BlendMode, Compose, Mix};
 use sparse_primitives::color::palette::css::{
     BEIGE, BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED,
 };
-use sparse_primitives::{FillRule, RenderContext};
+use sparse_primitives::{Fill, RenderContext};
 use std::f64::consts::PI;
 
 mod util;
@@ -184,7 +184,7 @@ fn filling_evenodd_rule() {
     let star = star_path();
 
     ctx.set_paint(MAROON.into());
-    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_fill_rule(Fill::EvenOdd);
     ctx.fill_path(&star.into());
 
     check_ref(&ctx, "filling_evenodd_rule");

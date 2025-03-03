@@ -1,5 +1,6 @@
 use criterion::measurement::WallTime;
 use criterion::{BenchmarkGroup, Criterion};
+use peniko::Style::Fill;
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 use sparse_primitives::execute::Avx2;
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
@@ -8,7 +9,6 @@ use sparse_primitives::execute::Scalar;
 use sparse_primitives::kurbo::{Affine, BezPath, Stroke};
 use sparse_primitives::strip::render_strips;
 use sparse_primitives::tiling::{FlatLine, Tile, Tiles};
-use sparse_primitives::FillRule;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -36,7 +36,7 @@ pub fn _render_strips(c: &mut Criterion) {
                                     tile,
                                     &mut strip_buf,
                                     &mut alpha_buf,
-                                    FillRule::NonZero,
+                                    Fill::NonZero,
                                 );
                             }
                         })

@@ -14,7 +14,7 @@
 use crate::execute::KernelExecutor;
 use crate::tiling::Tiles;
 use crate::wide_tile::STRIP_HEIGHT;
-use crate::FillRule;
+use peniko::Fill;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Strip {
@@ -29,7 +29,7 @@ pub fn render_strips<KE: KernelExecutor>(
     tiles: &Tiles,
     strip_buf: &mut Vec<Strip>,
     alpha_buf: &mut Vec<u32>,
-    fill_rule: FillRule,
+    fill_rule: Fill,
 ) {
     strip_buf.clear();
 
@@ -54,13 +54,13 @@ impl Strip {
 pub(crate) mod scalar {
     use crate::strip::Strip;
     use crate::tiling::{Footprint, Tiles};
-    use crate::FillRule;
+    use peniko::Fill;
 
     pub(crate) fn render_strips(
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
+        fill_rule: Fill,
     ) {
         let mut strip_start = true;
         let mut cols = alpha_buf.len() as u32;
@@ -167,10 +167,10 @@ pub(crate) mod scalar {
                 }
 
                 match fill_rule {
-                    FillRule::NonZero => {
+                    Fill::NonZero => {
                         fill!(|area: f32| (area.abs().min(1.0) * 255.0 + 0.5) as u32)
                     }
-                    FillRule::EvenOdd => {
+                    Fill::EvenOdd => {
                         fill!(|area: f32| {
                             let area_abs = area.abs();
                             let area_fract = area_abs.fract();
@@ -228,7 +228,7 @@ pub(crate) mod scalar {
 pub(crate) mod neon {
     use crate::strip::Strip;
     use crate::tiling::{Footprint, Tiles};
-    use crate::FillRule;
+    use crate::Fill;
     use std::arch::aarch64::*;
 
     /// SAFETY: The CPU needs to support the target feature `neon`.
@@ -236,7 +236,7 @@ pub(crate) mod neon {
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
+        fill_rule: Fill,
     ) {
         let mut strip_start = true;
         let mut cols = alpha_buf.len() as u32;
@@ -333,7 +333,7 @@ pub(crate) mod neon {
                 }
 
                 match fill_rule {
-                    FillRule::NonZero => {
+                    Fill::NonZero => {
                         fill!(|idx: usize| {
                             let area = vld1q_f32(areas.as_ptr().add(idx));
                             let abs = vabsq_f32(area);
@@ -347,7 +347,7 @@ pub(crate) mod neon {
                             vget_lane_u32::<0>(vreinterpret_u32_u8(shifted))
                         })
                     }
-                    FillRule::EvenOdd => {
+                    Fill::EvenOdd => {
                         fill!(|idx: usize| {
                             let area = vld1q_f32(areas.as_ptr().add(idx));
                             let area_abs = vabsq_f32(area);
@@ -417,7 +417,7 @@ pub(crate) mod neon {
 pub(crate) mod avx2 {
     use crate::strip::Strip;
     use crate::tiling::{Footprint, Tiles};
-    use crate::FillRule;
+    use crate::Fill;
     use std::arch::x86_64::*;
 
     /// SAFETY: The CPU needs to support the target feature `avx2`.
@@ -449,7 +449,7 @@ pub(crate) mod avx2 {
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
+        fill_rule: Fill,
     ) {
         let mut strip_start = true;
         let mut cols = alpha_buf.len() as u32;
@@ -549,7 +549,7 @@ pub(crate) mod avx2 {
                 }
 
                 match fill_rule {
-                    FillRule::NonZero => {
+                    Fill::NonZero => {
                         fill!(|idx: usize| {
                             let area = _mm_loadu_ps(areas.as_ptr().add(idx));
                             let abs = abs_128(area);
@@ -564,7 +564,7 @@ pub(crate) mod avx2 {
                         })
                     }
 
-                    FillRule::EvenOdd => {
+                    Fill::EvenOdd => {
                         fill!(|idx: usize| {
                             let area = _mm_loadu_ps(areas.as_ptr().add(idx));
                             let area_abs = abs_128(area);

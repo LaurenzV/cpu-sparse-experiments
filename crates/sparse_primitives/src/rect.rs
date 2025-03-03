@@ -12,9 +12,8 @@ use crate::render::{InnerContext, DEFAULT_TOLERANCE};
 use crate::strip::Strip;
 use crate::tiling::FlatLine;
 use crate::wide_tile::{STRIP_HEIGHT, WIDE_TILE_WIDTH};
-use crate::FillRule;
-use peniko::kurbo;
 use peniko::kurbo::{Affine, Join, Rect, Shape};
+use peniko::{kurbo, Fill};
 
 impl<KE: KernelExecutor> InnerContext<KE> {
     pub(crate) fn fill_rect(&mut self, rect: &Rect) {
@@ -110,7 +109,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
             }
         } else {
             self.strip_filled_rect(rect);
-            self.generate_commands(FillRule::NonZero, paint);
+            self.generate_commands(Fill::NonZero, paint);
         }
     }
 

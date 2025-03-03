@@ -17,21 +17,6 @@ pub mod wide_tile;
 
 pub use peniko::*;
 
-#[derive(Clone, Copy)]
-pub enum FillRule {
-    NonZero,
-    EvenOdd,
-}
-
-impl FillRule {
-    pub(crate) fn active_fill(&self, winding: i32) -> bool {
-        match self {
-            FillRule::NonZero => winding != 0,
-            FillRule::EvenOdd => winding % 2 != 0,
-        }
-    }
-}
-
 enum InnerContextType {
     Scalar(InnerContext<Scalar>),
     #[cfg(all(feature = "simd", target_arch = "aarch64"))]
@@ -129,7 +114,7 @@ impl RenderContext {
     }
 
     /// Set the fill rule for filling operations.
-    pub fn set_fill_rule(&mut self, fill_rule: FillRule) {
+    pub fn set_fill_rule(&mut self, fill_rule: Fill) {
         dispatch_mut!(func: set_fill_rule(fill_rule), self)
     }
 

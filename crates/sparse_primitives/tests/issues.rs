@@ -1,7 +1,7 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
 use peniko::kurbo::{BezPath, Stroke};
+use peniko::Fill;
 use sparse_primitives::color::palette::css::{DARK_BLUE, LIME};
-use sparse_primitives::FillRule;
 
 mod util;
 
@@ -213,7 +213,7 @@ fn issue_28_triangle_exceeding_viewport_1() {
 
     let mut ctx = get_ctx(15, 8, false);
 
-    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_fill_rule(Fill::EvenOdd);
     ctx.set_paint(LIME.into());
     ctx.fill_path(&path.into());
 
@@ -230,7 +230,7 @@ fn issue_28_triangle_exceeding_viewport_2() {
 
     let mut ctx = get_ctx(15, 8, false);
 
-    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_fill_rule(Fill::EvenOdd);
     ctx.set_paint(LIME.into());
     ctx.fill_path(&path.into());
 
@@ -248,7 +248,7 @@ fn issue_30_shape_at_wide_tile_boundary() {
 
     let mut ctx = get_ctx(256, 4, false);
 
-    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_fill_rule(Fill::EvenOdd);
     ctx.set_paint(LIME.into());
     ctx.fill_path(&path.into());
 
@@ -267,7 +267,7 @@ fn issue_eo_filling_missing_anti_aliasing() {
 
     let mut ctx = get_ctx(50, 50, false);
 
-    ctx.set_fill_rule(FillRule::EvenOdd);
+    ctx.set_fill_rule(Fill::EvenOdd);
     ctx.set_paint(LIME.into());
     ctx.fill_path(&path.into());
 

@@ -1,6 +1,7 @@
 use crate::strip::Strip;
 use crate::tiling::Tiles;
-use crate::{fine, strip, FillRule};
+use crate::{fine, strip};
+use peniko::Fill;
 
 #[derive(Copy, Clone, Debug)]
 /// The execution mode used for the rendering process.
@@ -43,7 +44,7 @@ pub trait KernelExecutor: fine::Compose {
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
+        fill_rule: Fill,
     );
 }
 
@@ -57,7 +58,7 @@ impl KernelExecutor for Scalar {
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
+        fill_rule: Fill,
     ) {
         strip::scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
     }
@@ -72,7 +73,7 @@ impl KernelExecutor for Avx2 {
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
+        fill_rule: Fill,
     ) {
         unsafe {
             strip::avx2::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
@@ -86,7 +87,7 @@ impl KernelExecutor for Neon {
         tiles: &Tiles,
         strip_buf: &mut Vec<Strip>,
         alpha_buf: &mut Vec<u32>,
-        fill_rule: FillRule,
+        fill_rule: Fill,
     ) {
         unsafe {
             strip::neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule);

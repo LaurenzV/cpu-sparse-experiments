@@ -14,10 +14,10 @@ use crate::{
     strip::Strip,
     tiling::FlatLine,
     wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
-    FillRule, Pixmap,
+    Pixmap,
 };
 use peniko::kurbo::BezPath;
-use peniko::{color::AlphaColor, kurbo::Affine, BlendMode, Compose, Mix};
+use peniko::{color::AlphaColor, kurbo::Affine, BlendMode, Compose, Fill, Mix};
 use std::marker::PhantomData;
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
@@ -33,7 +33,7 @@ pub(crate) struct InnerContext<KE: KernelExecutor> {
     pub(crate) paint: Paint,
     pub(crate) stroke: Stroke,
     pub(crate) transform: Affine,
-    pub(crate) fill_rule: FillRule,
+    pub(crate) fill_rule: Fill,
     pub(crate) blend_mode: BlendMode,
     // Whether the current context is cleared.
     resetted: bool,
@@ -59,7 +59,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         let cleared = true;
 
         let transform = Affine::IDENTITY;
-        let fill_rule = FillRule::NonZero;
+        let fill_rule = Fill::NonZero;
         let paint = BLACK.into();
         let stroke = Stroke {
             width: 1.0,
@@ -95,7 +95,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
 
     pub(crate) fn stroke_path(&mut self, path: &BezPath) {
         crate::flatten::stroke(&path, &self.stroke, self.transform, &mut self.line_buf);
-        self.render_path(FillRule::NonZero, self.paint.clone());
+        self.render_path(Fill::NonZero, self.paint.clone());
     }
 
     pub(crate) fn set_blend_mode(&mut self, blend_mode: BlendMode) {
@@ -110,7 +110,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         self.paint = paint;
     }
 
-    pub(crate) fn set_fill_rule(&mut self, fill_rule: FillRule) {
+    pub(crate) fn set_fill_rule(&mut self, fill_rule: Fill) {
         self.fill_rule = fill_rule;
     }
 
@@ -190,7 +190,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         &self.strip_buf
     }
 
-    fn render_path(&mut self, fill_rule: FillRule, paint: Paint) {
+    fn render_path(&mut self, fill_rule: Fill, paint: Paint) {
         if let Some(rect) = lines_to_rect(&self.line_buf, self.width, self.height) {
             // Path is actually a rectangle, so used fast path for rectangles.
             self.render_filled_rect(&rect, paint);
@@ -214,7 +214,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
     }
 
     /// Generate the strip and fill commands for each wide tile using the current `strip_buf`.
-    pub(crate) fn generate_commands(&mut self, fill_rule: FillRule, paint: Paint) {
+    pub(crate) fn generate_commands(&mut self, fill_rule: Fill, paint: Paint) {
         let width_tiles = self.wide_tiles_per_row();
 
         if self.strip_buf.is_empty() {
@@ -274,7 +274,12 @@ impl<KE: KernelExecutor> InnerContext<KE> {
                 self.wide_tiles[row_start + xtile].push(Cmd::Strip(cmd));
             }
 
-            if fill_rule.active_fill(next_strip.winding)
+            let active_fill = match fill_rule {
+                Fill::NonZero => next_strip.winding != 0,
+                Fill::EvenOdd => next_strip.winding % 2 != 0,
+            };
+
+            if active_fill
                 && y == next_strip.strip_y()
                 // Only fill if we are actually inside the viewport.
                 && next_strip.x() >= 0
