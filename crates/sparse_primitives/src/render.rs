@@ -1,23 +1,23 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::color::palette::css::BLACK;
 use crate::execute::KernelExecutor;
-use crate::kurbo::{Cap, Join, Stroke};
-use crate::paint::Paint;
-use crate::strip::render_strips;
-use crate::tiling::Tiles;
 use crate::util::ColorExt;
 use crate::{
     fine::Fine,
-    strip::Strip,
-    tiling::FlatLine,
     wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
     Pixmap,
 };
-use peniko::kurbo::BezPath;
-use peniko::{color::AlphaColor, kurbo::Affine, BlendMode, Compose, Fill, Mix};
 use std::marker::PhantomData;
+use vello_common::color::palette::css::BLACK;
+use vello_common::color::AlphaColor;
+use vello_common::flatten;
+use vello_common::flatten::FlatLine;
+use vello_common::kurbo::{Affine, BezPath, Cap, Join, Stroke};
+use vello_common::paint::Paint;
+use vello_common::peniko::{BlendMode, Compose, Fill, Mix};
+use vello_common::strip::Strip;
+use vello_common::tile::Tiles;
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
 
@@ -88,12 +88,12 @@ impl<KE: KernelExecutor> InnerContext<KE> {
     }
 
     pub(crate) fn fill_path(&mut self, path: &BezPath) {
-        crate::flatten::fill(&path, self.transform, &mut self.line_buf);
+        flatten::fill(&path, self.transform, &mut self.line_buf);
         self.render_path(self.fill_rule, self.paint.clone());
     }
 
     pub(crate) fn stroke_path(&mut self, path: &BezPath) {
-        crate::flatten::stroke(&path, &self.stroke, self.transform, &mut self.line_buf);
+        flatten::stroke(&path, &self.stroke, self.transform, &mut self.line_buf);
         self.render_path(Fill::NonZero, self.paint.clone());
     }
 
@@ -193,7 +193,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         self.tiles.make_tiles(&self.line_buf);
         self.tiles.sort_tiles();
 
-        render_strips::<KE>(
+        KE::render_strips(
             &self.tiles,
             &mut self.strip_buf,
             &mut self.alphas,
@@ -222,12 +222,12 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         for i in 0..self.strip_buf.len() - 1 {
             let strip = &self.strip_buf[i];
 
-            if strip.x() >= self.width as i32 {
+            if strip.x >= self.width as i32 {
                 // Don't render strips that are outside the viewport.
                 continue;
             }
 
-            if strip.y() >= self.height as u16 {
+            if strip.y >= self.height as u16 {
                 // Since strips are sorted by location, any subsequent strips will also be
                 // outside the viewport, so we can abort entirely.
                 break;
@@ -238,8 +238,8 @@ impl<KE: KernelExecutor> InnerContext<KE> {
             // support viewport culling yet. However, when generating the commands
             // we only want to emit strips >= 0, so we calculate the adjustment
             // and then only include the alpha indices for columns where x >= 0.
-            let x0_adjustment = (strip.x()).min(0).unsigned_abs();
-            let x0 = (strip.x() + x0_adjustment as i32) as u32;
+            let x0_adjustment = (strip.x).min(0).unsigned_abs();
+            let x0 = (strip.x + x0_adjustment as i32) as u32;
             let y = strip.strip_y();
             let row_start = y as usize * width_tiles;
             let mut col = strip.col + x0_adjustment;
@@ -276,10 +276,10 @@ impl<KE: KernelExecutor> InnerContext<KE> {
             if active_fill
                 && y == next_strip.strip_y()
                 // Only fill if we are actually inside the viewport.
-                && next_strip.x() >= 0
+                && next_strip.x >= 0
             {
                 x = x1;
-                let x2 = next_strip.x() as u32;
+                let x2 = next_strip.x as u32;
                 let fxt0 = x1 as usize / WIDE_TILE_WIDTH;
                 let fxt1 = (x2 as usize).div_ceil(WIDE_TILE_WIDTH);
                 for xtile in fxt0..fxt1 {

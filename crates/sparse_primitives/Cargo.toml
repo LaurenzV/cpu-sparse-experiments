@@ -3,8 +3,7 @@ name = "sparse_primitives"
 edition = "2021"
 
 [dependencies]
-peniko = {workspace = true}
-flatten = { workspace = true }
+vello_common = { workspace = true, features = ["simd"] }
 
 [[bench]]
 name = "main"

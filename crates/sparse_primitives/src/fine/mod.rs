@@ -10,10 +10,11 @@ pub(crate) mod neon;
 pub(crate) mod scalar;
 
 use crate::execute::KernelExecutor;
-use crate::paint::Paint;
 use crate::util::ColorExt;
 use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use std::marker::PhantomData;
+use vello_common::paint::Paint;
+use vello_common::peniko;
 
 pub(crate) const COLOR_COMPONENTS: usize = 4;
 pub(crate) const TOTAL_STRIP_HEIGHT: usize = STRIP_HEIGHT * COLOR_COMPONENTS;
@@ -104,6 +105,7 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
 
                 KE::compose_fill(target, &color, compose);
             }
+            _ => unimplemented!(),
         }
     }
 
@@ -127,6 +129,7 @@ impl<'a, KE: KernelExecutor> Fine<'a, KE> {
 
                 KE::compose_strip(target, &color, alphas, compose);
             }
+            _ => unimplemented!(),
         }
     }
 }

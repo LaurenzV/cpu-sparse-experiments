@@ -1,12 +1,12 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use peniko::color::palette::css::{DARK_GREEN, YELLOW};
-use peniko::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
-use peniko::{BlendMode, Compose, Mix};
-use sparse_primitives::color::palette::css::{
-    BEIGE, BLUE, GREEN, LIME, MAROON, REBECCA_PURPLE, RED,
-};
-use sparse_primitives::{Fill, RenderContext};
+use sparse_primitives::RenderContext;
 use std::f64::consts::PI;
+use vello_common::color::palette::css::{
+    BEIGE, BLUE, DARK_GREEN, GREEN, LIME, MAROON, REBECCA_PURPLE, RED, YELLOW,
+};
+use vello_common::kurbo::{Affine, BezPath, Circle, Join, Point, Rect, Shape, Stroke};
+use vello_common::peniko;
+use vello_common::peniko::Compose;
 
 mod util;
 
@@ -184,7 +184,7 @@ fn filling_evenodd_rule() {
     let star = star_path();
 
     ctx.set_paint(MAROON.into());
-    ctx.set_fill_rule(Fill::EvenOdd);
+    ctx.set_fill_rule(peniko::Fill::EvenOdd);
     ctx.fill_path(&star.into());
 
     check_ref(&ctx, "filling_evenodd_rule");
@@ -484,7 +484,7 @@ fn compose_source(ctx: &mut RenderContext) {
 macro_rules! compose_impl {
     ($mode:path, $name:expr) => {
         let mut ctx = compose_destination();
-        ctx.set_blend_mode(BlendMode::new(Mix::Normal, $mode));
+        ctx.set_blend_mode(peniko::BlendMode::new(peniko::Mix::Normal, $mode));
         compose_source(&mut ctx);
 
         check_ref(&ctx, $name);

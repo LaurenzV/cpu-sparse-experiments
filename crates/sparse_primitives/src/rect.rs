@@ -8,7 +8,7 @@
 
 use crate::execute::KernelExecutor;
 use crate::render::{InnerContext, DEFAULT_TOLERANCE};
-use peniko::kurbo::{Rect, Shape};
+use vello_common::kurbo::{Rect, Shape};
 
 impl<KE: KernelExecutor> InnerContext<KE> {
     pub(crate) fn fill_rect(&mut self, rect: &Rect) {

@@ -1,4 +1,4 @@
-use crate::color::{PremulColor, Srgb};
+use vello_common::color::{PremulColor, Srgb};
 
 pub(crate) trait ColorExt {
     /// Using the already-existing `to_rgba8` is slow on x86 because it involves rounding, so

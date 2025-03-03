@@ -1,6 +1,7 @@
-use crate::execute::Avx2;
 use crate::fine;
 use crate::fine::COLOR_COMPONENTS;
+use vello_common::execute::Avx2;
+use vello_common::peniko;
 
 impl fine::Compose for Avx2 {
     fn compose_fill(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], compose: peniko::Compose) {

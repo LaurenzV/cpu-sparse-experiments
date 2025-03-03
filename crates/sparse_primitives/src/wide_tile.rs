@@ -1,9 +1,9 @@
 // Copyright 2024 the Piet Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::paint::Paint;
-use peniko::color::{AlphaColor, Srgb};
-use peniko::Compose;
+use vello_common::color::{AlphaColor, Srgb};
+use vello_common::paint::Paint;
+use vello_common::peniko::Compose;
 
 pub const WIDE_TILE_WIDTH: usize = 256;
 pub const STRIP_HEIGHT: usize = 4;
@@ -61,7 +61,7 @@ pub struct CmdStrip {
 
 impl WideTile {
     pub(crate) fn fill(&mut self, x: u32, width: u32, paint: Paint, compose: Compose) {
-        let Paint::Solid(s) = &paint;
+        let Paint::Solid(s) = &paint else { todo!() };
         let can_override = x == 0 && width == WIDE_TILE_WIDTH as u32 && s.components[3] == 1.0;
 
         if can_override {

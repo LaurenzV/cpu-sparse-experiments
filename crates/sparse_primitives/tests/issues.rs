@@ -1,7 +1,7 @@
 use crate::util::{check_ref, get_ctx, render_pixmap};
-use peniko::kurbo::{BezPath, Stroke};
-use peniko::Fill;
-use sparse_primitives::color::palette::css::{DARK_BLUE, LIME};
+use vello_common::color::palette::css::{DARK_BLUE, LIME};
+use vello_common::kurbo::{BezPath, Stroke};
+use vello_common::peniko::Fill;
 
 mod util;
 

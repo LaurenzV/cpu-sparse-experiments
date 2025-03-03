@@ -1421,13 +1421,12 @@ version = "0.0.0"
 dependencies = [
  "bench_gen",
  "criterion",
- "flatten",
  "image",
  "once_cell",
  "oxipng",
- "peniko",
  "png",
  "rand 0.8.5",
+ "vello_common",
 ]
 
 [[package]]
@@ -1584,6 +1583,21 @@ dependencies = [
  "aligned-vec",
  "num-traits",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "vello_api"
+version = "0.4.0"
+dependencies = [
+ "peniko",
+]
+
+[[package]]
+name = "vello_common"
+version = "0.4.0"
+dependencies = [
+ "flatten",
+ "vello_api",
 ]
 
 [[package]]

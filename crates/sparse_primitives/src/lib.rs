@@ -3,26 +3,21 @@
 
 #![cfg_attr(not(feature = "simd"), forbid(unsafe_code))]
 
-pub mod execute;
+mod execute;
 pub mod fine;
-pub mod flatten;
-pub mod paint;
 pub mod pixmap;
 mod rect;
 pub mod render;
-pub mod strip;
-pub mod tiling;
+mod strip;
 mod util;
 pub mod wide_tile;
-
-pub use peniko::*;
 
 enum InnerContextType {
     Scalar(InnerContext<Scalar>),
     #[cfg(all(feature = "simd", target_arch = "aarch64"))]
     Neon(InnerContext<execute::Neon>),
     #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-    Avx2(InnerContext<execute::Avx2>),
+    Avx2(InnerContext<Avx2>),
 }
 
 macro_rules! dispatch_mut {
@@ -248,11 +243,13 @@ fn select_inner_context(
     }
 }
 
-use crate::execute::{ExecutionMode, Scalar};
-use crate::kurbo::{Affine, BezPath, Rect, Stroke};
-use crate::paint::Paint;
 use crate::render::InnerContext;
-use crate::strip::Strip;
-use crate::tiling::{FlatLine, Tiles};
 use crate::wide_tile::WideTile;
 pub use pixmap::Pixmap;
+use vello_common::execute::{Avx2, ExecutionMode, Scalar};
+use vello_common::flatten::FlatLine;
+use vello_common::kurbo::{Affine, BezPath, Rect, Stroke};
+use vello_common::paint::Paint;
+use vello_common::peniko::{BlendMode, Fill};
+use vello_common::strip::Strip;
+use vello_common::tile::Tiles;

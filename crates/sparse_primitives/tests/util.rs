@@ -1,12 +1,12 @@
 use image::{load_from_memory, Rgba, RgbaImage};
 use once_cell::sync::Lazy;
-use peniko::color::palette;
-use peniko::kurbo::{Rect, Shape};
-use sparse_primitives::execute::ExecutionMode;
 use sparse_primitives::{Pixmap, RenderContext};
 use std::cmp::max;
 use std::path::PathBuf;
 use std::sync::LazyLock;
+use vello_common::color::palette;
+use vello_common::execute::ExecutionMode;
+use vello_common::kurbo::{Rect, Shape};
 
 const REPLACE: bool = true;
 
