@@ -11,7 +11,7 @@
 //! If there becomes a single, unified code base for this, then the
 //! path_id type should probably become a generic parameter.
 
-use crate::execute::KernelExecutor;
+use crate::execute::{KernelExecutor, Scalar};
 use crate::tiling::Tiles;
 use crate::wide_tile::STRIP_HEIGHT;
 use peniko::Fill;
@@ -22,6 +22,54 @@ pub struct Strip {
     pub y: u32,
     pub col: u32,
     pub winding: i32,
+}
+
+pub trait Render {
+    fn render_strips(
+        tiles: &Tiles,
+        strip_buf: &mut Vec<Strip>,
+        alpha_buf: &mut Vec<u32>,
+        fill_rule: Fill,
+    );
+}
+
+impl Render for Scalar {
+    fn render_strips(
+        tiles: &Tiles,
+        strip_buf: &mut Vec<Strip>,
+        alpha_buf: &mut Vec<u32>,
+        fill_rule: Fill,
+    ) {
+        scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
+    }
+}
+
+#[cfg(all(target_arch = "x86_64", feature = "simd"))]
+impl Render for crate::execute::Avx2 {
+    fn render_strips(
+        tiles: &Tiles,
+        strip_buf: &mut Vec<Strip>,
+        alpha_buf: &mut Vec<u32>,
+        fill_rule: Fill,
+    ) {
+        unsafe {
+            avx2::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
+        }
+    }
+}
+
+#[cfg(all(target_arch = "aarch64", feature = "simd"))]
+impl Render for crate::execute::Neon {
+    fn render_strips(
+        tiles: &Tiles,
+        strip_buf: &mut Vec<Strip>,
+        alpha_buf: &mut Vec<u32>,
+        fill_rule: Fill,
+    ) {
+        unsafe {
+            neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
+        }
+    }
 }
 
 #[inline(never)]

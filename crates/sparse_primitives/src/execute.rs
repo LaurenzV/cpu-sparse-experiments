@@ -1,7 +1,4 @@
-use crate::strip::Strip;
-use crate::tiling::Tiles;
 use crate::{fine, strip};
-use peniko::Fill;
 
 #[derive(Copy, Clone, Debug)]
 /// The execution mode used for the rendering process.
@@ -39,58 +36,20 @@ impl Default for ExecutionMode {
     }
 }
 
-pub trait KernelExecutor: fine::Compose {
-    fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: Fill,
-    );
-}
+pub trait KernelExecutor: fine::Compose + strip::Render {}
 
 pub struct Scalar;
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
 pub struct Neon;
 
-impl KernelExecutor for Scalar {
-    fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: Fill,
-    ) {
-        strip::scalar::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
-    }
-}
+impl KernelExecutor for Scalar {}
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 pub struct Avx2;
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
-impl KernelExecutor for Avx2 {
-    fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: Fill,
-    ) {
-        unsafe {
-            strip::avx2::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
-        }
-    }
-}
+impl KernelExecutor for Avx2 {}
 
 #[cfg(all(target_arch = "aarch64", feature = "simd"))]
-impl KernelExecutor for Neon {
-    fn render_strips(
-        tiles: &Tiles,
-        strip_buf: &mut Vec<Strip>,
-        alpha_buf: &mut Vec<u32>,
-        fill_rule: Fill,
-    ) {
-        unsafe {
-            strip::neon::render_strips(tiles, strip_buf, alpha_buf, fill_rule);
-        }
-    }
-}
+impl KernelExecutor for Neon {}
