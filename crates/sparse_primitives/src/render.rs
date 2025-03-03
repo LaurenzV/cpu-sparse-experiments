@@ -5,7 +5,6 @@ use crate::color::palette::css::BLACK;
 use crate::execute::KernelExecutor;
 use crate::kurbo::{Cap, Join, Stroke};
 use crate::paint::Paint;
-use crate::rect::lines_to_rect;
 use crate::strip::render_strips;
 use crate::tiling::Tiles;
 use crate::util::ColorExt;
@@ -191,22 +190,17 @@ impl<KE: KernelExecutor> InnerContext<KE> {
     }
 
     fn render_path(&mut self, fill_rule: Fill, paint: Paint) {
-        if let Some(rect) = lines_to_rect(&self.line_buf, self.width, self.height) {
-            // Path is actually a rectangle, so used fast path for rectangles.
-            self.render_filled_rect(&rect, paint);
-        } else {
-            self.tiles.make_tiles(&self.line_buf);
-            self.tiles.sort_tiles();
+        self.tiles.make_tiles(&self.line_buf);
+        self.tiles.sort_tiles();
 
-            render_strips::<KE>(
-                &self.tiles,
-                &mut self.strip_buf,
-                &mut self.alphas,
-                fill_rule,
-            );
+        render_strips::<KE>(
+            &self.tiles,
+            &mut self.strip_buf,
+            &mut self.alphas,
+            fill_rule,
+        );
 
-            self.generate_commands(fill_rule, paint);
-        }
+        self.generate_commands(fill_rule, paint);
     }
 
     fn wide_tiles_per_row(&self) -> usize {

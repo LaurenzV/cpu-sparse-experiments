@@ -12,7 +12,10 @@ const TILE_WIDTH_SCALE: f32 = TILE_WIDTH as f32;
 const TILE_HEIGHT_SCALE: f32 = TILE_HEIGHT as f32;
 const INV_TILE_WIDTH_SCALE: f32 = 1.0 / TILE_WIDTH_SCALE;
 const INV_TILE_HEIGHT_SCALE: f32 = 1.0 / TILE_HEIGHT_SCALE;
-const NUDGE_FACTOR: f32 = 0.0000001;
+// The value of 8192.0 is mainly chosen for compatibility with the old cpu-sparse
+// implementation.
+const NUDGE_FACTOR: f32 = 1.0 / 8192.0;
+const SCALED_X_NUDGE_FACTOR: f32 = 1.0 / (8192.0 * 4.0);
 
 /// Handles the tiling of paths.
 #[derive(Clone, Debug)]
@@ -82,7 +85,7 @@ impl Tiles {
             // strip generation code, but it works for now.
             if p.x.fract() == 0.0 {
                 Point {
-                    x: p.x + NUDGE_FACTOR,
+                    x: p.x + SCALED_X_NUDGE_FACTOR,
                     y: p.y,
                 }
             } else {
@@ -209,7 +212,7 @@ impl Tiles {
 
                 for i in 0..tile_count_x - 1 {
                     let yclip = yclip0 + i as f32 * sign * slope;
-                    let yfrac = scale_up(yclip).max(0.0000001);
+                    let yfrac = scale_up(yclip).max(NUDGE_FACTOR);
                     let packed = Point::new(xclip, yfrac);
 
                     push_tile(x, y, last_packed, packed);
