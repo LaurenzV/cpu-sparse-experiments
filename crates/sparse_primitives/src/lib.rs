@@ -10,7 +10,6 @@ mod rect;
 pub mod render;
 mod strip;
 mod util;
-pub mod wide_tile;
 
 enum InnerContextType {
     Scalar(InnerContext<Scalar>),
@@ -244,7 +243,6 @@ fn select_inner_context(
 }
 
 use crate::render::InnerContext;
-use crate::wide_tile::WideTile;
 pub use pixmap::Pixmap;
 use vello_common::execute::{Avx2, ExecutionMode, Scalar};
 use vello_common::flatten::Line;
@@ -253,3 +251,4 @@ use vello_common::paint::Paint;
 use vello_common::peniko::{BlendMode, Fill};
 use vello_common::strip::Strip;
 use vello_common::tile::Tiles;
+use vello_common::wide::WideTile;

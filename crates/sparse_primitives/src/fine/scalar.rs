@@ -49,7 +49,7 @@ pub(crate) mod fill {
 pub(crate) mod strip {
     use crate::fine::{COLOR_COMPONENTS, TOTAL_STRIP_HEIGHT};
     use crate::util::scalar::div_255;
-    use crate::wide_tile::STRIP_HEIGHT;
+    use vello_common::strip::STRIP_HEIGHT;
 
     pub(crate) fn src_over(target: &mut [u8], cs: &[u8; COLOR_COMPONENTS], alphas: &[u32]) {
         for (cb, masks) in target.chunks_exact_mut(TOTAL_STRIP_HEIGHT).zip(alphas) {

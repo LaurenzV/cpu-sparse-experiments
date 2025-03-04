@@ -11,10 +11,11 @@ pub(crate) mod scalar;
 
 use crate::execute::KernelExecutor;
 use crate::util::ColorExt;
-use crate::wide_tile::{Cmd, STRIP_HEIGHT, WIDE_TILE_WIDTH};
 use std::marker::PhantomData;
 use vello_common::paint::Paint;
 use vello_common::peniko;
+use vello_common::strip::STRIP_HEIGHT;
+use vello_common::wide::{Cmd, WIDE_TILE_WIDTH};
 
 pub(crate) const COLOR_COMPONENTS: usize = 4;
 pub(crate) const TOTAL_STRIP_HEIGHT: usize = STRIP_HEIGHT * COLOR_COMPONENTS;

@@ -3,22 +3,18 @@
 
 use crate::execute::KernelExecutor;
 use crate::util::ColorExt;
-use crate::{
-    fine::Fine,
-    wide_tile::{Cmd, CmdStrip, WideTile, STRIP_HEIGHT, WIDE_TILE_WIDTH},
-    Pixmap,
-};
+use crate::{fine::Fine, Pixmap};
 use std::marker::PhantomData;
 use vello_common::color::palette::css::BLACK;
 use vello_common::color::AlphaColor;
-use vello_common::flatten;
 use vello_common::flatten::Line;
 use vello_common::kurbo::{Affine, BezPath, Cap, Join, Stroke};
 use vello_common::paint::Paint;
 use vello_common::peniko::{BlendMode, Compose, Fill, Mix};
-use vello_common::strip::Strip;
+use vello_common::strip::{Strip, STRIP_HEIGHT};
 use vello_common::tile::Tiles;
-use crate::wide_tile::generate_commands;
+use vello_common::wide::{WideTile, WIDE_TILE_WIDTH};
+use vello_common::{flatten, wide};
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
 
@@ -198,6 +194,13 @@ impl<KE: KernelExecutor> InnerContext<KE> {
 
     /// Generate the strip and fill commands for each wide tile using the current `strip_buf`.
     pub(crate) fn generate_commands(&mut self, fill_rule: Fill, paint: Paint) {
-        generate_commands(&self.strip_buf, &mut self.wide_tiles, fill_rule, paint, self.width, self.height);
+        wide::generate(
+            &self.strip_buf,
+            &mut self.wide_tiles,
+            fill_rule,
+            paint,
+            self.width,
+            self.height,
+        );
     }
 }
