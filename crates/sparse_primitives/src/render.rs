@@ -18,6 +18,7 @@ use vello_common::paint::Paint;
 use vello_common::peniko::{BlendMode, Compose, Fill, Mix};
 use vello_common::strip::Strip;
 use vello_common::tile::Tiles;
+use crate::wide_tile::generate_commands;
 
 pub(crate) const DEFAULT_TOLERANCE: f64 = 0.1;
 
@@ -34,8 +35,6 @@ pub(crate) struct InnerContext<KE: KernelExecutor> {
     pub(crate) transform: Affine,
     pub(crate) fill_rule: Fill,
     pub(crate) blend_mode: BlendMode,
-    // Whether the current context is cleared.
-    resetted: bool,
     phantom_data: PhantomData<KE>,
 }
 
@@ -55,7 +54,6 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         let line_buf = vec![];
         let tiles = Tiles::new();
         let strip_buf = vec![];
-        let cleared = true;
 
         let transform = Affine::IDENTITY;
         let fill_rule = Fill::NonZero;
@@ -82,7 +80,6 @@ impl<KE: KernelExecutor> InnerContext<KE> {
             fill_rule,
             stroke,
             blend_mode,
-            resetted: cleared,
             phantom_data: Default::default(),
         }
     }
@@ -134,13 +131,9 @@ impl<KE: KernelExecutor> InnerContext<KE> {
     }
 
     pub(crate) fn reset(&mut self) {
-        if !self.resetted {
-            for tile in &mut self.wide_tiles {
-                tile.bg = AlphaColor::TRANSPARENT;
-                tile.cmds.clear();
-            }
-
-            self.resetted = true;
+        for tile in &mut self.wide_tiles {
+            tile.bg = AlphaColor::TRANSPARENT;
+            tile.cmds.clear();
         }
     }
 
@@ -154,7 +147,7 @@ impl<KE: KernelExecutor> InnerContext<KE> {
                 let tile = &self.wide_tiles[y * width_tiles + x];
                 fine.clear(tile.bg.premultiply().to_rgba8_fast());
                 for cmd in &tile.cmds {
-                    fine.run_cmd(cmd, &self.alphas, cmd.compose());
+                    fine.run_cmd(cmd, &self.alphas, Compose::SrcOver);
                 }
                 fine.pack(x, y);
             }
@@ -203,97 +196,8 @@ impl<KE: KernelExecutor> InnerContext<KE> {
         self.generate_commands(fill_rule, paint);
     }
 
-    fn wide_tiles_per_row(&self) -> usize {
-        self.width.div_ceil(WIDE_TILE_WIDTH)
-    }
-
     /// Generate the strip and fill commands for each wide tile using the current `strip_buf`.
     pub(crate) fn generate_commands(&mut self, fill_rule: Fill, paint: Paint) {
-        let width_tiles = self.wide_tiles_per_row();
-
-        if self.strip_buf.is_empty() {
-            return;
-        }
-
-        // It's of course still possible that we end up drawing nothing, but better
-        // safe than sorry.
-        self.resetted = false;
-
-        for i in 0..self.strip_buf.len() - 1 {
-            let strip = &self.strip_buf[i];
-
-            if strip.x >= self.width as i32 {
-                // Don't render strips that are outside the viewport.
-                continue;
-            }
-
-            if strip.y >= self.height as u16 {
-                // Since strips are sorted by location, any subsequent strips will also be
-                // outside the viewport, so we can abort entirely.
-                break;
-            }
-
-            let next_strip = &self.strip_buf[i + 1];
-            // Currently, strips can also start at a negative x position, since we don't
-            // support viewport culling yet. However, when generating the commands
-            // we only want to emit strips >= 0, so we calculate the adjustment
-            // and then only include the alpha indices for columns where x >= 0.
-            let x0_adjustment = (strip.x).min(0).unsigned_abs();
-            let x0 = (strip.x + x0_adjustment as i32) as u32;
-            let y = strip.strip_y();
-            let row_start = y as usize * width_tiles;
-            let mut col = strip.col + x0_adjustment;
-            // Can potentially be 0, if the next strip's x values is also < 0.
-            let strip_width = next_strip.col.saturating_sub(col);
-            let x1 = x0 + strip_width;
-            let xtile0 = x0 as usize / WIDE_TILE_WIDTH;
-            // It's possible that a strip extends into a new wide tile, but we don't actually
-            // have as many wide tiles (e.g. because the pixmap width is only 512, but
-            // strip ends at 513), so take the minimum between the rounded values and `width_tiles`.
-            let xtile1 = (x1 as usize).div_ceil(WIDE_TILE_WIDTH).min(width_tiles);
-            let mut x = x0;
-
-            for xtile in xtile0..xtile1 {
-                let x_tile_rel = x % WIDE_TILE_WIDTH as u32;
-                let width = x1.min(((xtile + 1) * WIDE_TILE_WIDTH) as u32) - x;
-                let cmd = CmdStrip {
-                    x: x_tile_rel,
-                    width,
-                    alpha_ix: col as usize,
-                    paint: paint.clone(),
-                    compose: self.blend_mode.compose,
-                };
-                x += width;
-                col += width;
-                self.wide_tiles[row_start + xtile].push(Cmd::Strip(cmd));
-            }
-
-            let active_fill = match fill_rule {
-                Fill::NonZero => next_strip.winding != 0,
-                Fill::EvenOdd => next_strip.winding % 2 != 0,
-            };
-
-            if active_fill
-                && y == next_strip.strip_y()
-                // Only fill if we are actually inside the viewport.
-                && next_strip.x >= 0
-            {
-                x = x1;
-                let x2 = next_strip.x as u32;
-                let fxt0 = x1 as usize / WIDE_TILE_WIDTH;
-                let fxt1 = (x2 as usize).div_ceil(WIDE_TILE_WIDTH);
-                for xtile in fxt0..fxt1 {
-                    let x_tile_rel = x % WIDE_TILE_WIDTH as u32;
-                    let width = x2.min(((xtile + 1) * WIDE_TILE_WIDTH) as u32) - x;
-                    x += width;
-                    self.wide_tiles[row_start + xtile].fill(
-                        x_tile_rel,
-                        width,
-                        paint.clone(),
-                        self.blend_mode.compose,
-                    );
-                }
-            }
-        }
+        generate_commands(&self.strip_buf, &mut self.wide_tiles, fill_rule, paint, self.width, self.height);
     }
 }
